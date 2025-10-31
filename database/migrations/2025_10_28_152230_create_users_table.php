@@ -18,7 +18,7 @@ class CreateUsersTable extends Migration
             $table->dateTime('dateHourLastAccess')->nullable();
             $table->smallInteger('failedAttempts')->default(0);
             $table->boolean('blocked')->default(false);
-            $table->rememberToken();
+            $table->rememberToken(); // helper de Laravel que usa internamente pero al usar Sanctum, no es tan necesario
             $table->timestamps();
 
             $table->foreign('idRol')->references('id')->on('rol')->onDelete('restrict')->onUpdate('cascade');
