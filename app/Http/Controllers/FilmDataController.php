@@ -17,7 +17,8 @@ class FilmDataController extends Controller
 // con callbacks a funciones que traen de esta API campos que no se podrían encontrar en TMDB 
 // (A veces no se encuentran tampoco en WIKIDATA por películas poco conocidas o muy nuevas) 
 
-public function importFromTMDB($yearStart, $yearEnd, $pages = 1)
+public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 1)
+
 {
     $apiKey = config('services.tmdb.key'); // Guardado en config/services.php
 
@@ -26,7 +27,7 @@ public function importFromTMDB($yearStart, $yearEnd, $pages = 1)
         return response()->json(['error' => 'Falta la clave API de TMDb'], 500);
     }
 
-    $limit = 6; // PARA PRUEBAS: Manejar poniendo límite de 2-3 films y después --> ¡Cambiar a null o eliminar para traer todas las pelis!
+    $limit = 0; // PARA PRUEBAS: Manejar poniendo límite de 2-3 films y después --> ¡Cambiar a null o eliminar para traer todas las pelis!
     $insertadas = 0;
     $fallidas = 0;
 
@@ -36,7 +37,7 @@ public function importFromTMDB($yearStart, $yearEnd, $pages = 1)
     $wikidataCache = $this->loadWikidataCache(); // Carga/guarda la caché local de Wikidata para evitar repetir consultas SPARQL en importaciones masivas.
 
 
-    for ($page = 1; $page <= $pages; $page++) { // Para peticiones a la página discovery de TMDB descubrir películas filtradas y ordenadas
+    for ($page = $startPage; $page <= $endPage; $page++) { // Para peticiones a la página discovery de TMDB descubrir películas filtradas y ordenadas
                                                 // (fechas, género, idioma, país, etc.), sin necesidad de buscar por título específico a diferencia de la pág. search
         $url = "https://api.themoviedb.org/3/discover/movie?api_key=$apiKey&primary_release_date.gte={$yearStart}-01-01&primary_release_date.lte={$yearEnd}-12-31&page=$page&sort_by=popularity.desc";
         $response = Http::timeout(10)->get($url); // timeout() para tener un tope de espera en la petición y sino, se pasa al siguiente
@@ -49,7 +50,9 @@ public function importFromTMDB($yearStart, $yearEnd, $pages = 1)
         $data = $response->json();
         if (empty($data['results'])) continue;
 
-        foreach (array_slice($data['results'], 0, $limit) as $movie) {
+        // Nota: si limit es mayor que 0 (subir a más de 0 para pruebas), entonces se corta el array y trae esa cantidad de films, si limit = 0, trae todos los films
+        foreach (($limit > 0 ? array_slice($data['results'], 0, $limit) : $data['results']) as $movie) { 
+
             try {
                 // Comprobar si la película ya existe por rtitle y realease_date
                 $existingFilm = Film::where('title', $movie['title'])
@@ -208,6 +211,12 @@ public function importFromTMDB($yearStart, $yearEnd, $pages = 1)
                 Log::error("Error procesando {$movie['title']}: " . $e->getMessage());
             }
         }
+        // Sleep de seguridad entre páginas para no saturar las peticiones
+        sleep(1); // espera 1 segundo entre páginas
+        if ($page % 5 === 0) {
+            Log::info("Pausa de seguridad tras página $page...");
+            sleep(3); // cada 5 páginas, pausa más larga
+        }
     }
 
     Log::info("Importación en BD finalizada. Insertadas: $insertadas | Fallidas: $fallidas");
@@ -233,7 +242,13 @@ public function importFromTMDB($yearStart, $yearEnd, $pages = 1)
         SELECT ?awardLabel ?nomLabel ?festivalLabel WHERE {
         OPTIONAL { wd:$wikidataId wdt:P166 ?award. }     
         OPTIONAL { wd:$wikidataId wdt:P1411 ?nom. }       
-        OPTIONAL { wd:$wikidataId wdt:P1433 ?festival. } 
+        OPTIONAL {
+            { wd:$wikidataId wdt:P4232 ?festival. }
+            UNION
+            { wd:$wikidataId wdt:P1433 ?festival. }
+            UNION
+            { wd:$wikidataId wdt:P1191 ?festival. }
+        }
         SERVICE wikibase:label { bd:serviceParam wikibase:language 'en,es'. }
         }");
 
