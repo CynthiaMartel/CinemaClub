@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\AuthRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -12,22 +13,12 @@ class AuthController extends Controller
 {
     // LOGIN: autentica al usuario y devuelve un token Sanctum
 
-    public function login(Request $request)
+    public function login(AuthRequest $request)
     {
-        // Validar campos para loguin con EMAIL y PASSWORD
-        $validated = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => [
-                'required',
-                'string',
-                // Nota: Laravel permite poner condiciones en la validación:
-                'min:8', // Mínimo 8 caracteres
-                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*#?&]).+$/' // Al menos una mayúscula, una minúscula, un número y un símbolo especial
-            ],
-        ]);
+        // Validar campos para loguin con EMAIL y PASSWORD (ya lo hace AuthRequest)
 
-        $email = $validated['email'];
-        $password = $validated['password'];
+        $email = $request->email;
+        $password = $request->password;
 
         // LIMITADOR DE INTENTOS FALLIDOS: si usuario falla al loguearse más de 5 veces en 1 min., no se deja que el usuario vuelva a intentar el log durante unos segundos  
         // Nota: Sistema de protección temporal que no marca al usuario como bloqueado sino que evita ataque desde mismo IP o mismo mail un tiempo
@@ -97,7 +88,7 @@ class AuthController extends Controller
         ], 200);
     }
 
-    // LOGOUT: revoca el token actual // Nota: lleva mildware asegurando que el usuario haya iniciado sesión en rutas (auth:sanctum)
+    // LOGOUT: revoca el token actual // Nota: En la ruta, lleva mildware asegurando que el usuario haya iniciado sesión (auth:sanctum)
     
     public function logout(Request $request)
     {
@@ -109,7 +100,12 @@ class AuthController extends Controller
         ]);
     }
 
-    // ME: para comprobar si el token Sanctum sigue siendo válido y obtener información del usuario logueado. //  Nota: lleva mildware asegurando que el usuario haya iniciado sesión en rutas (auth:sanctum)
+    // checkSession(): para obtener información del usuario autentificado mediante tokens Sanctum. 
+    // Usado para saber si la sesión sigue activa y obtener datos delusuario en diferentes partes del código: como votar, escribir reseñas, por ej.
+
+    // Nota: En la ruta, lleva mildware que valida automáticament el token recibido en cabexera en la cabecera 'Authorization: Bearer <token>, antes de utilizar este controlador,
+    // y Laravel inyecta el usuario autenticado en $request->user(), si token es válido.
+    // Aunque, esto ya se hace de forma automática por Sanctu, tenemos esta función para usarla estretégicamente en otras partes del código devolviendo la información útil y eprsonalizada del usuario (como ip, role, blocked..)
     
     public function checkSession (Request $request)
     {
@@ -129,3 +125,4 @@ class AuthController extends Controller
         ]);
     }
 }
+
