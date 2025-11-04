@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 // Validaciones para usar en el LOGIN en Controllers/AuthController.php
+
 class AuthRequest extends FormRequest
 {
     // Autorizar el uso de este Request devolveindo true 
