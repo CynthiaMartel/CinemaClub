@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\FilmController;
 use App\Http\Controllers\FilmDataController;
 use App\Http\Controllers\TestsDBApisController;
@@ -9,15 +11,15 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-// FilmController CRUD llenado manual de datos de películas
+// --RUTAS CRUD: FilmController CRUD llenado manual de datos de películas-- //
 Route::get('/films', [FilmController::class, 'index'])->name('films.index'); // Obtener datos listado de películas
 Route::get('/films/{film}', [FilmController::class, 'show'])->name('films.show'); // Obtener datos de una película concreta
 Route::post('/films', [FilmController::class, 'store'])->name('films.store'); // Guardado de películas
 Route::put('/films/{film}', [FilmController::class, 'update'])->name('films.update'); // Actualizar una película 
 Route::delete('/films/{film}', [FilmController::class, 'destroy'])->name('films.destroy'); // Borrado de una película
+//----------------------------------------------------------------------------//
 
-
-//-------- RUTAS TEMPORALES PARA PROBAR TRAER DATOS DESDE API TMDB Y API WIKI DATA EN POSTMAN ------------
+//-------- RUTAS TEMPORALES PARA PROBAR TRAER DATOS DESDE API TMDB Y API WIKI DATA EN POSTMAN ------------//
 
 // Ruta para obtener el token CSRF desde Postman o cliente externo
 Route::get('/csrf-token', function () {
@@ -33,7 +35,7 @@ Route::get('/films/test_wikidata/{wikidataId}', [TestsDBApisController::class, '
 // Test WikiData solo lectura, para saber si busca por título
 Route::get('/wikidata/test_title_wikidata/{title}', [TestsDBApisController::class, 'testFindWikidataIdByTitle']);
 
-//----------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------//
 
 //Routa para importar desde APIs wikidata y tmdb --> poblar y guardar en BD (si en la función se cambia la variable limit por un núnero reducido, puede servir de prueba rápida para ver si se puebla la BD correctamente)
 Route::post('/films/import/{yearStart}/{yearEnd}/{startPage?}/{endPage?}', [FilmDataController::class, 'importFromTMDB'])->name('films.import');
@@ -45,20 +47,31 @@ Route::post('/films/import/{start}/{end}/{from}/{to}', function($start,$end,$fro
     ]);
 });
 
-Route::post('/import/tmdb/async', [FilmDataController::class, 'importFromTMDBAsync']); // Para invocar un botón (ej en fronted y así importar las películas)
+//-------------------------------------------------------------------------------------------------------------------------//
 
 
-// RUTAS AUTH: rutas de autentificación con login, logout y comprobación de sesión. Respuesta Json y tokens Sanctum
+// --RUTAS AUTH: rutas de autentificación con login, logout, comprobación de sesión (en AuthController) y registro de creación de nueva cuenta (RegisterController) --// 
 
 // LOGIN: inicia sesión y devuelve token
-Route::post('/login', [AuthController::class, 'login'])->name('login');
+Route::post('/api/login', [AuthController::class, 'login'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class) // Quita guardia de CSRF propio de formularios web: acepta peticiones API (JSON, sin cookies,) al trabajar con api
+    ->name('api.login');
 
 // LOGOUT: cierra sesión (requiere token Sanctum)
-Route::post('/logout', [AuthController::class, 'logout'])
-    ->middleware('auth:sanctum')
-    ->name('logout');
+Route::post('/api/logout', [AuthController::class, 'logout'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class) // Quita guardia de CSRF propio de formularios web: acepta peticiones API (JSON, sin cookies,) al trabajar con api
+    ->middleware('auth:sanctum') //Activa guardia sanctum: con middleware comprueba que el token que se genera, corresponde a usuario autenticado 
+    ->name('api.logout');        // mildware Necesario ya que para hacer logout, tiene que estar logueado primero y por lo tanto tener un token)
+    
 
 // CHECK SESSION: devuelve usuario autenticado si el token es válido
-Route::get('/check-session', [AuthController::class, 'checkSession'])
-    ->middleware('auth:sanctum')
-    ->name('checkSession');
+Route::get('/api/check-session', [AuthController::class, 'checkSession'])
+    ->middleware('auth:sanctum') // Activa guardia sanctum: middleware para comprobar token, ya que hay sesión cuando el usuario está logueado 
+    ->name('api.checkSession');  // No se pone withoutMiddleware porque peticiones tipo GET no necesitan token Bearer
+
+// REGISTER: crea una nueva cuenta de usuario
+Route::post('/api/register', [RegisterController::class, 'register'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class) // Quita guardia de CSRF propio de formularios web: acepta peticiones API (JSON, sin cookies,) al trabajar con api
+    ->name('api.register');
+
+// ----------------------------------------------------------------------------------------- //
