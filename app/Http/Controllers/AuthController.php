@@ -117,9 +117,11 @@ class AuthController extends Controller
                 'id'            => $user->id,
                 'name'          => $user->name,
                 'email'         => $user->email,
-                'role'          => optional($user->role)->rolType,
+                'role'          => optional($user->role)->rolType, //optional por si el usuario no tiene asignado el rol para que pueda existir este campo con null sin romper código ()
                 'blocked'       => (bool) $user->blocked,
-                'lastAccessAt'  => optional($user->dateHourLastAccess)->toDateTimeString(),
+                'passwordChangedAt' => optional($user->password_changed_at)->toDateTimeString(), //optional por si el usuario nunca ha cambiado la contraseña para que pueda existir este campo con null sin romper código (hay una llamada a un método dentro de este campo y si fuese null, de devolvería un error fatal)
+
+                'lastAccessAt'  => optional($user->dateHourLastAccess)->toDateTimeString(), //optinal por si el usuario no ha iniciado sesión todavía  para que pueda existir este campo con null sin romper código (hay una llamada a un método dentro de este campo y si fuese null, de devolvería un error fatal)
                 'lastAccessIp'  => $user->ipLastAccess,
             ],
         ]);
