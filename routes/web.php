@@ -1,11 +1,13 @@
 <?php
 
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\FilmController;
 use App\Http\Controllers\FilmDataController;
 use App\Http\Controllers\TestsDBApisController;
 use Illuminate\Support\Facades\Route;
+
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\RegisterController;
+use App\Http\Controllers\ChangePasswordController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -37,7 +39,7 @@ Route::get('/wikidata/test_title_wikidata/{title}', [TestsDBApisController::clas
 
 //----------------------------------------------------------------------------------------------------------------//
 
-//Routa para importar desde APIs wikidata y tmdb --> poblar y guardar en BD (si en la función se cambia la variable limit por un núnero reducido, puede servir de prueba rápida para ver si se puebla la BD correctamente)
+//Ruta para importar desde APIs wikidata y tmdb --> poblar y guardar en BD (si en la función se cambia la variable limit por un núnero reducido, puede servir de prueba rápida para ver si se puebla la BD correctamente)
 Route::post('/films/import/{yearStart}/{yearEnd}/{startPage?}/{endPage?}', [FilmDataController::class, 'importFromTMDB'])->name('films.import');
 
 // Ruta para manejar el Job por si usamos Postman o desde la Web
@@ -60,18 +62,25 @@ Route::post('/api/login', [AuthController::class, 'login'])
 // LOGOUT: cierra sesión (requiere token Sanctum)
 Route::post('/api/logout', [AuthController::class, 'logout'])
     ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class) // Quita guardia de CSRF propio de formularios web: acepta peticiones API (JSON, sin cookies,) al trabajar con api
-    ->middleware('auth:sanctum') //Activa guardia sanctum: con middleware comprueba que el token que se genera, corresponde a usuario autenticado 
+    ->middleware('auth:sanctum') //Activa guardia sanctum: con middleware comprueba que el token que se genera, correspondiendo a usuario autenticado 
     ->name('api.logout');        // mildware Necesario ya que para hacer logout, tiene que estar logueado primero y por lo tanto tener un token)
     
 
-// CHECK SESSION: devuelve usuario autenticado si el token es válido
+// CHECK SESSION: devuelve usuario autenticado si el token es válido (Requiere token Sanctum)
 Route::get('/api/check-session', [AuthController::class, 'checkSession'])
     ->middleware('auth:sanctum') // Activa guardia sanctum: middleware para comprobar token, ya que hay sesión cuando el usuario está logueado 
     ->name('api.checkSession');  // No se pone withoutMiddleware porque peticiones tipo GET no necesitan token Bearer
 
-// REGISTER: crea una nueva cuenta de usuario
+// ----------------------------------------------------------------------------------------- //
+
+// --RUTA REGISTER: para crea una nueva cuenta de usuario (en RegisterController)-- //
 Route::post('/api/register', [RegisterController::class, 'register'])
     ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class) // Quita guardia de CSRF propio de formularios web: acepta peticiones API (JSON, sin cookies,) al trabajar con api
     ->name('api.register');
-
 // ----------------------------------------------------------------------------------------- //
+
+// --RUTA CHANGE PASSWORD: para cambiar contraseña a otra nueva o (en ChangePasswordController) (requiere token Sanctum)--//
+Route::post('/api/change-password', [ChangePasswordController::class, 'update']) 
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('auth:sanctum')
+    ->name('api.changePassword');
