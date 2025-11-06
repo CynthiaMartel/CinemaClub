@@ -1,8 +1,9 @@
 <?php
+
 namespace App\Models;
 
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
@@ -12,7 +13,14 @@ class User extends Authenticatable
     protected $table = 'users';
 
     protected $fillable = [
-        'name', 'email', 'password', 'idRol', 'ipLastAccess', 'dateHourLastAccess', 'failedAttempts', 'blocked'
+        'name',
+        'email',
+        'password',
+        'idRol',
+        'ipLastAccess',
+        'dateHourLastAccess',
+        'failedAttempts',
+        'blocked'
     ];
 
     protected $hidden = [
@@ -25,6 +33,8 @@ class User extends Authenticatable
         'blocked' => 'boolean',
         'dateHourLastAccess' => 'datetime',
     ];
+
+    // RELACIONES 
 
     public function role()
     {
@@ -39,6 +49,34 @@ class User extends Authenticatable
     public function individualRates()
     {
         return $this->hasMany(IndividualRate::class, 'idUser');
+    }
+
+    // MÉTODOS DE ROL 
+
+    // Verificar si el usuario tiene rol de Admin (en BD Admin tiene id = 1)
+
+    public function isAdmin()
+    {
+        return $this->role && $this->role->rolType === 'Admin';
+    }
+
+    // Verifica si el usuario tiene rol de Editor (en BD Editor tiene id=2 )
+    
+    public function isEditor()
+    {
+        return $this->role && $this->role->rolType === 'Editor';
+    }
+
+    // Verifica si el usuario tiene rol de User (usuario "regular". En BD User tiene id=3)
+    public function isUser()
+    {
+        return $this->role && $this->role->rolType === 'User';
+    }
+
+    //  Verifica si el usuario es Admin o Editor (para editar, crear, borrar posts, etc)
+    public function isAdminOrEditor()
+    {
+        return $this->isAdmin() || $this->isEditor();
     }
 }
 
