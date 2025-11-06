@@ -9,6 +9,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\ChangePasswordController;
 
+use App\Http\Controllers\PostController;
+
 Route::get('/', function () {
     return view('welcome');
 });
@@ -84,3 +86,27 @@ Route::post('/api/change-password', [ChangePasswordController::class, 'update'])
     ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
     ->middleware('auth:sanctum')
     ->name('api.changePassword');
+
+// ----
+Route::get('/api/post-index', [PostController::class, 'index'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->name('api.post.index');
+
+Route::post('/api/post-store', [PostController::class, 'store'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('auth:sanctum')
+    ->name('api.post.store');
+
+Route::get('/api/post-show/{id}', [PostController::class, 'show'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->name('api.post.show');
+
+Route::put('/api/post-update/{id}', [PostController::class, 'update'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('auth:sanctum')
+    ->name('api.post.update');
+
+Route::delete('/api/post-destroy/{id}', [PostController::class, 'destroy'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('auth:sanctum')
+    ->name('api.post.destroy');
