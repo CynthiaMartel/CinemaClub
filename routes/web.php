@@ -9,6 +9,8 @@ use App\Http\Controllers\TestsDBApisController;
 
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\UserProfileController;
+use App\Http\Controllers\UserFilmActionController;
+
 
 use Illuminate\Support\Facades\Route;
 
@@ -127,43 +129,66 @@ Route::delete('/api/post-destroy/{id}', [PostController::class, 'destroy'])
     ->name('api.post.destroy');
 
 
-
 /*
 |--------------------------------------------------------------------------
 |     -- RUTAS DE API USER PROFILE --
 |--------------------------------------------------------------------------
 */
 
-// MOSTRAR todos los perfiles -> Si es ADMIN 
-Route::get('/api/user_profiles/index', [UserProfileController::class, 'index'])
-    ->middleware('auth:sanctum')
-    ->name('api.user_profiles.index');
+Route::middleware('auth:sanctum')->prefix('api')->group(function () {
 
-// CREAR NUEVO PERFIL -> Si es ADMIN 
-Route::post('/api/user_profiles/store', [UserProfileController::class, 'store'])
-    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
-    ->middleware('auth:sanctum')
-    ->name('api.user_profiles.store');
+    // MOSTRAR todos los perfiles -> Si es ADMIN 
+    Route::get('/user_profiles/index', [UserProfileController::class, 'index'])
+        ->name('api.user_profiles.index');
 
+    // CREAR NUEVO PERFIL -> Si es ADMIN 
+    Route::post('/user_profiles/store', [UserProfileController::class, 'store'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.user_profiles.store');
 
-// MOSTRAR PERFIL POR ID DEL USER -> Si es ADMIN o USER REGULAR LOGEUADO 
-Route::get('/api/user_profiles/show/{userId?}', [UserProfileController::class, 'show'])
-    ->middleware('auth:sanctum')
-    ->name('api.user-profiles.show');
+    // MOSTRAR PERFIL POR ID DEL USER -> Si es ADMIN o USER REGULAR LOGEUADO 
+    Route::get('/user_profiles/show/{userId?}', [UserProfileController::class, 'show'])
+        ->name('api.user_profiles.show');
 
+    // ACTUALIZAR PERFIL -> Si es ADMIN o USER LOGUEADO
+    Route::put('/user_profiles/update/{userId}', [UserProfileController::class, 'update'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.user_profiles.update');
 
-// ACTUALIZAR PERFIL -> Si es ADMIN o USER LOGUEADO
-Route::put('/api/user_profiles/update/{userId}', [UserProfileController::class, 'update'])
-    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
-    ->middleware('auth:sanctum')
-    ->name('api.user_profiles.update');
-
-// ELIMINAR PERFIL -> Si es ADMIN 
-Route::delete('/api/user_profiles/delete/{id}', [UserProfileController::class, 'destroy'])
-    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
-    ->middleware('auth:sanctum')
-    ->name('api.user_profiles.destroy');
+    // ELIMINAR PERFIL -> Si es ADMIN 
+    Route::delete('/user_profiles/delete/{id}', [UserProfileController::class, 'destroy'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.user_profiles.destroy');
+});
 
 
+
+/*
+|--------------------------------------------------------------------------
+|     -- RUTAS USER FILMS ACTIONS --
+|--------------------------------------------------------------------------
+*/
+// Rutas para Crear o actualizar sección de favs, watch later, watched... ; eliminar alguna de estas; mostrar listas de favs, ratings, etc; mostrar estadísticas
+
+    Route::middleware('auth:sanctum')->prefix('api')->group(function () {
+
+    // CREAR/ACTUALIZAR una acción de usuario (favorito, ver más tarde, vista, puntuación, etc.)
+    Route::post('/films/createOrEdit/{filmId}', [UserFilmActionController::class, 'storeOrUpdate'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.films.action.createOrEdit');
+
+    // DESMARCAR una acción específica (quitar favorito, reseña, etc.)
+    Route::delete('/films/unmarkAction/{filmId}', [UserFilmActionController::class, 'unmarkAction'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.films.action.unmarkAction');
+
+    // MOSTRAR LISTAS de películas según tipo de acción (favorites, watch_later, watched, rating)
+    Route::get('/my_films', [UserFilmActionController::class, 'showUserFilmCollection'])
+        ->name('api.user.films.my_films');
+
+    // MOSTRAR ESTADÍSTICAS de actividad del usuario (admin o logueado)
+    Route::get('/user_films/stats/{userId?}', [UserFilmActionController::class, 'showStats'])
+        ->name('api.user.films.stats');
+});
 
 
