@@ -34,7 +34,7 @@ class User extends Authenticatable
         'dateHourLastAccess' => 'datetime',
     ];
 
-    // RELACIONES 
+    // RELACIONES ROLE, POST
 
     public function role()
     {
@@ -46,10 +46,29 @@ class User extends Authenticatable
         return $this->hasMany(Post::class, 'idUser');
     }
 
-    public function individualRates()
+    // RELACIONES SOCIALMEDIA
+    public function profile()
     {
-        return $this->hasMany(IndividualRate::class, 'idUser');
+        return $this->hasOne(UserProfile::class);
     }
+
+    public function filmActions()
+    {
+        return $this->hasMany(UserFilmAction::class, 'idUser');
+    }
+
+    public function followers()
+    {
+        return $this->hasMany(UserFriends::class, 'followed_id')
+                    ->where('status', 'accepted');
+    }
+
+    public function followings()
+    {
+        return $this->hasMany(UserFriends::class, 'follower_id')
+                    ->where('status', 'accepted');
+    }
+
 
     // MÉTODOS DE ROL 
 
