@@ -2,24 +2,39 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\RegisterController;
+
 use App\Http\Controllers\FilmController;
 use App\Http\Controllers\FilmDataController;
 use App\Http\Controllers\TestsDBApisController;
+
+use App\Http\Controllers\PostController;
+use App\Http\Controllers\UserProfileController;
+
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
+
+/*
+|--------------------------------------------------------------------------
+|  --RUTAS CRUD FILMS--
+|--------------------------------------------------------------------------
+*/
 // --RUTAS CRUD: FilmController CRUD llenado manual de datos de películas-- //
 Route::get('/films', [FilmController::class, 'index'])->name('films.index'); // Obtener datos listado de películas
 Route::get('/films/{film}', [FilmController::class, 'show'])->name('films.show'); // Obtener datos de una película concreta
 Route::post('/films', [FilmController::class, 'store'])->name('films.store'); // Guardado de películas
 Route::put('/films/{film}', [FilmController::class, 'update'])->name('films.update'); // Actualizar una película 
 Route::delete('/films/{film}', [FilmController::class, 'destroy'])->name('films.destroy'); // Borrado de una película
-//----------------------------------------------------------------------------//
 
-//-------- RUTAS TEMPORALES PARA PROBAR TRAER DATOS DESDE API TMDB Y API WIKI DATA EN POSTMAN ------------//
+/*
+|--------------------------------------------------------------------------
+|  --RUTAS DE PRUEBA CONEXIÓN APIS Y LLENADO DE BD--
+|--------------------------------------------------------------------------
+*/
+// --Rutas para probar traer datos desde API TMDB y API WIKIDATA vía Postman o similar, y comprobar la conexión a estas APIS-- //
 
 // Ruta para obtener el token CSRF desde Postman o cliente externo
 Route::get('/csrf-token', function () {
@@ -35,9 +50,13 @@ Route::get('/films/test_wikidata/{wikidataId}', [TestsDBApisController::class, '
 // Test WikiData solo lectura, para saber si busca por título
 Route::get('/wikidata/test_title_wikidata/{title}', [TestsDBApisController::class, 'testFindWikidataIdByTitle']);
 
-//----------------------------------------------------------------------------------------------------------------//
 
-//Routa para importar desde APIs wikidata y tmdb --> poblar y guardar en BD (si en la función se cambia la variable limit por un núnero reducido, puede servir de prueba rápida para ver si se puebla la BD correctamente)
+/*
+|--------------------------------------------------------------------------
+|  --RUTAS IMPORTACIÓN DATOS A BD--
+|--------------------------------------------------------------------------
+*/
+// --Rutas para importar desde APIs wikidata y tmdb --> poblar y guardar en BD (si en la función se cambia la variable limit por un núnero reducido, puede servir de prueba rápida para ver si se puebla la BD correctamente)
 Route::post('/films/import/{yearStart}/{yearEnd}/{startPage?}/{endPage?}', [FilmDataController::class, 'importFromTMDB'])->name('films.import');
 
 // Ruta para manejar el Job por si usamos Postman o desde la Web
@@ -47,10 +66,13 @@ Route::post('/films/import/{start}/{end}/{from}/{to}', function($start,$end,$fro
     ]);
 });
 
-//-------------------------------------------------------------------------------------------------------------------------//
 
-
-// --RUTAS AUTH: rutas de autentificación con login, logout, comprobación de sesión (en AuthController) y registro de creación de nueva cuenta (RegisterController) --// 
+/*
+|--------------------------------------------------------------------------
+|  --RUTAS AUTH--
+|--------------------------------------------------------------------------
+*/
+// --Rutas de autentificación con login, logout, comprobación de sesión (en AuthController) y registro de creación de nueva cuenta (RegisterController) --// 
 
 // LOGIN: inicia sesión y devuelve token
 Route::post('/api/login', [AuthController::class, 'login'])
@@ -74,4 +96,74 @@ Route::post('/api/register', [RegisterController::class, 'register'])
     ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class) // Quita guardia de CSRF propio de formularios web: acepta peticiones API (JSON, sin cookies,) al trabajar con api
     ->name('api.register');
 
-// ----------------------------------------------------------------------------------------- //
+
+/*
+|--------------------------------------------------------------------------
+|  -- RUTAS NOTICIAS (POSTS): PostController --
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/api/post-index', [PostController::class, 'index'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->name('api.post.index');
+
+Route::post('/api/post-store', [PostController::class, 'store'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('auth:sanctum')
+    ->name('api.post.store');
+
+Route::get('/api/post-show/{id}', [PostController::class, 'show'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->name('api.post.show');
+
+Route::put('/api/post-update/{id}', [PostController::class, 'update'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('auth:sanctum')
+    ->name('api.post.update');
+
+Route::delete('/api/post-destroy/{id}', [PostController::class, 'destroy'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('auth:sanctum')
+    ->name('api.post.destroy');
+
+
+
+/*
+|--------------------------------------------------------------------------
+|     -- RUTAS DE API USER PROFILE --
+|--------------------------------------------------------------------------
+*/
+
+// MOSTRAR todos los perfiles -> Si es ADMIN 
+Route::get('/api/user_profiles/index', [UserProfileController::class, 'index'])
+    ->middleware('auth:sanctum')
+    ->name('api.user_profiles.index');
+
+// CREAR NUEVO PERFIL -> Si es ADMIN 
+Route::post('/api/user_profiles/store', [UserProfileController::class, 'store'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('auth:sanctum')
+    ->name('api.user_profiles.store');
+
+
+// MOSTRAR PERFIL POR ID DEL USER -> Si es ADMIN o USER REGULAR LOGEUADO 
+Route::get('/api/user_profiles/show/{userId?}', [UserProfileController::class, 'show'])
+    ->middleware('auth:sanctum')
+    ->name('api.user-profiles.show');
+
+
+// ACTUALIZAR PERFIL -> Si es ADMIN o USER LOGUEADO
+Route::put('/api/user_profiles/update/{userId}', [UserProfileController::class, 'update'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('auth:sanctum')
+    ->name('api.user_profiles.update');
+
+// ELIMINAR PERFIL -> Si es ADMIN 
+Route::delete('/api/user_profiles/delete/{id}', [UserProfileController::class, 'destroy'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('auth:sanctum')
+    ->name('api.user_profiles.destroy');
+
+
+
+
