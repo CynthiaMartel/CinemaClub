@@ -1,31 +1,74 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+namespace App\Models;
 
-return new class extends Migration {
-    public function up(): void
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class UserFilmActions extends Model
+{
+    use HasFactory;
+   
+    protected $table = 'user_film_actions';
+
+
+    protected $fillable = [
+        'idUser',
+        'idFilm',
+        'is_favorite',
+        'watch_later',
+        'watched',
+        'rating',
+        'short_review',
+        'visibility',
+    ];
+
+   
+    protected $casts = [
+        'is_favorite' => 'boolean',
+        'watch_later' => 'boolean',
+        'watched'     => 'boolean',
+        'rating'      => 'integer',
+    ];
+
+  
+    public function user()
     {
-        Schema::create('user_film_actions', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('idUser')->constrained('user')->onDelete('cascade');
-            $table->foreignId('idFilm')->constrained('films')->onDelete('cascade');
-            $table->boolean('is_favorite')->default(false);
-            $table->boolean('watch_later')->default(false);
-            $table->boolean('watched')->default(false);
-            $table->tinyInteger('rating')->unsigned()->nullable(); // 1-5 estrellas 
-            $table->string('short_review', 500)->nullable();
-            $table->enum('visibility', ['public', 'friends', 'private'])->default('public');
-            $table->timestamps();
-
-            $table->unique(['idUser', 'idFilm']);
-        });
+        return $this->belongsTo(User::class, 'idUser');
     }
 
-    public function down(): void
+    public function film()
     {
-        Schema::dropIfExists('user_film_actions');
+        return $this->belongsTo(Film::class, 'idFilm', 'idFilm');
     }
-};
+
+   
+    public function scopePublic($query)
+    {
+        return $query->where('visibility', 'public');
+    }
+
+    
+    public function scopeFavorites($query)
+    {
+        return $query->where('is_favorite', true);
+    }
+
+    public function scopeWatchLater($query)
+    {
+        return $query->where('watch_later', true);
+    }
+
+    
+    public function scopeWatched($query)
+    {
+        return $query->where('watched', true);
+    }
+
+    public function scopeRated($query)
+    {
+        return $query->whereNotNull('rating');
+    }
+}
+
 
