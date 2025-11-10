@@ -32,6 +32,13 @@ class Film extends Model
     {
         return $this->cast()->wherePivot('role', 'Director');
     }
+
+
+    public function comments()
+    {
+        return $this->morphMany(UserComment::class, 'commentable');
+    }
+
 }
 
 

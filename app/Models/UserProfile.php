@@ -19,7 +19,7 @@ class UserProfile extends Model
         'bio',
         'location',
         'website',
-        'top_5_films',
+        'top_5_films', // películas favoritas de usuario para el perfil personal
         'films_seen',
         'films_rated',
         'films_seen_this_year',
@@ -34,10 +34,8 @@ class UserProfile extends Model
         'top_5_films' => 'array',
     ];
 
-    /**
-     * Relación inversa con User.
-     * Un perfil pertenece a un usuario.
-     */
+    //Relación inversa con User-
+    
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
