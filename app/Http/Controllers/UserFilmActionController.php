@@ -39,7 +39,8 @@ class UserFilmActionController extends Controller
         $action->fill($validated);
         $action->save();
 
-        // Si el usuario puntua la película, actualizar promedio directamente desde user_film_actions
+        // Si el usuario puntua la película, se actualiza individualRate(siendo un promedio de votaciones de usuarios de un films, en tabla films) 
+        // directamente desde user_film_actions con 'rating'
         if (isset($validated['rating'])) {
             $average = UserFilmActions::where('idFilm', $filmId)
                 ->whereNotNull('rating')
