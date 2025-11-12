@@ -57,30 +57,36 @@ class User extends Authenticatable
         return $this->hasMany(UserFilmAction::class, 'idUser');
     }
 
+    // Seguidores: usuarios que siguen al user (FOLLOWERS)
     public function followers()
     {
-        return $this->hasMany(UserFriends::class, 'followed_id')
+        return $this->hasMany(UserFriend::class, 'followed_id')
                     ->where('status', 'accepted');
     }
 
+    // Seguidos: usuarios que sigue el user (FOLLOWINGS)
     public function followings()
     {
-        return $this->hasMany(UserFriends::class, 'follower_id')
+        return $this->hasMany(UserFriend::class, 'follower_id')
                     ->where('status', 'accepted');
     }
 
+    // Usuarios que he bloqueado
+    public function blockedUsers()
+    {
+        return $this->hasMany(UserFriend::class, 'follower_id')
+                    ->where('status', 'blocked');
+    }
 
     // MÉTODOS DE ROL 
 
     // Verificar si el usuario tiene rol de Admin (en BD Admin tiene id = 1)
-
     public function isAdmin()
     {
         return $this->role && $this->role->rolType === 'Admin';
     }
 
     // Verifica si el usuario tiene rol de Editor (en BD Editor tiene id=2 )
-    
     public function isEditor()
     {
         return $this->role && $this->role->rolType === 'Editor';
@@ -92,10 +98,11 @@ class User extends Authenticatable
         return $this->role && $this->role->rolType === 'User';
     }
 
-    //  Verifica si el usuario es Admin o Editor (para editar, crear, borrar posts, etc)
+    // Verifica si el usuario es Admin o Editor (para editar, crear, borrar posts, etc)
     public function isAdminOrEditor()
     {
         return $this->isAdmin() || $this->isEditor();
     }
 }
+
 
