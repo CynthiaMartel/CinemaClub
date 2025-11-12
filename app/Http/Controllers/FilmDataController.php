@@ -68,6 +68,14 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
                     "https://api.themoviedb.org/3/movie/{$movie['id']}?api_key=$apiKey&append_to_response=credits,external_ids"
                 );
 
+                if ($detailsResponse->status() === 429) { // Incluir error 429 y sleep
+                Log::warning("TMDb devolvió 429 (demasiadas peticiones) en detalles de película {$movie['id']}. Esperando 30s...");
+                sleep(30);
+                $detailsResponse = Http::timeout(10)->get(
+                    "https://api.themoviedb.org/3/movie/{$movie['id']}?api_key=$apiKey&append_to_response=credits,external_ids"
+                );
+                }
+
                 if (!$detailsResponse->successful()) {
                     Log::warning("Fallo al obtener detalles de TMDb para ID {$movie['id']}");
                     $fallidas++;
@@ -206,6 +214,8 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
 
                 $insertadas++;
                 Log::info("Película guardada en BD: {$film->title}");
+
+                usleep(400000); // Pausa después de procesar cada película para dar tiempo entre peticiones
             } catch (\Throwable $e) {
                 $fallidas++;
                 Log::error("Error procesando {$movie['title']}: " . $e->getMessage());
@@ -296,6 +306,12 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
         $url = "https://query.wikidata.org/sparql?query=$query&format=json";
 
         $response = Http::timeout(10)->get($url);
+
+        if ($response->status() === 429) { //Para manejar el error 429 (TMDB API puede cortar por demasiadas peticiones)
+        Log::warning("TMDb devolvió 429 (demasiadas peticiones). Esperando 30s antes de reintentar...");
+        sleep(30);
+        $response = Http::timeout(10)->get($url);
+        }
 
         if ($response->successful() && !empty($response['results']['bindings'][0]['item']['value'])) {
             return basename($response['results']['bindings'][0]['item']['value']); // Devuelve Qxxxx
