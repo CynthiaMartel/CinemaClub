@@ -10,11 +10,11 @@ return new class extends Migration {
         Schema::create('user_saved_lists', function (Blueprint $table) {
             $table->increments('id'); // igual que en users y user_entries
 
-            // 🔹 Usuario que guarda la lista
+            // Para que usuario guarde la lista
             $table->unsignedInteger('user_id');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
 
-            // 🔹 ID de la lista guardada (entrada tipo user_list)
+            // Para ID de la lista guardada (entrada tipo user_list)
             $table->unsignedInteger('user_entry_id');
             $table->foreign('user_entry_id')->references('id')->on('user_entries')->onDelete('cascade');
 
