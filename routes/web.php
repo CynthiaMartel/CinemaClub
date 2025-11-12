@@ -15,7 +15,9 @@ use App\Http\Controllers\UserEntryController;
 use App\Http\Controllers\UserCommentController;
 use App\Http\Controllers\UserSavedListController;
 use App\Http\Controllers\UserEntryFilmController;
+use App\Http\Controllers\UserFriendsController;
 
+use App\Http\Controllers\UserFeedController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -292,3 +294,58 @@ Route::middleware('auth:sanctum')->prefix('api')->group(function () {
 
 });
 
+
+/*
+|--------------------------------------------------------------------------
+|     -- RUTAS USER FRIENDS --
+|--------------------------------------------------------------------------
+*/
+// Rutas para relaciones de amigos del user en UserFriendsController (flistas followers, followings, seguir, bloquear...)
+Route::middleware('auth:sanctum')->prefix('api')->group(function () {
+
+    // SEGUIR a un usuario
+    Route::post('/user_friends/{id}/follow', [UserFriendsController::class, 'follow'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.user_friends.follow');
+
+    //DEJAR DE SEGUIR usuario
+    Route::delete('/user_friends/{id}/unfollow', [UserFriendsController::class, 'unfollow'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.user_friends.unfollow');
+
+    // BLOQUEAR a un usuario
+    Route::post('/user_friends/{id}/block', [UserFriendsController::class, 'block'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.user_friends.block');
+
+    // DESBLOQUEAR a un usuario
+    Route::delete('/user_friends/{id}/unblock', [UserFriendsController::class, 'unblock'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.user_friends.unblock');
+
+    // VER lista de followers
+    Route::get('/user_friends/followers/{id?}', [UserFriendsController::class, 'followers'])
+        ->name('api.user_friends.followers');
+
+    // VER LISTA de followings
+    Route::get('/user_friends/followings/{id?}', [UserFriendsController::class, 'followings'])
+        ->name('api.user_friends.followings');
+
+    // VER LISTA de bloqueados
+    Route::get('/user_friends/blocked', [UserFriendsController::class, 'blocked'])
+        ->name('api.user_friends.blocked');
+});
+
+
+/*
+|--------------------------------------------------------------------------
+|     -- RUTA FEED FRIENDS --
+|--------------------------------------------------------------------------
+*/
+// Rutas para actividades de las relaciones de amistad del user (listas followers, followings, lista bloqueados)
+Route::middleware('auth:sanctum')->prefix('api')->group(function () {
+
+    // VER FEED (actividad) de amigos que user sigue
+    Route::get('/feed', [UserFeedController::class, 'index'])
+        ->name('api.user_feed.index');
+});
