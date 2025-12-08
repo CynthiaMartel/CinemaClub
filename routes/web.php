@@ -18,6 +18,7 @@ use App\Http\Controllers\UserEntryFilmController;
 use App\Http\Controllers\UserFriendsController;
 
 use App\Http\Controllers\UserFeedController;
+use App\Http\Controllers\UserController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -25,18 +26,40 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-
 /*
 |--------------------------------------------------------------------------
-|  --RUTAS CRUD FILMS--
+|  --RUTAS DE FILMS--
 |--------------------------------------------------------------------------
 */
-// --RUTAS CRUD: FilmController CRUD llenado manual de datos de películas-- //
-Route::get('/films', [FilmController::class, 'index'])->name('films.index'); // Obtener datos listado de películas
-Route::get('/films/{film}', [FilmController::class, 'show'])->name('films.show'); // Obtener datos de una película concreta
-Route::post('/films', [FilmController::class, 'store'])->name('films.store'); // Guardado de películas
-Route::put('/films/{film}', [FilmController::class, 'update'])->name('films.update'); // Actualizar una película 
-Route::delete('/films/{film}', [FilmController::class, 'destroy'])->name('films.destroy'); // Borrado de una película
+Route::middleware('auth:sanctum')
+->prefix('api')
+->group(function () {
+
+    // BÚSQUEDA barra de búsqueda
+    // Ejemplo: GET http://cinemaclub.test/api/films/search?q=alien
+    Route::get('/films/search', [FilmController::class, 'search'])
+        ->name('api.films.search');
+
+    // VER película concreta
+    // Ejemplo: GET http://cinemaclub.test/api/films/3 (por id)
+    Route::get('/films/{film}', [FilmController::class, 'show'])
+        ->name('api.films.show');
+
+    // CREAR película (para llenado manual)
+    Route::post('/films/store', [FilmController::class, 'store'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.films.store');
+
+    // ACTUALIZAR película (de forma manual)
+    Route::put('/films/{film}/update', [FilmController::class, 'update'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.films.update');
+
+    // BORRAR película
+    Route::delete('/films/{film}/delete', [FilmController::class, 'destroy'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.films.destroy');
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -349,3 +372,51 @@ Route::middleware('auth:sanctum')->prefix('api')->group(function () {
     Route::get('/feed', [UserFeedController::class, 'index'])
         ->name('api.user_feed.index');
 });
+
+/*
+|--------------------------------------------------------------------------
+|     -- RUTAS USERS (ADMIN / GESTIÓN CUENTAS) --
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth:sanctum')->prefix('api')->group(function () {
+
+    // LISTAR usuarios (con filtros ?q=, ?role=, ?blocked=)
+    Route::get('/users', [UserController::class, 'index'])
+        ->name('api.users.index');
+
+    // BÚSQUEDA rápida para barra de búsqueda
+    Route::get('/users/search', [UserController::class, 'search'])
+        ->name('api.users.search');
+
+    // VER detalle de un usuario
+    Route::get('/users/{user}', [UserController::class, 'show'])
+        ->name('api.users.show');
+
+    // CREAR usuario (para ADMIN)
+    Route::post('/users/create', [UserController::class, 'store'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.users.store');
+
+    // ACTUALIZAR usuario (para ADMIN o el propio user)
+    Route::put('/users/{user}/update', [UserController::class, 'update'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.users.update');
+
+    // ELIMINAR usuario (para ADMIN o el propio user)
+    Route::delete('/users/{user}/destroy', [UserController::class, 'destroy'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.users.destroy');
+
+    // BLOQUEAR usuario (para ADMIN)
+    Route::post('/users/{user}/block', [UserController::class, 'block'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.users.block');
+
+    // DESBLOQUEAR usuario (para ADMIN)
+    Route::post('/users/{user}/unblock', [UserController::class, 'unblock'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.users.unblock');
+});
+
+
