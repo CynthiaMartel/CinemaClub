@@ -10,6 +10,9 @@ use Illuminate\Http\Request;
 
 use Carbon\Carbon;
 
+use App\Models\UserProfile;
+use App\Mail\WelcomeUserMail;
+
 
 class RegisterController extends Controller
 {
@@ -45,9 +48,9 @@ class RegisterController extends Controller
             'followings_count' => 0,
         ]);
 
-        // Para enviar correo de bienvenida ***** POR HACER
+        // Para enviar correo de bienvenida 
         try {
-            // **** POR HACER
+            Mail::to($user->email)->send(new WelcomeUserMail($user));
         } catch (\Exception $e) {
             \Log::warning("Error enviando correo de bienvenida a {$user->email}: ".$e->getMessage());
         }
@@ -66,7 +69,7 @@ class RegisterController extends Controller
                 'email' => $user->email,
                 'role'  => optional($user->role)->rolType,
             ]
-        ], 201); // Error 201 si success no es 1
+        ], 201); // 201 : recurso creado correctamente
     }
 }
 

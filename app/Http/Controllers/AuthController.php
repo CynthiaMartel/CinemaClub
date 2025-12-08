@@ -9,22 +9,28 @@ use Illuminate\Support\Facades\RateLimiter;
 use App\Models\User;
 use Carbon\Carbon;
 
+use Illuminate\Support\Facades\Mail;
+use App\Mail\AccountBlockedMail;
+
+
 class AuthController extends Controller
 {
     // LOGIN: autentica al usuario y devuelve un token Sanctum
 
-    public function login(AuthRequest $request)
+        public function login(AuthRequest $request)
     {
         // Validar campos para loguin con EMAIL y PASSWORD (ya lo hace AuthRequest)
 
-        $email = $request->email;
+        $email    = $request->email;
         $password = $request->password;
 
         // LIMITADOR DE INTENTOS FALLIDOS: si usuario falla al loguearse más de 5 veces en 1 min., no se deja que el usuario vuelva a intentar el log durante unos segundos  
         // Nota: Sistema de protección temporal que no marca al usuario como bloqueado sino que evita ataque desde mismo IP o mismo mail un tiempo
-        
-        $throttleKey = 'login:'.strtolower($email).'|'.$request->ip(); // $throttleKey: Construcción de clave única para contar intentos de login (ej: login:cynthia@example.com|192.168.0.5)
-        if (RateLimiter::tooManyAttempts($throttleKey, 5)) { // Este if devuelve success 0 y un mensaje si se han superado los maxAttemps, 
+            
+        $throttleKey = 'login:' . strtolower($email) . '|' . $request->ip(); // $throttleKey: Construcción de clave única para contar intentos de login (ej: login:cynthia@example.com|192.168.0.5)
+        $maxAttempts = config('app.max_failed_attempts', 5);
+
+        if (RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) { // Este if devuelve success 0 y un mensaje si se han superado los maxAttemps, 
             $seconds = RateLimiter::availableIn($throttleKey); // que en este caso son 5 (RateLimiter::tooManyAttempts($key, $maxAttempts))
             return response()->json([
                 'success' => 0,
@@ -40,14 +46,33 @@ class AuthController extends Controller
         if (!$user || !Hash::check($password, $user->password)) { // Si password escrita no coincide con password hasheada guardada en la BD, entra en el if
                                                                 //Nota: Hash::check() compara la contraseña escrita con el hash guardado en la BD, 
                                                                 // ya que Laravel las guarda ya hasheadas. Devuelve true si hash guardado y password coinciden, false si no
-                                                                                    
+                                                                                        
             RateLimiter::hit($throttleKey, 60); // Registramo en caché un intento fallido que durará 60 segundos (RateLimiter::hit($key, $decaySeconds))
+
+            $justBlockedNow = false;
+
             if ($user) { // Si usuario existe (email en BD), entramos en el if (pero su password escrita no coincidía con la hasheada en BD)
                 $user->failedAttempts = $user->failedAttempts + 1; // Se incrementa el contador de fallos a 1
-                if ($user->failedAttempts >= config('app.max_failed_attempts', 5)) { // Si el contador de fallos llega a 5, se marca el user como blocked
+
+                // Si el contador de fallos llega a 5, se marca el user como blocked
+                if ($user->failedAttempts >= $maxAttempts) {
+                    // Si antes no estaba bloqueado y ahora pasa a estarlo, marcamos bandera
+                    if (!$user->blocked) {
+                        $justBlockedNow = true;
+                    }
                     $user->blocked = true;
                 }
+
                 $user->save();
+
+                // Si se acaba de bloquear aquí, enviamos aviso
+                if ($justBlockedNow) {
+                    try {
+                        Mail::to($user->email)->send(new AccountBlockedMail($user));
+                    } catch (\Exception $e) {
+                        \Log::warning("Error enviando correo de bloqueo a {$user->email}: " . $e->getMessage());
+                    }
+                }
             }
 
             return response()->json([
@@ -65,14 +90,14 @@ class AuthController extends Controller
         }
 
         // Si no entra en ningún if --> Restablecer intentos fallidos y actualizar última conexión
-        $user->failedAttempts = 0;
+        $user->failedAttempts     = 0;
         $user->dateHourLastAccess = Carbon::now();
-        $user->ipLastAccess = $request->ip();
+        $user->ipLastAccess       = $request->ip();
         $user->save();
 
         // Crear token para manejo en Sanctum: se guarda en la tabla personal_access_tokens, para próximas peticiones como votar por ej.
         $tokenName = 'login_token';
-        $token = $user->createToken($tokenName)->plainTextToken;
+        $token     = $user->createToken($tokenName)->plainTextToken;
 
         // Respuesta json si no entra en ningún if:
         return response()->json([
@@ -87,6 +112,7 @@ class AuthController extends Controller
             ],
         ], 200);
     }
+
 
     // LOGOUT: revoca el token actual // Nota: En la ruta, lleva mildware asegurando que el usuario haya iniciado sesión (auth:sanctum)
     

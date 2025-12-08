@@ -9,7 +9,12 @@ use App\Http\Requests\ChangePasswordRequest;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
 
+use Illuminate\Support\Facades\Mail;
+use App\Mail\PasswordChangedMail;
+
+
 class ChangePasswordController extends Controller
+
 
 {
     public function update(ChangePasswordRequest $request)
@@ -29,6 +34,14 @@ class ChangePasswordController extends Controller
         $user->password_changed_at = now();     
         $user->save();
 
+    // Para enviar correo de aviso de cambio de contraseña
+        try {
+            Mail::to($user->email)->send(new PasswordChangedMail($user));
+        } catch (\Exception $e) {
+            \Log::warning("Error enviando correo de cambio de contraseña a {$user->email}: ".$e->getMessage());
+        }
+
+        
         // Para mayor seguridad, invalidamos tokens antiguos (por si hay alguna ssesión abierta en algún otro dispositivo con la contraseña antigua)
         //$user->tokens()->delete();
 
