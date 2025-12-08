@@ -83,26 +83,44 @@ class User extends Authenticatable
     // Verificar si el usuario tiene rol de Admin (en BD Admin tiene id = 1)
     public function isAdmin()
     {
-        return $this->role && $this->role->rolType === 'Admin';
+        return $this->role
+            && (
+                strtolower($this->role->rolType) === 'admin'
+                || (int) $this->idRol === 1
+            );
     }
+
 
     // Verifica si el usuario tiene rol de Editor (en BD Editor tiene id=2 )
     public function isEditor()
     {
-        return $this->role && $this->role->rolType === 'Editor';
+        return $this->role
+            && (
+                strtolower($this->role->rolType) === 'editor'
+                || (int) $this->idRol === 2
+            );
     }
 
     // Verifica si el usuario tiene rol de User (usuario "regular". En BD User tiene id=3)
-    public function isUser()
+        public function isUser()
     {
-        return $this->role && $this->role->rolType === 'User';
+        return $this->role
+            && (
+                strtolower($this->role->rolType) === 'user'
+                || (int) $this->idRol === 3
+            );
     }
-
     // Verifica si el usuario es Admin o Editor (para editar, crear, borrar posts, etc)
     public function isAdminOrEditor()
     {
         return $this->isAdmin() || $this->isEditor();
     }
 }
+
+
+
+
+
+
 
 
