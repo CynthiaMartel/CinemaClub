@@ -1,11 +1,14 @@
+<script setup>
+import MainNavbar from '@/components/MainNavbar.vue'
+</script>
+
 <template>
-  <div class="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center">
-    <h1 class="text-3xl font-bold">
-      Cinemaclub – Frontend Vue 3 🐈‍⬛
-    </h1>
+  <div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <MainNavbar />
+    <main class="flex-1">
+      <router-view />
+    </main>
   </div>
 </template>
 
-<script setup>
 
-</script>
