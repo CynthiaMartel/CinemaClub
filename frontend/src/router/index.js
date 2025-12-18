@@ -1,6 +1,6 @@
+// Para las views
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
-import LoginView from '@/views/LoginView.vue'
 import FilmDetailView from '@/views/FilmDetailView.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -11,15 +11,9 @@ const routes = [
     component: HomeView,
   },
   {
-    path: '/login',
-    name: 'login',
-    component: LoginView,
-  },
-  {
     path: '/films/:id',
     name: 'film-detail',
     component: FilmDetailView,
-    meta: { requiresAuth: true },
   },
   // ******aquí van más rutas después: noticias, perfil, etc.
 ]
@@ -29,7 +23,7 @@ const router = createRouter({
   routes,
 })
 
-// Guard : proteger rutas que requieran auth
+// Guard : proteger rutas que requieran auth******************
 router.beforeEach((to, from, next) => {
   const auth = useAuthStore()
 

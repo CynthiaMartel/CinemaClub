@@ -1,5 +1,6 @@
 <script setup>
 import MainNavbar from '@/components/MainNavbar.vue'
+import ErrorToast from '@/components/ErrorToast.vue'
 </script>
 
 <template>
@@ -8,7 +9,14 @@ import MainNavbar from '@/components/MainNavbar.vue'
     <main class="flex-1">
       <router-view />
     </main>
+
+    <ErrorToast />
   </div>
 </template>
+
+
+
+
+
 
 
