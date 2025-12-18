@@ -21,12 +21,12 @@ class ChangePasswordController extends Controller
     {
         $user = $request->user();
 
-        // Para verificar que la contraseña actual sea correcta: si no fuese correcta, se devuelve un error 401 y no se continua
+        // Para verificar que la contraseña actual sea correcta: si no fuese correcta, se devuelve un 422 y no se continua
         if (!Hash::check($request->current_password, $user->password)) {
             return response()->json([
                 'success' => 0,
                 'message' => 'La contraseña actual es incorrecta.'
-            ], 401);
+            ], 422);
         }
 
         // Para actualizar con nueva contraseña hasheada 
@@ -43,15 +43,15 @@ class ChangePasswordController extends Controller
 
         
         // Para mayor seguridad, invalidamos tokens antiguos (por si hay alguna ssesión abierta en algún otro dispositivo con la contraseña antigua)
-        //$user->tokens()->delete();
+        $user->tokens()->delete();
 
         // Crear nuevo token para mantener sesión activa y el usuario no pierda la sesión ACTUAL
-        //$newToken = $user->createToken('password_changed_token')->plainTextToken;
+        $newToken = $user->createToken('password_changed_token')->plainTextToken;
 
         return response()->json([
             'success' => 1,
             'message' => 'Contraseña actualizada correctamente.',
-            //'token' => $newToken
+            'token' => $newToken
         ], 200);
     }
 }

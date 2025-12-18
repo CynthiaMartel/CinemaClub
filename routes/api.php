@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\RegisterController;
+use App\Http\Controllers\ChangePasswordController;
 
 use App\Http\Controllers\FilmController;
 use App\Http\Controllers\FilmDataController;
@@ -38,19 +39,20 @@ Route::get('/user', function (Request $request) {
 |  --RUTAS DE FILMS--
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')
+
+// BÚSQUEDA barra de búsqueda -> PÚBLICAS
+// Ejemplo: GET http://cinemaclub.test/api/films/search?q=alien
+Route::get('/films/search', [FilmController::class, 'search'])
+    ->name('api.films.search');
+
+// VER película concreta 
+// Ejemplo: GET http://cinemaclub.test/api/films/3 (por id)
+Route::get('/films/{film}', [FilmController::class, 'show'])
+    ->name('api.films.show');
+
+// para ADMIN -> REQUIEREN AUTENTIFICACIÓN
+Route::middleware('auth:sanctum') 
 ->group(function () {
-
-    // BÚSQUEDA barra de búsqueda
-    // Ejemplo: GET http://cinemaclub.test/api/films/search?q=alien
-    Route::get('/films/search', [FilmController::class, 'search'])
-        ->name('api.films.search');
-
-    // VER película concreta
-    // Ejemplo: GET http://cinemaclub.test/api/films/3 (por id)
-    Route::get('/films/{film}', [FilmController::class, 'show'])
-        ->name('api.films.show');
-
     // CREAR película (para llenado manual)
     Route::post('/films/store', [FilmController::class, 'store'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
@@ -90,13 +92,23 @@ Route::post('/logout', [AuthController::class, 'logout'])
 // CHECK SESSION: devuelve usuario autenticado si el token es válido
 Route::get('/check-session', [AuthController::class, 'checkSession'])
     ->middleware('auth:sanctum') // Activa guardia sanctum: middleware para comprobar token, ya que hay sesión cuando el usuario está logueado 
-    ->name('api.checkSession');  // No se pone withoutMiddleware porque peticiones tipo GET no necesitan token Bearer
+    ->name('api.checkSession');  // No se pone withoutMiddleware porque peticiones tipo GET no necesitan CSRF
 
 // REGISTER: crea una nueva cuenta de usuario
 Route::post('/register', [RegisterController::class, 'register'])
     ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class) // Quita guardia de CSRF propio de formularios web: acepta peticiones API (JSON, sin cookies,) al trabajar con api
     ->name('api.register');
 
+
+/*
+|--------------------------------------------------------------------------
+|  --RUTAS DE CHANGE PASSWORD--
+|--------------------------------------------------------------------------
+*/
+// Ruta para cambio de contraseña
+Route::post('/change-password', [ChangePasswordController::class, 'update'])
+    ->middleware('auth:sanctum')
+    ->name('api.changePassword');
 
 /*
 |--------------------------------------------------------------------------
