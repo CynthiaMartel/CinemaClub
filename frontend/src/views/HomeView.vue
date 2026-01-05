@@ -43,6 +43,7 @@ const userName = computed(() =>
       </p>
 
       <button
+        v-if="!auth.isAuthenticated"
         type="button"
         class="mt-6 px-6 py-2.5 rounded-full bg-emerald-500 text-slate-900 font-semibold text-sm md:text-base hover:bg-emerald-400"
         @click="openRegister"
