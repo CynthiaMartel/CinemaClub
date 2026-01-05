@@ -20,7 +20,9 @@ const password_confirmation = ref('')
 const loading = ref(false)
 const errors = ref([]) // Array para mostrar los errores escritos en código del request de ChangePassword del backend
 
+const nameInputRef = ref(null)
 const emailInputRef = ref(null)
+const passwordInputRef = ref(null)
 
 
 const close = () => emit('update:modelValue', false)
@@ -35,12 +37,15 @@ watch(
       password.value = ''
       password_confirmation.value = ''
       await nextTick()
-      emailInputRef.value?.focus?.()
-      }
+      nameInputRef.value?.focus?.()
+      }else {
+      toast.close() 
+    }
   }
 )
 
 const submit = async () => {
+  toast.close()
   errors.value = []        
   loading.value = true
 
@@ -48,16 +53,32 @@ const submit = async () => {
     await auth.register(name.value, email.value, password.value, password_confirmation.value)
     close()
   } catch (e) {
+    loading.value = false 
+
     if (Array.isArray(e?.messages)) {
       errors.value = e.messages
-      toast.error(e.messages[0] )
+      await nextTick() 
+      
+      const firstError = errors.value[0].toLowerCase()
+
+      if (firstError.includes('email')) {
+        emailInputRef.value?.focus()
+      } else if (firstError.includes('contraseña') ) {
+        passwordInputRef.value?.focus()
+      }
+   
+
+      if (errors.value.length > 1) {
+        toast.error(`Hay ${errors.value.length} errores que requieren tu atención`, true)
+      } else {
+        toast.error(errors.value[0], true)
+      }
+      
     } else {
-      const msg = e?.message || 'No se pudo registrar nuevo usuario'
+      const msg = e?.message || 'No se pudo realizar el registro de nuevo usuario'
       errors.value = [msg]
-      toast.error(msg)
+      toast.error(msg, true)
     }
-  } finally {
-    loading.value = false
   }
 }
 
@@ -81,10 +102,10 @@ const onKeydown = (e) => {
       class="fixed inset-0 z-[60]"
       @keydown="onKeydown"
     >
-      <div class="absolute inset-0 bg-black/40 backdrop-blur-[1px]" @click="close"></div>
+      <div class="absolute inset-0 bg-black/40 backdrop-blur-[1px]"></div>
 
       <!-- Dialog pop -->
-      <div class="relative min-h-full flex items-center justify-center px-4">
+      <div class="relative min-h-full flex items-center justify-center px-4" @click.self="close">
         <Transition
           enter-active-class="transition duration-200 ease-out"
           enter-from-class="opacity-0 translate-y-2 scale-95"
@@ -111,6 +132,7 @@ const onKeydown = (e) => {
                 <div class="space-y-1">
                   <label class="text-sm font-medium text-slate-200">Nombre de usuario/usuaria</label>
                   <input
+                    ref = 'nameInputRef'
                     v-model="name"
                     type="text"
                     required
@@ -132,6 +154,7 @@ const onKeydown = (e) => {
                 <div class="space-y-1">
                   <label class="text-sm font-medium text-slate-200">Contraseña</label>
                   <input
+                    ref = 'passwordInputRef'
                     v-model="password"
                     type="password"
                     required
@@ -142,6 +165,7 @@ const onKeydown = (e) => {
                 <div class="space-y-1">
                   <label class="text-sm font-medium text-slate-200">Confirma nueva contraseña</label>
                   <input
+                    ref = 'passwordInputRef'
                     v-model="password_confirmation"
                     type="password"
                     required
@@ -151,7 +175,7 @@ const onKeydown = (e) => {
                 </div>
               </div>
 
-              <ul v-if="errors.length" class="text-sm text-red-300 space-y-1">
+              <ul v-if="errors.length > 1" class="text-sm text-red-300 space-y-1">
                 <li v-for="(msg, i) in errors" :key="i">{{ msg }}</li>
               </ul>
 

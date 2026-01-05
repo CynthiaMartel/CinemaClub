@@ -1,6 +1,10 @@
 <script setup>
 import { ref, nextTick, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
+
+const toast = useToastStore()
+
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -16,6 +20,9 @@ const confirm_password = ref('')
 const loading = ref(false)
 const errors = ref([]) // Array para mostrar los errores escritos en código del request de ChangePassword del backend
 
+const current_passwordInputRef = ref(null)
+const new_passwordInputRef = ref(null)
+const confirm_passwordInputRef = ref(null)
 
 const close = () => emit('update:modelValue', false)
 
@@ -29,31 +36,52 @@ watch(
       confirm_password.value = ''
       await nextTick()
       
+    }else {
+      toast.close() 
     }
   }
 )
 
 const submit = async () => {
-  errors.value = []
+  toast.close()
+  errors.value = []        
   loading.value = true
 
   try {
-    await auth.changePassword(
-      current_password.value,
+    await auth.changePassword(current_password.value,
       new_password.value,
-      confirm_password.value
-    )
+      confirm_password.value)
     close()
   } catch (e) {
-    // si el error es array del store auth.js
+    loading.value = false 
+
     if (Array.isArray(e?.messages)) {
       errors.value = e.messages
+      await nextTick() 
+      
+      const firstError = errors.value[0].toLowerCase()
+
+      if (firstError.includes('actual')) {
+        current_passwordInputRef.value?.focus()
+
+      } else if (firstError.includes('nueva') ) {
+        new_passwordInputRef.value?.focus()
+      }
+      else if (firstError.includes('confirm') ) {
+        confirm_passwordInputRef.value?.focus()
+      }
+
+      if (errors.value.length > 1) {
+        toast.error(`Hay ${errors.value.length} errores que requieren tu atención`, true)
+      } else {
+        toast.error(errors.value[0], true)
+      }
+      
     } else {
-      // si otro Error, por ejemplo UX
-      errors.value = [e?.message || 'Error inesperado']
+      const msg = e?.message || 'No se pudo realizar cambio de contraseña'
+      errors.value = [msg]
+      toast.error(msg, true)
     }
-  } finally {
-    loading.value = false
   }
 }
 
@@ -80,7 +108,7 @@ const onKeydown = (e) => {
       <div class="absolute inset-0 bg-black/40 backdrop-blur-[1px]" @click="close"></div>
 
       <!-- Dialog pop -->
-      <div class="relative min-h-full flex items-center justify-center px-4">
+      <div class="relative min-h-full flex items-center justify-center px-4" @click.self="close">
         <Transition
           enter-active-class="transition duration-200 ease-out"
           enter-from-class="opacity-0 translate-y-2 scale-95"
@@ -108,6 +136,7 @@ const onKeydown = (e) => {
                   <label class="text-sm font-medium text-slate-200">Contraseña Actual</label>
                   <input
                     v-model="current_password"
+                    ref="current_passwordInputRef"
                     type="password"
                     required
                     autocomplete="current-password"
@@ -118,6 +147,7 @@ const onKeydown = (e) => {
                   <label class="text-sm font-medium text-slate-200">Nueva Contraseña</label>
                   <input
                     v-model="new_password"
+                    ref="new_passwordInputRef"
                     type="password"
                     required
                     autocomplete="new-password"
@@ -128,6 +158,7 @@ const onKeydown = (e) => {
                   <label class="text-sm font-medium text-slate-200">Confirma nueva contraseña</label>
                   <input
                     v-model="confirm_password"
+                    ref="confirm_passwordInputRef"
                     type="password"
                     required
                     autocomplete="confirm-password"

@@ -18,7 +18,9 @@ const loading = ref(false)
 const errors = ref([])
 const emailInputRef = ref(null)
 
-const close = () => emit('update:modelValue', false)
+const close = () => 
+emit('update:modelValue', false)
+toast.close()
 
 watch(
   () => props.modelValue,
@@ -29,11 +31,14 @@ watch(
       password.value = ''
       await nextTick()
       emailInputRef.value?.focus?.()
+    }else {
+      toast.close() 
     }
   }
 )
 
 const submit = async () => {
+  toast.close()
   errors.value = []        
   loading.value = true
 
@@ -41,17 +46,27 @@ const submit = async () => {
     await auth.login(email.value, password.value)
     close()
   } catch (e) {
-    if (Array.isArray(e?.messages)) {
-      errors.value = e.messages
-      toast.error(e.messages[0] || 'Error al iniciar sesión')
+  if (Array.isArray(e?.messages)) {
+    errors.value = e.messages
+    loading.value = false
+  
+    if (errors.value.length > 1) {
+      // Si hay más de un error, ponemos un resumen
+      toast.error(`Hay ${errors.value.length} errores que requieren tu atención`, true)
+      
     } else {
-      const msg = e?.message || 'No se pudo iniciar sesión'
-      errors.value = [msg]
-      toast.error(msg)
+      // Si solo hay uno, mostramos ese único error
+      toast.error(errors.value[0], true)
+      
     }
-  } finally {
+    
+  } else {
+    const msg = e?.message || 'No se pudo iniciar sesión'
+    errors.value = [msg]
+    toast.error(msg, true)
     loading.value = false
   }
+}
 }
 
 const onKeydown = (e) => {
@@ -61,11 +76,11 @@ const onKeydown = (e) => {
 
 <template>
   <div v-if="modelValue" class="fixed inset-0 z-[60]" @keydown="onKeydown">
-    <!-- Overlay (deja ver el home detrás) -->
-    <div class="absolute inset-0 bg-black/40 backdrop-blur-[1px]" @click="close"></div>
+    
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-[1px]"></div>
 
-    <!-- Dialog -->
-    <div class="relative min-h-full flex items-center justify-center px-4">
+   
+    <div class="relative min-h-full flex items-center justify-center px-4" @click.self="close">
       <div class="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
         <div class="flex items-center justify-between px-6 py-4 bg-slate-950 border-b border-slate-800">
           <h2 class="text-base md:text-lg font-semibold text-slate-100">
@@ -102,7 +117,7 @@ const onKeydown = (e) => {
             </div>
           </div>
 
-          <ul v-if="errors.length" class="text-sm text-red-300 space-y-1">
+          <ul v-if="errors.length > 1" class="text-sm text-red-300 space-y-1">
                 <li v-for="(msg, i) in errors" :key="i">{{ msg }}</li>
           </ul>
 
