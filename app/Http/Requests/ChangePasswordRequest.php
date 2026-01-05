@@ -39,7 +39,7 @@ class ChangePasswordRequest extends FormRequest
             'new_password.different' => 'La nueva contraseña no puede ser igual a la actual.',
             'new_password.regex' => 'La nueva contraseña debe contener al menos una mayúscula, una minúscula, un número y un carácter especial',
             'confirm_password.required' => 'Debes confirmar la nueva contraseña',
-            'confirm_password.same' => 'El campo de nueva contraseña debe coincidir con el campo de confirmación de nueva contraseña',
+            'confirm_password.same' => 'El campo de nueva contraseña debe coincidir con el campo de confirmar nueva contraseña',
         ];
     }
 }

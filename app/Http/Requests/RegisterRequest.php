@@ -53,11 +53,11 @@ class RegisterRequest extends FormRequest
             'name.min' => 'El nombre de usuario debe tener al menos 3 caracteres',
             'name.max' => 'El nombre de usuario no puede superar 30 caracteres',
             'name.unique' => 'Ese nombre de usuario ya está en uso',
-            'name.regex'  => 'Usa solo letras y números. Puedes incluir ".", "-" o "_" entre medias, pero no al principio o al final, y sin espacios',
+            'name.regex'  => 'Para nombre de usuario: Usa solo letras y números. Puedes incluir ".", "-" o "_" entre medias, pero no al principio o al final, y sin espacios',
 
-            'email.required' => 'Debes rellenar tu correo',
-            'email.email' => 'El correo no tiene un formato válido',
-            'email.unique' => 'Ya existe una cuenta registrada con este correo',
+            'email.required' => 'Debes rellenar tu email',
+            'email.email' => 'El email no tiene un formato válido',
+            'email.unique' => 'Ya existe una cuenta registrada con este email',
 
             'password.required' => 'Debes introducir una contraseña',
             'password.min' => 'La contraseña debe tener al menos 8 caracteres',

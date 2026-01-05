@@ -28,9 +28,9 @@ class AuthRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'email.required' => 'Debes escribir tu correo electrónico.',
-            'email.email' => 'El formato del correo no es válido. Revísalo.',
-            'email.exists' => 'No existe ninguna cuenta con este correo.',
+            'email.required' => 'Debes escribir tu email.',
+            'email.email' => 'El formato del email no es válido. Revísalo.',
+            'email.exists' => 'No existe ninguna cuenta con este email.',
             'password.required' => 'Debes escribir tu contraseña.',
         ];
     }
