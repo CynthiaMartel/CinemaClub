@@ -58,6 +58,8 @@ class UserCommentController extends Controller
             'visibility' => $request->visibility ?? 'public',
         ]);
 
+        $comment->load('user:id,name');
+
         return response()->json([
             'success' => true,
             'message' => 'Comentario publicado correctamente.',
