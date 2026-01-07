@@ -22,31 +22,25 @@ class UserFilmActionController extends Controller
     public function storeOrUpdate(UserFilmActionsRequest $request, $filmId): JsonResponse
     {
         $user = Auth::user();
-        $film = Film::find($filmId);
-
-        if (!$film) {
-            return response()->json(['error' => 'La película no existe.'], 404);
-        }
+        $film = Film::findOrFail($filmId);
 
         $validated = $request->validated();
 
-        // Buscar o crear la acción del usuario sobre la película
-        $action = UserFilmActions::firstOrNew([
-            'idUser' => $user->id,
-            'idFilm' => $filmId,
-        ]);
+        // Guardar o Actualizar la nota del usuario
+        $action = UserFilmActions::updateOrCreate(
+            ['idUser' => $user->id, 'idFilm' => $filmId],
+            $validated
+        );
 
-        $action->fill($validated);
-        $action->save();
-
-        // Si el usuario puntua la película, se actualiza individualRate(siendo un promedio de votaciones de usuarios de un films, en tabla films) 
-        // directamente desde user_film_actions con 'rating'
+        // i ha enviado una nota, recalculamos la media de TODO EL CLUB
+        $newAverage = 0;
         if (isset($validated['rating'])) {
-            $average = UserFilmActions::where('idFilm', $filmId)
+            $newAverage = UserFilmActions::where('idFilm', $filmId)
                 ->whereNotNull('rating')
                 ->avg('rating');
 
-            $film->individualRate = round($average, 2);
+            // Guardamos la media en globalRate
+            $film->globalRate = round($newAverage, 1);
             $film->save();
         }
 
