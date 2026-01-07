@@ -124,7 +124,7 @@ class FilmController extends Controller
     // Búsqueda por id de film para película concreta
     public function show(Film $film)
     {
-        return response()->json($film);
+        return response()->json($film->load('cast')); //Para que devuelva la relación cast_crew y podamos ver director y reparto
     }
 
     // Admin: Crear película manualmente por si se necesita añadir alguna película que no se haya encontrado con API TMDB ni Wikidata (de manera manual desde ADMIN)

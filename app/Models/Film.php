@@ -22,12 +22,13 @@ class Film extends Model
         'festivals' => 'array',
         'alternative_titles' => 'array', 
         'release_date' => 'date',
-        'vote_average' => 'float',
+        'vote_average' => 'float', // Nota media sacada API TMDB
     ];
 
-    public function individualRates()
+    public function userActions()
     {
-        return $this->hasMany(IndividualRate::class, 'idFilm', 'idFilm');
+        // Relación con la tabla user_film_actions
+        return $this->hasMany(UserFilmActions::class, 'idFilm', 'idFilm');
     }
 
     public function cast()

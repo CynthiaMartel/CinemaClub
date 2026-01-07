@@ -75,23 +75,32 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
 
                 $details = $detailsResponse->json();
                 $castTMDb = $details['credits']['cast'] ?? [];
-                $directorData = collect($details['credits']['crew'] ?? [])->firstWhere('job', 'Director');
-                $directorId = null;
+                
+                // --- INICIO CÓDIGO NUEVO DIRECTORES ---
+                $directorsData = collect($details['credits']['crew'] ?? [])->where('job', 'Director');
+                $directorIds = []; // Array para guardar todos los IDs de directores encontrados
 
-                // Guardar o recuperar director solo si realmente existe un ID y un nombre (Hay peículas que no tienen info del director)
-                if (!empty($directorData['id']) && !empty($directorData['name'])) {
-                    $director = CastCrew::firstOrCreate(
-                        ['tmdb_id' => $directorData['id']],
-                        [
-                            'name' => $directorData['name'],
-                            'bio' => null,
-                            'profile_path' => $directorData['profile_path'] ?? null,
-                        ]
-                    );
-                    $directorId = $director->idPerson;
-                } else {
-                    Log::info("Película '{$details['title']}' sin director válido (no insertado en pivot).");
+                foreach ($directorsData as $dData) {
+                    if (!empty($dData['id']) && !empty($dData['name'])) {
+                        $directorRecord = CastCrew::firstOrCreate(
+                            ['tmdb_id' => $dData['id']],
+                            [
+                                'name' => $dData['name'],
+                                'bio' => null,
+                                'profile_path' => $dData['profile_path'] ?? null,
+                            ]
+                        );
+                        $directorIds[] = $directorRecord->idPerson;
+                    }
                 }
+
+                // Para mantener compatibilidad con tu columna 'director_id' en la tabla films:
+                $mainDirectorId = !empty($directorIds) ? $directorIds[0] : null;
+
+                if (empty($directorIds)) {
+                    Log::info("Película '{$details['title']}' sin directores válidos.");
+                }
+                // --- FIN CÓDIGO NUEVO DIRECTORES ---
 
                 $genres = implode(', ', array_column($details['genres'] ?? [], 'name'));
                 $countries = implode(', ', array_column($details['production_countries'] ?? [], 'name'));
@@ -166,7 +175,7 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
                     'duration'           => $details['runtime'] ?? 0,
                     'release_date'       => $details['release_date'] ?? now(),
                     'frame'              => !empty($details['poster_path']) ? "https://image.tmdb.org/t/p/w500" . $details['poster_path'] : '',
-                    'backdrop'           => !empty($details['backdrop_path']) ? "https://image.tmdb.org/t/p/original" . $details['backdrop_path'] : '',
+                    'backdrop' => !empty($details['backdrop_path']) ? "https://image.tmdb.org/t/p/original" . $details['backdrop_path'] : ($film->backdrop ?? ''), // <--- MANTIENE EL ANTERIOR SI EL NUEVO ESTÁ VACÍO
 
                     'awards'             => array_slice($wikidata['awards'], 0, 10),
                     'nominations'        => array_slice($wikidata['nominations'], 0, 10),
@@ -176,7 +185,7 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
                     'total_awards'       => count($wikidata['awards']),
                     'total_nominations'  => count($wikidata['nominations']),
                     'total_festivals'    => count($wikidata['festivals']),
-                    'director_id'        => $directorId,
+                    'director_id' => $mainDirectorId,
 
                     'vote_average'       => $details['vote_average'] ?? 0,
                     'individualRate'     => 0,
@@ -189,15 +198,18 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
                 // Esto evita duplicados y limpia datos viejos al volver a llamar a la api para un re-llenado de datos faltantes al llamar al job de nuevo en films con otros campos completos
                 DB::table('film_cast_pivot')->where('idFilm', $film->idFilm)->delete();
 
-                //Insertamos director/directora
-                if ($directorId) {
+                // --- INICIO INSERCIÓN MÚLTIPLES DIRECTORES ---
+                foreach ($directorIds as $idPers) {
                     DB::table('film_cast_pivot')->insert([
                         'idFilm' => $film->idFilm,
-                        'idPerson' => $directorId,
+                        'idPerson' => $idPers,
                         'role' => 'Director'
                     ]);
-                    Log::info("Director asignado: ID $directorId a película $film->idFilm");
                 }
+                if (!empty($directorIds)) {
+                    Log::info("Directores asignados (" . count($directorIds) . ") a película $film->idFilm");
+                }
+                // --- FIN INSERCIÓN MÚLTIPLES DIRECTORES ---
 
                //Insertamos actores y actrices
                 foreach ($castTMDb as $order => $actor) {
@@ -264,78 +276,92 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
 
 // API WIKIDATA: Obtener datos faltantes que no proporciona TMDB
     private function getWikidataData($wikidataId)
-    {
-    if (!$wikidataId) return ['awards' => [], 'nominations' => [], 'festivals' => [], 'titles' => []];
+{
+    if (!$wikidataId) return ['awards' => [], 'nominations' => [], 'festivals' => [], 'alternative_titles' => []];
 
-    // Consulta SPARQL:
-    // P166 = Premio, P1411 = Nominación, P585 = Fecha (Año)
-    // rdfs:label con FILTER(LANG) para los idiomas
+    // Consulta SPARQL corregida
     $query = urlencode("
     SELECT DISTINCT ?awardLabel ?awardYear ?nomLabel ?nomYear ?festivalLabel ?titleES ?titleEN ?titleIT WHERE {
       BIND(wd:$wikidataId AS ?movie)
       
-      # Premios y su año
+      # Premios y su año (Prioridad: es > en)
       OPTIONAL { 
         ?movie p:P166 ?awardStmt. 
         ?awardStmt ps:P166 ?award.
         OPTIONAL { ?awardStmt pq:P585 ?timeA. BIND(YEAR(?timeA) AS ?awardYear) }
       }
       
-      # Nominaciones y su año
+      # Nominaciones y su año (Prioridad: es > en)
       OPTIONAL { 
         ?movie p:P1411 ?nomStmt. 
         ?nomStmt ps:P1411 ?nom.
         OPTIONAL { ?nomStmt pq:P585 ?timeN. BIND(YEAR(?timeN) AS ?nomYear) }
       }
 
-      # Festivales (P1344 = Participante en)
+      # Festivales
       OPTIONAL { ?movie wdt:P1344 ?festival. }
 
-      # Títulos en idiomas específicos
+      # Títulos específicos para tu array de titles
       OPTIONAL { ?movie rdfs:label ?titleES FILTER(LANG(?titleES) = 'es') }
       OPTIONAL { ?movie rdfs:label ?titleEN FILTER(LANG(?titleEN) = 'en') }
       OPTIONAL { ?movie rdfs:label ?titleIT FILTER(LANG(?titleIT) = 'it') }
 
+      # LA CLAVE: El servicio de etiquetas con fallback (primero es, luego en)
       SERVICE wikibase:label { bd:serviceParam wikibase:language 'es,en'. }
     }");
 
     $url = "https://query.wikidata.org/sparql?query=$query&format=json";
-    $response = Http::withHeaders(['Accept' => 'application/json'])->get($url);
-    $data = $response->json();
 
-    $awards = [];
-    $nominations = [];
-    $festivals = [];
-    $titles = [];
+    try {
+        // Añadimos User-Agent para evitar bloqueos 403 de Wikidata
+        $response = Http::withHeaders([
+            'Accept' => 'application/json',
+            'User-Agent' => 'CinemaClubApp/1.0 (contact: tu-email@ejemplo.com)'
+        ])->timeout(15)->get($url);
 
-    foreach ($data['results']['bindings'] ?? [] as $bind) {
-        // Mapeo de Premios: "Nombre (Año)"
-        if (isset($bind['awardLabel'])) {
-            $year = isset($bind['awardYear']) ? " (" . $bind['awardYear']['value'] . ")" : "";
-            $awards[] = $bind['awardLabel']['value'] . $year;
+        if (!$response->successful()) return ['awards' => [], 'nominations' => [], 'festivals' => [], 'alternative_titles' => []];
+
+        $data = $response->json();
+        $awards = [];
+        $nominations = [];
+        $festivals = [];
+        $titles = [];
+
+        foreach ($data['results']['bindings'] ?? [] as $bind) {
+            // Mapeo de Premios: "Nombre (Año)" - Ahora traerá el nombre en inglés si no hay español
+            if (isset($bind['awardLabel'])) {
+                $year = isset($bind['awardYear']) ? " (" . $bind['awardYear']['value'] . ")" : "";
+                $awards[] = $bind['awardLabel']['value'] . $year;
+            }
+
+            // Mapeo de Nominaciones
+            if (isset($bind['nomLabel'])) {
+                $year = isset($bind['nomYear']) ? " (" . $bind['nomYear']['value'] . ")" : "";
+                $nominations[] = $bind['nomLabel']['value'] . $year;
+            }
+
+            // Mapeo de Festivales
+            if (isset($bind['festivalLabel'])) {
+                $festivals[] = $bind['festivalLabel']['value'];
+            }
+
+            // Títulos por idioma
+            if (isset($bind['titleES'])) $titles['es'] = $bind['titleES']['value'];
+            if (isset($bind['titleEN'])) $titles['en'] = $bind['titleEN']['value'];
+            if (isset($bind['titleIT'])) $titles['it'] = $bind['titleIT']['value'];
         }
 
-        // Mapeo de Nominaciones: "Nombre (Año)"
-        if (isset($bind['nomLabel'])) {
-            $year = isset($bind['nomYear']) ? " (" . $bind['nomYear']['value'] . ")" : "";
-            $nominations[] = $bind['nomLabel']['value'] . $year;
-        }
+        return [
+            'awards' => array_values(array_unique($awards)),
+            'nominations' => array_values(array_unique($nominations)),
+            'festivals' => array_values(array_unique($festivals)),
+            'alternative_titles' => $titles
+        ];
 
-        // Mapeo de Festivales
-        if (isset($bind['festivalLabel'])) $festivals[] = $bind['festivalLabel']['value'];
-
-        // Mapeo de Títulos por idioma
-        if (isset($bind['titleES'])) $titles['es'] = $bind['titleES']['value'];
-        if (isset($bind['titleEN'])) $titles['en'] = $bind['titleEN']['value'];
-        if (isset($bind['titleIT'])) $titles['it'] = $bind['titleIT']['value'];
+    } catch (\Exception $e) {
+        \Log::error("Error consultando Wikidata ID $wikidataId: " . $e->getMessage());
+        return ['awards' => [], 'nominations' => [], 'festivals' => [], 'alternative_titles' => []];
     }
-
-    return [
-        'awards' => array_values(array_unique($awards)),
-        'nominations' => array_values(array_unique($nominations)),
-        'festivals' => array_values(array_unique($festivals)),
-        'alternative_titles' => $titles
-    ];
 }
     
     
