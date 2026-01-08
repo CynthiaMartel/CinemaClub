@@ -162,6 +162,36 @@ class UserFilmActionController extends Controller
         ], 200);
     }
 
+    //Obtener una campo específico de las acciones del usuario : nota de film, si es fav, watched, puesta en la lista de watched..
+    // UserFilmActionController.php
+
+    public function showAction($filmId): JsonResponse
+    {
+        $user = Auth::user();
+        
+        // Buscamos el registro para ese usuario y esa película
+        $action = UserFilmActions::where('idUser', $user->id)
+                                ->where('idFilm', $filmId)
+                                ->first();
+
+        // Si no existe, devolvemos un objeto vacío o valores por defecto
+        if (!$action) {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'rating' => 0,
+                    'is_favorite' => false,
+                    'watched' => false,
+                    'watch_later' => false
+                ]
+            ], 200);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $action,
+        ], 200);
+    }
 
     // Método auxiliar:
     // Para actualizar estadísticas en el perfil del usuario (favoritas, vistas, vistas este año) que se utiliza en storeOrUpdate()

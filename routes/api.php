@@ -188,6 +188,9 @@ Route::middleware('auth:sanctum')->group(function () {
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
         ->name('api.films.action.createOrEdit');
 
+    // VER UNA ACCIÓN EN ESPECÍFICO: rated, watched, en watch_list...
+    Route::get('/films/show-user-action/{filmId}', [UserFilmActionController::class, 'showAction']);
+
     // DESMARCAR una acción específica (quitar favorito, reseña, etc.)
     Route::delete('/films/unmarkAction/{filmId}', [UserFilmActionController::class, 'unmarkAction'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
