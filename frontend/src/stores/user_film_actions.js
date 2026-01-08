@@ -21,7 +21,7 @@ export const useUserFilmActionsStore = defineStore('userFilmActions', () => {
             if (response.data.success) {
                 // Actualizamos los datos en el objeto film que pasamos por referencia
                 if (filmRef.value) {
-                    // Actualizamos la media global del club
+                    //Actualizamos la media global del club
                     filmRef.value.globalRate = response.data.new_global_rate;
                     
                     // Aseguramos que el objeto user_action existe y actualizamos el rating
