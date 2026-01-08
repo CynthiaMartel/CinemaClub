@@ -6,13 +6,15 @@ import api from '@/services/api'
 import LoginModal from '@/components/LoginModal.vue'
 import { storeToRefs } from 'pinia';
 import { useUserFilmActionsStore } from '@/stores/user_film_actions'
+// Importamos el nuevo componente de estrellas
+import RatingIt from '@/components/RatingIt.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
 const userActionsStore = useUserFilmActionsStore()
 
 
-// Variables estáticas
+// Variables base
 const film = ref(null)
 const comments = ref([])
 const isLoading = ref(true)
@@ -60,6 +62,17 @@ const formattedTMDB = computed(() => {
 })
 
 // Acciones
+watch(() => auth.isAuthenticated, async (isLoged) => {
+    if (isLoged === true) {
+        console.log("Detectado login, recargando datos del usuario...");
+      
+        await fetchFilm(); 
+    } else { // Al cerrar sesión, se limpian los datos
+        comments.value = [];
+        userVote.value = null;
+    }
+});
+
 const fetchFilm = async () => {
   isLoading.value = true
   error.value = null
@@ -68,7 +81,10 @@ const fetchFilm = async () => {
     
     const { data } = await api.get(`/films/${id}`)
     film.value = data
-    await fetchComments()
+    await Promise.all([
+      fetchComments(),
+      fetchUserRating()])
+
   } catch (e) {
     error.value = 'Could not load movie information.'
   } finally {
@@ -86,6 +102,22 @@ const fetchComments = async () => {
     }
   } catch (e) {
     console.error("Error loading comments:", e)
+  }
+}
+
+const fetchUserRating = async () => {
+  try {
+    const id = route.params.id;
+   
+    const response = await api.get(`/films/show-user-action/${id}`);
+    
+    if (response.data && response.data.success) {
+      // Sincronizamos la variable userVote del store con lo que viene de la BD
+      // Si el rating es null, ponemos null
+      userVote.value = response.data.data.rating || null;
+    } 
+  } catch (e) {
+    console.error("Error loading user rating:", e);
   }
 }
 
@@ -146,17 +178,19 @@ watch(() => film.value, (newFilm) => {
     }
 }, { deep: true });
 
-// Acción para guardar la nota
+// Acción para guardar la nota (Nota: El nuevo componente RatingIt ya llama a store.saveRating internamente)
 const handleSaveRating = () => {
     userActionsStore.saveRating(film.value.idFilm, film);
 }
+
+
 </script>
 
 <template> 
   <div class="min-h-screen bg-slate-950 text-slate-100 font-sans">
 
     <div v-if="isLoading" class="flex flex-col items-center justify-center h-screen gap-4">
-      <div class="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+      <div class="w-12 h-12 border-4 border-emerald-500/20 border-t-red-600 rounded-full animate-spin"></div>
       <p class="text-slate-400">Consulting CinemaClub archives...</p>
     </div>
 
@@ -175,13 +209,11 @@ const handleSaveRating = () => {
         <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
         <div class="relative z-10 w-full max-w-6xl mx-auto">
           <div class="flex items-center gap-3 mb-6">
-            <div v-if="filmYear" class="flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 backdrop-blur-md shadow-lg">
-              <span class="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Year</span>
+            <div v-if="filmYear" class="flex items-center gap-2 px-3 py-1 rounded-full border border-red-600/40 bg-red-600/10 backdrop-blur-md shadow-lg">
               <span class="text-sm font-bold text-white">{{ filmYear }}</span>
             </div>
             <span v-if="filmYear && filmDuration" class="w-1 h-1 bg-slate-500 rounded-full"></span>
             <div v-if="filmDuration" class="flex items-center gap-2 px-3 py-1 rounded-full border border-slate-100/20 bg-slate-100/10 backdrop-blur-md shadow-lg">
-              <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Runtime</span>
               <span class="text-sm font-bold text-white">{{ filmDuration }}</span>
             </div>
           </div>
@@ -191,14 +223,11 @@ const handleSaveRating = () => {
         </div>
       </header>
 
-      <!-- Menos espacio arriba para que el frame quede más pegado al título -->
       <main class="max-w-7xl mx-auto px-4 md:px-16 pt-6 pb-12">
         
-        <!-- NUEVO GRID: Frame + Sinopsis (mismo bloque) -->
         <section class="grid gap-10 md:grid-cols-12 items-start">
 
           
-          <!-- COLUMNA IZQUIERDA: Frame + Género + Ratings -->
           <aside class="md:col-span-4 lg:col-span-3">
           
             <div class="sticky top-4 flex flex-col gap-4 max-w-[220px]">
@@ -210,9 +239,7 @@ const handleSaveRating = () => {
                 />
               </div>
 
-              
               <div v-if="film.genre" class="flex flex-col px-1 mt-3">
-                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2 text-center">Género</span>
                 <div class="flex flex-wrap gap-1 justify-center">
                   <span v-for="g in (Array.isArray(film.genre) ? film.genre : film.genre.split(','))" :key="g" 
                     class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700 uppercase font-medium">
@@ -221,17 +248,16 @@ const handleSaveRating = () => {
                 </div>
               </div>
               
-
               <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl space-y-4 shadow-xl backdrop-blur-sm">
                 <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Ratings</h3>
                 <div class="grid grid-cols-2 gap-3">
                   <div class="text-center p-2 bg-slate-950/50 rounded-xl border border-slate-800">
                     <p class="text-[9px] text-slate-500 font-bold uppercase mb-1">TMDB</p>
-                    <p class="text-emerald-400 font-black text-lg">{{ formattedTMDB }}</p>
+                    <p class="text-yellow-600 font-black text-lg">{{ formattedTMDB }}</p>
                   </div>
                   <div class="text-center p-2 bg-slate-950/50 rounded-xl border border-slate-800">
                     <p class="text-[9px] text-slate-500 font-bold uppercase mb-1">Club</p>
-                    <p class="text-yellow-500 font-black text-lg">
+                    <p class="text-brand font-black text-lg">
                       {{ film.globalRate > 0 ? Number(film.globalRate).toFixed(1) : '—' }}
                     </p>
                   </div>
@@ -244,41 +270,30 @@ const handleSaveRating = () => {
                     Tu puntuación
                   </h3>
                   
-                  <span class="block text-[9px] text-slate-400 leading-tight">
+                  <span class="block text-[9px] text-slate-400 leading-tight"> ¡Haz
                     <span @click="openLogin" class="text-brand font-bold cursor-pointer">Login</span> 
-                    para puntuar
+                    para puntuar!
                   </span>
                 </div>
                 
-                <div v-if="auth.isAuthenticated" class="star-rating flex justify-center">
-                  <template v-for="star in [5, 4, 3, 2, 1]" :key="star">
-                    <input 
-                      type="radio" 
-                      :id="'star' + star" 
-                      name="rating" 
-                      :value="star" 
-                      v-model="userVote" 
-                      @change="handleSaveRating"
-                      :disabled="isSavingRate"
-                    />
-                    <label :for="'star' + star" :title="star + ' estrellas'"></label>
-                  </template>
-                </div>
+                <RatingIt 
+                  v-if="auth.isAuthenticated" 
+                  :filmId="film.idFilm" 
+                  :filmRef="film" 
+                />
                 
-                <p v-if="isSavingRate" class="text-[9px] text-emerald-500 text-center animate-pulse">Guardando...</p>
+                <p v-if="isSavingRate" class="text-[9px] text-orange-500 text-center animate-pulse">Procesando voto...</p>
                 
               </div>
+              
             </div>
           </aside>
 
-          <!-- COLUMNA DERECHA: Sinopsis + resto del contenido -->
-          <!-- COLUMNA DERECHA: Sinopsis + resto del contenido -->
           <div class="md:col-span-8 lg:col-span-9 flex flex-col gap-8">
 
-            <!-- Sinopsis ahora dentro del grid, a la derecha del frame -->
             <div class="space-y-4">
               <h2 class="text-2xl font-bold text-white flex items-center gap-2">
-                <span class="w-2 h-1 bg-emerald-500 rounded-full"></span> Sinopsis
+                <span class="w-2 h-1 bg-brand rounded-full"></span> Sinopsis
               </h2>
               <p class="text-slate-300 text-lg leading-relaxed italic">
                 {{ film.overview || 'No description available.' }}
@@ -287,7 +302,7 @@ const handleSaveRating = () => {
 
             <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl backdrop-blur-sm">
               <div class="bg-slate-800/50 px-5 py-3 border-b border-slate-700">
-                <h3 class="text-xs font-black text-emerald-500 uppercase tracking-widest">Ficha Técnica</h3>
+                <h3 class="text-sm font-black text-yellow-600 uppercase tracking-widest">Ficha Técnica</h3>
               </div>
               <div class="p-5 space-y-4">
                 <div v-if="film.original_title" class="flex flex-col">
@@ -299,7 +314,7 @@ const handleSaveRating = () => {
                   <span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Director</span>
                   <div class="flex flex-wrap gap-x-2">
                     <template v-for="(dir, index) in directors" :key="dir.idPerson">
-                      <router-link :to="`/person/${dir.idPerson}`" class="text-sm text-emerald-400 hover:text-emerald-300 hover:underline transition-colors uppercase">
+                      <router-link :to="`/person/${dir.idPerson}`" class="text-slate-200 hover:text-yellow-600 transition-colors">
                         {{ dir.name }}
                       </router-link>
                       <span v-if="index < directors.length - 1" class="text-slate-600">|</span>
@@ -322,7 +337,7 @@ const handleSaveRating = () => {
                   <span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mb-2">Reparto Principal</span>
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-1 gap-x-4">
                     <div v-for="actor in actors" :key="actor.idPerson" class="text-xs flex items-baseline gap-2">
-                      <router-link :to="`/person/${actor.idPerson}`" class="text-slate-200 hover:text-emerald-400 transition-colors">
+                      <router-link :to="`/person/${actor.idPerson}`" class="text-slate-200 hover:text-yellow-600 transition-colors">
                         {{ actor.name }}
                       </router-link>
                       <span v-if="actor.pivot?.character_name" class="text-slate-500 italic text-[10px] truncate">
@@ -336,41 +351,45 @@ const handleSaveRating = () => {
 
             <section class="space-y-8 pt-8 border-t border-slate-800">
               <h2 class="text-2xl font-bold text-white flex items-center gap-2">
-                <span class="w-2 h-1 bg-emerald-500 rounded-full"></span> Comunidad
+                <span class="w-2 h-1 bg-brand rounded-full"></span> Comunidad
               </h2>
 
-              <div v-if="auth.isAuthenticated" class="bg-slate-900/40 p-6 rounded-2xl border border-slate-800 space-y-4">
-                <textarea 
-                  v-model="newComment"
-                  rows="3"
-                  class="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  placeholder="What did you think of the movie?"
-                ></textarea>
-                <div class="flex justify-end">
-                  <button 
-                    @click="postComment"
-                    :disabled="!newComment.trim() || isSending"
-                    class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-8 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-emerald-900/20"
-                  >
-                    <span v-if="isSending" class="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
-                    {{ isSending ? 'Posting...' : 'Post Review' }}
-                  </button>
+              <!-- BLOQUE formulario de comentario o aviso de login -->
+              <div class="space-y-4">
+                <div v-if="auth.isAuthenticated" class="bg-slate-900/40 p-6 rounded-2xl border border-slate-800 space-y-4">
+                  <textarea 
+                    v-model="newComment"
+                    rows="3"
+                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    placeholder="¿Qué piensas de la película?"
+                  ></textarea>
+                  <div class="flex justify-end">
+                    <button 
+                      @click="postComment"
+                      :disabled="!newComment.trim() || isSending"
+                      class="bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 text-white px-8 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-emerald-900/20"
+                    >
+                      <span v-if="isSending" class="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+                      {{ isSending ? 'Posting...' : 'Comentar' }}
+                    </button>
+                  </div>
+                </div>
+
+                <div v-else class="bg-slate-900/30 p-8 rounded-2xl border border-dashed border-slate-700 text-center">
+                  <p class="text-slate-400">
+                    ¡Haz <span @click="openLogin" class="text-emerald-500 font-bold cursor-pointer underline">login</span> para dejar un comentario!
+                  </p>
                 </div>
               </div>
 
-              <div v-else class="bg-slate-900/30 p-8 rounded-2xl border border-dashed border-slate-700 text-center">
-                <p class="text-slate-400">
-                  Debes <span @click="openLogin" class="text-emerald-500 font-bold cursor-pointer underline">hacer login</span> para dejar un comentario.
-                </p>
-              </div>
-
-              <div class="space-y-6">
+              <!-- BLOQUEcomentarios -->
+              <div class="space-y-6 pt-6 border-t border-slate-800/60">
                 <div v-if="comments.length === 0" class="text-slate-600 italic text-center py-4 text-sm">
                   No comments yet. Be the first!
                 </div>
                 
                 <div v-for="comment in comments" :key="comment.id" class="flex gap-4 p-5 rounded-2xl bg-slate-900/20 border border-slate-800/50 hover:bg-slate-900/30 transition-colors">
-                  <div class="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center text-emerald-500 font-bold shrink-0 border border-emerald-500/20">
+                  <div class="w-10 h-10 bg-yellow-500/20 rounded-full flex items-center justify-center text-yellow-600 font-bold shrink-0 border border-yellow-500/20">
                     {{ comment.user?.name?.charAt(0).toUpperCase() || 'U' }}
                   </div>
                   <div class="flex-1 space-y-2">
@@ -391,7 +410,6 @@ const handleSaveRating = () => {
                 </div> 
               </div> 
             </section>
-
           </div>
         </section>
       </main>
@@ -402,39 +420,3 @@ const handleSaveRating = () => {
 </template>
 
 
-<style>
-/* Estilos para las estrellas de CinemaClub */
-.star-rating {
-  display: flex;
-  flex-direction: row-reverse;
-  justify-content: flex-start;
-  gap: 0.25rem;
-}
-
-.star-rating input {
-  display: none;
-}
-
-.star-rating label {
-  cursor: pointer;
-  font-size: 1.5rem;
-  transition: transform 0.2s;
-}
-
-.star-rating label::before {
-  font-family: "bootstrap-icons";
-  content: "\f588"; /* bi-star (vacía) */
-  color: #475569; /* slate-500 */
-}
-
-.star-rating label:hover::before,
-.star-rating label:hover ~ label::before {
-  content: "\f586"; /* bi-star-fill (llena) */
-  color: #10b981; /* esmeralda */
-}
-
-.star-rating input:checked ~ label::before {
-  content: "\f586";
-  color: #ef4444; /* rojo (o el color que prefieras) */
-}
-</style>
