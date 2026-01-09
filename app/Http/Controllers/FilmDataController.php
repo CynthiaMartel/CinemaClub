@@ -211,33 +211,64 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
                 }
                 // --- FIN INSERCIÓN MÚLTIPLES DIRECTORES ---
 
-               //Insertamos actores y actrices
+               //Insertamos actores y actrices: ¡¡HECHA MEJORA PARA AUMENTAR LA INSERCIÓN EN BD Y NO SATURAR!!
                 foreach ($castTMDb as $order => $actor) {
-                    // Tu validación de datos válidos sigue aquí (ID y Nombre)
+                    // Reiniciamos la variable en cada vuelta del bucle
+                    $castCrew = null; 
+
                     if (!empty($actor['id']) && !empty($actor['name'])) {
                         
-                        // Buscamos o creamos al actor en la tabla principal (CastCrew)
-                        $castCrew = CastCrew::firstOrCreate(
-                            ['tmdb_id' => $actor['id']],
-                            [
-                                'name' => $actor['name'] ?? 'Desconocido',
-                                'profile_path' => $actor['profile_path'] ?? null,
-                            ]
-                        );
+                        // Intentamos buscar si ya existe en BD para no repetir llamadas a la API
+                        $castCrew = CastCrew::where('tmdb_id', $actor['id'])->first();
 
-                        // Insertamos la relación y como borramos arriba, aquí no habrá duplicados.
+                        // Si NO existe en nuestra base de datos, pedimos Bio y detalles a TMDB
+                        // Buscamos detalles profundos solo para los 6 primeros (índice 0 al 5) para no saturar peticiones
+                        if (!$castCrew && $order <= 5) { 
+                            try {
+                                $personUrl = "https://api.themoviedb.org/3/person/{$actor['id']}?api_key={$apiKey}";
+                                $pResponse = Http::timeout(5)->get($personUrl);
+                                
+                                if ($pResponse->successful()) {
+                                    $pDetails = $pResponse->json();
+                                    $castCrew = CastCrew::create([
+                                        'tmdb_id'        => $actor['id'],
+                                        'name'           => $actor['name'],
+                                        'bio'            => $pDetails['biography'] ?? null,
+                                        'profile_path'   => $actor['profile_path'] ?? null,
+                                        'birthday'       => $pDetails['birthday'] ?? null,
+                                        'place_of_birth' => $pDetails['place_of_birth'] ?? null,
+                                    ]);
+                                }
+                            } catch (\Exception $e) {
+                                Log::error("Error con actor {$actor['name']}: " . $e->getMessage());
+                            }
+                        } 
+                        
+                        // Si sigue siendo null (porque es un actor secundario > 6 o la API falló), se crea el registro básico pero sin biografía/fechas
+                        if (!$castCrew) {
+                            $castCrew = CastCrew::firstOrCreate(
+                                ['tmdb_id' => $actor['id']],
+                                [
+                                    'name' => $actor['name'],
+                                    'profile_path' => $actor['profile_path'] ?? null,
+                                ]
+                            );
+                        }
+
+                        // Insertamos la relación en la tabla pivot para los 12 actores
                         DB::table('film_cast_pivot')->insert([
-                            'idFilm' => $film->idFilm,
-                            'idPerson' => $castCrew->idPerson,
-                            'role' => 'Actor',
+                            'idFilm'         => $film->idFilm,
+                            'idPerson'       => $castCrew->idPerson,
+                            'role'           => 'Actor',
                             'character_name' => $actor['character'] ?? null,
-                            'credit_order' => $order
+                            'credit_order'   => $order
                         ]);
                     }
                     
-                    // OLimitamos a los primeros 15 actores para no saturar la BD y porque realmente en el front no vamos a tener tantos actores
-                    if ($order > 15) break; 
+                    // Si ya procesamos el actor número 12 (índice 11), paramos
+                    if ($order >= 11) break; 
                 }
+
 
                 $insertadas++;
                 Log::info("Película guardada en BD: {$film->title}");
