@@ -5,14 +5,18 @@ import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
 import LoginModal from '@/components/LoginModal.vue'
 import { storeToRefs } from 'pinia';
+
 import { useUserFilmActionsStore } from '@/stores/user_film_actions'
-// Importamos el nuevo componente de estrellas
 import RatingIt from '@/components/RatingIt.vue'
+import PersonModal from '@/components/CastCrewModal.vue'
+import FilmDetailsModal from '@/components/FilmDetailsModal.vue' 
 
 const route = useRoute()
 const auth = useAuthStore()
 const userActionsStore = useUserFilmActionsStore()
 
+const isCastCrewModalOpen = ref(false)
+const selectedActorId = ref(null) //¡También aplicado a director, y no solo a actors!
 
 // Variables base
 const film = ref(null)
@@ -23,9 +27,15 @@ const newComment = ref('')
 const isLoginOpen = ref(false)
 const isSending = ref(false)
 const deletingId = ref(null)
+const isDetailsModalOpen = ref(false)
 
 const openLogin = () => {
   isLoginOpen.value = true
+}
+
+const openPerson = (id) => {
+  selectedActorId.value = id
+  isCastCrewModalOpen.value = true
 }
 
 // Variables computadas
@@ -43,7 +53,7 @@ const actors = computed(() => {
     .slice(0, 12) // Mostramos los 12 principales para no saturar la ficha
 })
 
-// Computed properties existentes
+
 const filmYear = computed(() => {
   if (!film.value?.release_date) return ''
   return new Date(film.value.release_date).getFullYear()
@@ -61,6 +71,13 @@ const formattedTMDB = computed(() => {
   return film.value?.vote_average ? Number(film.value.vote_average).toFixed(1) : '—'
 })
 
+// Comprobar si hay información extra para mostrar el botón de ver más detalle en ficha técnica (ya que a veces no tenemos esta info en la bd)
+const hasExtraDetails = computed(() => {
+  return (film.value?.awards?.length > 0) || 
+         (film.value?.nominations?.length > 0) || 
+         (film.value?.alternative_titles?.length > 0);
+});
+
 // Acciones
 watch(() => auth.isAuthenticated, async (isLoged) => {
     if (isLoged === true) {
@@ -72,6 +89,21 @@ watch(() => auth.isAuthenticated, async (isLoged) => {
         userVote.value = null;
     }
 });
+
+watch(
+  () => route.params.id, 
+  async (newId, oldId) => {
+    if (newId && newId !== oldId) {
+      console.log("Navegando a nueva película ID:", newId);
+      
+      // Subimos el scroll arriba del todo de la vista para cuando se recargue, no oaparezca donde el usuario se quedó (por ej si se quedó leyendo por la mitad de la vista anteiormente)
+      window.scrollTo(0, 0); 
+      
+      //Llamamos a fetchFilm para que cargue la nueva película, comentarios y ratings
+      await fetchFilm();
+    }
+  }
+);
 
 const fetchFilm = async () => {
   isLoading.value = true
@@ -183,10 +215,8 @@ const handleSaveRating = () => {
     userActionsStore.saveRating(film.value.idFilm, film);
 }
 
-
 </script>
-
-<template> 
+<template>
   <div class="min-h-screen bg-slate-950 text-slate-100 font-sans">
 
     <div v-if="isLoading" class="flex flex-col items-center justify-center h-screen gap-4">
@@ -197,7 +227,7 @@ const handleSaveRating = () => {
     <div v-else-if="error" class="flex items-center justify-center h-screen">
       <div class="bg-red-500/10 border border-red-500/50 p-6 rounded-2xl text-center">
         <p class="text-red-400">{{ error }}</p>
-        <button @click="fetchFilm" class="mt-4 text-red-300 underline cursor-pointer">Retry</button>
+        <button @click="fetchFilm" class="mt-4 text-red-300 underline cursor-pointer">Reintentar</button>
       </div>
     </div>
 
@@ -220,14 +250,27 @@ const handleSaveRating = () => {
           <h1 class="text-4xl md:text-7xl font-black text-white drop-shadow-2xl tracking-tight">
             {{ film.title }}
           </h1>
+          
+          <div v-if="directors.length" class="mt-2 text-lg md:text-2xl font-medium text-slate-300 drop-shadow-lg">
+            Dirigida por 
+            <template v-for="(dir, index) in directors" :key="dir.idPerson" >
+              <span 
+                @click="openPerson(dir.idPerson)"
+                class="text-yellow-600 hover:text-yellow-700 transition-colors cursor-pointer "
+              >
+                {{ dir.name }}
+              </span>
+              <span v-if="index < directors.length - 1" class="text-yellow-600">, </span>
+            </template>
+          </div>
+        
         </div>
-      </header>
+      </header> 
 
       <main class="max-w-7xl mx-auto px-4 md:px-16 pt-6 pb-12">
         
         <section class="grid gap-10 md:grid-cols-12 items-start">
 
-          
           <aside class="md:col-span-4 lg:col-span-3">
           
             <div class="sticky top-4 flex flex-col gap-4 max-w-[220px]">
@@ -296,65 +339,81 @@ const handleSaveRating = () => {
                 <span class="w-2 h-1 bg-brand rounded-full"></span> Sinopsis
               </h2>
               <p class="text-slate-300 text-lg leading-relaxed italic">
-                {{ film.overview || 'No description available.' }}
+                {{ film.overview || 'No hay sinospsi disponible.' }}
               </p>
             </div>
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl backdrop-blur-sm">
+            
+          <div class="bg-slate-800/50 px-5 py-3 border-b border-slate-700 flex justify-between items-center">
+            <h3 class="text-sm font-black text-yellow-600 uppercase tracking-widest">Ficha Técnica</h3>
+            
+            <button 
+              v-if="hasExtraDetails"
+              @click="isDetailsModalOpen = true"
+              class="text-[10px] font-bold bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1 rounded-full transition-colors uppercase tracking-tighter flex items-center gap-1"
+            >
+              <span>Ver más detalles</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
 
-            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl backdrop-blur-sm">
-              <div class="bg-slate-800/50 px-5 py-3 border-b border-slate-700">
-                <h3 class="text-sm font-black text-yellow-600 uppercase tracking-widest">Ficha Técnica</h3>
+          <div class="p-5 space-y-4">
+            <div v-if="film.original_title" class="flex flex-col">
+              <span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Título original</span>
+              <span class="text-sm text-slate-200">{{ film.original_title }}</span>
+            </div>
+            
+            <div v-if="directors.length" class="flex flex-col">
+              <span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Director</span>
+              <div class="flex flex-wrap gap-x-2">
+                <template v-for="(dir, index) in directors" :key="dir.idPerson">
+                  <span 
+                    @click="openPerson(dir.idPerson)"
+                    class="text-slate-200 hover:text-slate-600 underline decoration-slate-500/40 underline-offset-4 hover:decoration-slate-600/60 transition-all duration-300 cursor-pointer">
+                    {{ dir.name }}
+                  </span>
+                  <span v-if="index < directors.length - 1" class="text-slate-600">|</span>
+                </template>
               </div>
-              <div class="p-5 space-y-4">
-                <div v-if="film.original_title" class="flex flex-col">
-                  <span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Título original</span>
-                  <span class="text-sm text-slate-200">{{ film.original_title }}</span>
-                </div>
-                
-                <div v-if="directors.length" class="flex flex-col">
-                  <span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Director</span>
-                  <div class="flex flex-wrap gap-x-2">
-                    <template v-for="(dir, index) in directors" :key="dir.idPerson">
-                      <router-link :to="`/person/${dir.idPerson}`" class="text-slate-200 hover:text-yellow-600 transition-colors">
-                        {{ dir.name }}
-                      </router-link>
-                      <span v-if="index < directors.length - 1" class="text-slate-600">|</span>
-                    </template>
-                  </div>
-                </div>
+            </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                  <div v-if="film.origin_country" class="flex flex-col">
-                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">País</span>
-                    <span class="text-sm text-slate-200">{{ film.origin_country }}</span>
-                  </div>
-                  <div v-if="film.original_language" class="flex flex-col">
-                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Idioma</span>
-                    <span class="text-sm text-slate-200 uppercase">{{ film.original_language }}</span>
-                  </div>
-                </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div v-if="film.origin_country" class="flex flex-col">
+                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">País</span>
+                <span class="text-sm text-slate-200">{{ film.origin_country }}</span>
+              </div>
+              <div v-if="film.original_language" class="flex flex-col">
+                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Idioma</span>
+                <span class="text-sm text-slate-200 uppercase">{{ film.original_language }}</span>
+              </div>
+            </div>
 
-                <div v-if="actors.length" class="flex flex-col pt-2 border-t border-slate-800">
-                  <span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mb-2">Reparto Principal</span>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-1 gap-x-4">
-                    <div v-for="actor in actors" :key="actor.idPerson" class="text-xs flex items-baseline gap-2">
-                      <router-link :to="`/person/${actor.idPerson}`" class="text-slate-200 hover:text-yellow-600 transition-colors">
-                        {{ actor.name }}
-                      </router-link>
-                      <span v-if="actor.pivot?.character_name" class="text-slate-500 italic text-[10px] truncate">
-                        {{ actor.pivot.character_name }}
-                      </span>
-                    </div>
-                  </div>
+            <div v-if="actors.length" class="flex flex-col pt-2 border-t border-slate-800">
+              <span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mb-2">Reparto Principal</span>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-1 gap-x-4">
+                <div v-for="actor in actors" :key="actor.idPerson" class="text-xs flex items-baseline gap-2">
+                  <span
+                    @click="openPerson(actor.idPerson)"
+                    class="text-slate-200 hover:text-slate-600 underline decoration-slate-500/40 underline-offset-4 hover:decoration-slate-600/60 transition-all duration-300 cursor-pointer"
+                  >
+                    {{ actor.name }}
+                  </span>
+                  <span v-if="actor.pivot?.character_name" class="text-slate-500 italic text-[10px] truncate">
+                    {{ actor.pivot.character_name }}
+                  </span>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
             <section class="space-y-8 pt-8 border-t border-slate-800">
               <h2 class="text-2xl font-bold text-white flex items-center gap-2">
                 <span class="w-2 h-1 bg-brand rounded-full"></span> Comunidad
               </h2>
 
-              <!-- BLOQUE formulario de comentario o aviso de login -->
               <div class="space-y-4">
                 <div v-if="auth.isAuthenticated" class="bg-slate-900/40 p-6 rounded-2xl border border-slate-800 space-y-4">
                   <textarea 
@@ -377,12 +436,11 @@ const handleSaveRating = () => {
 
                 <div v-else class="bg-slate-900/30 p-8 rounded-2xl border border-dashed border-slate-700 text-center">
                   <p class="text-slate-400">
-                    ¡Haz <span @click="openLogin" class="text-emerald-500 font-bold cursor-pointer underline">login</span> para dejar un comentario!
+                    ¡Haz <span @click="openLogin" class="text-yellow-600 font-bold cursor-pointer underline">login</span> para dejar un comentario!
                   </p>
                 </div>
               </div>
 
-              <!-- BLOQUEcomentarios -->
               <div class="space-y-6 pt-6 border-t border-slate-800/60">
                 <div v-if="comments.length === 0" class="text-slate-600 italic text-center py-4 text-sm">
                   No comments yet. Be the first!
@@ -416,7 +474,13 @@ const handleSaveRating = () => {
     </div>
   </div>
 
-  <LoginModal v-model="isLoginOpen" />
-</template>
+  <FilmDetailsModal 
+  v-model="isDetailsModalOpen" 
+  :film="film" 
+  @openPerson="openPerson" 
+/>
 
+  <LoginModal v-model="isLoginOpen" />
+  <PersonModal v-model="isCastCrewModalOpen" :personId="selectedActorId" />
+</template>
 
