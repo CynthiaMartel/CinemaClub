@@ -207,6 +207,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
+|     -- RUTAS CAST_CREW --
+|--------------------------------------------------------------------------
+*/
+// Ruta para mostrar actores y actrices, director con cada film asociado
+
+use App\Http\Controllers\CastCrewController;
+
+Route::get('{id}/cast-crew', [CastCrewController::class, 'show']);
+
+/*
+|--------------------------------------------------------------------------
 |     -- RUTAS USER ENTRIES --
 |--------------------------------------------------------------------------
 */
