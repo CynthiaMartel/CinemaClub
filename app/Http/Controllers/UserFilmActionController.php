@@ -137,29 +137,39 @@ class UserFilmActionController extends Controller
 
     // MOSTRAR ESTADÍSTICAS de actividad del usuario (admin o logueado)
  
-    public function showStats($userId = null): JsonResponse
+    public function showStats($userId = null)
     {
-        $authUser = Auth::user();
-        $userId = $userId ?? $authUser->id;
+        $targetId = $userId ?? auth()->id();
 
-        // Solo admin puede ver otros usuarios
-        if ($authUser->id !== $userId && !$authUser->isAdmin()) {
-            return response()->json(['error' => 'No tienes permiso para ver estas estadísticas.'], 403);
-        }
+        //Consultar el perfil y contar las acciones (watched, rating, y vitas este año, )relacionadas
+        $userStats = User::withCount([
+            'filmActions as films_seen_count' => function ($query) {
+                $query->where('watched', true);
+            },
+            'filmActions as films_rated_count' => function ($query) {
+                $query->whereNotNull('rating');
+            },
+            'filmActions as seen_this_year_count' => function ($query) {
+                $query->where('watched', true)
+                    ->whereYear('updated_at', now()->year);
+            }
+        ])
+        ->with('profile') // Traemos también el perfil con la bio, avatar, etc.
+        ->findOrFail($targetId);
 
-        $stats = [
-            'favorites' => UserFilmActions::where('idUser', $userId)->where('is_favorite', true)->count(),
-            'watch_later' => UserFilmActions::where('idUser', $userId)->where('watch_later', true)->count(),
-            'watched' => UserFilmActions::where('idUser', $userId)->where('watched', true)->count(),
-            'rated' => UserFilmActions::where('idUser', $userId)->whereNotNull('rating')->count(),
-            'last_updated' => UserFilmActions::where('idUser', $userId)->max('updated_at'),
-        ];
-
+        // Devolver la respuesta
         return response()->json([
-            'success' => true,
-            'user_id' => $userId,
-            'stats' => $stats,
-        ], 200);
+            'user' => [
+                'name' => $userStats->name,
+                'profile' => $userStats->profile,
+                'stats' => [
+                    'films_seen' => $userStats->films_seen_count,
+                    'films_rated'   => $userStats->films_rated_count,
+                    'films_seen_this_year' => $userStats->seen_this_year_count,
+                    // Añadir 'Listas' aquí contando la relación de listas!!!!!! ***
+                ]
+            ]
+        ]);
     }
 
     //Obtener una campo específico de las acciones del usuario : nota de film, si es fav, watched, puesta en la lista de watched..
