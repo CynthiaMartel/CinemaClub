@@ -37,7 +37,7 @@ const handleStarClick = () => {
 
 <template>
   <div class="rateit-wrapper">
-    <h3 class="rating-title">Tu puntuación</h3>
+    <h3 class="rating-title">Tu interacción</h3>
     
     <div 
       class="rateit-range" 

@@ -180,3 +180,4 @@ const groupedFilms = computed(() => {
   background: #ef4444;
 }
 </style>
+
