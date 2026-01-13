@@ -81,18 +81,19 @@ const hasExtraDetails = computed(() => {
 // Acciones
 // Acciones al cambiar el estado de login
 watch(() => auth.isAuthenticated, async (isLoged) => {
-    if (isLoged) { 
-        // Si se loguea, refrescamos la película para traer sus datos personales
-        await fetchFilm(); 
-    } else { 
-        // Si sale, limpiamos comentarios y las acciones del usuario en la UI
-        comments.value = []; 
-        userVote.value = 0;
-        if (film.value) {
-            film.value.user_action = null; 
-        }
-    }
-});
+  if (isLoged) {
+    // Si se loguea, refrescamos la película para traer sus datos personales
+    await fetchFilm()
+  } else {
+    // Si sale las acciones del usuario en la UI
+    userVote.value = 0
+    if (film.value) film.value.user_action = null
+
+    // opcional: si quieres asegurar recarga pública
+    await fetchComments()
+  }
+})
+
 
 // Funciones fetch para traer los datos que el usuario tenga recogidos en cada film
 const fetchFilm = async () => {
