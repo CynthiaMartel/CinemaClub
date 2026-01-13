@@ -3,49 +3,41 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UserFilmActionsRequest;
+use App\Models\User; 
 use App\Models\UserFilmActions;
-use App\Models\IndividualRate;
 use App\Models\Film;
 use App\Models\UserProfile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-
 use Carbon\Carbon;
 
 class UserFilmActionController extends Controller
 {
- 
 
-    // CREAR O ACTUALIZAR una acción de usuario sobre una película: marcar como favorita, ver después, vista, puntuar, escribir reseña, marcar visibilidad de la actividad
-
+    // CREAR O ACTUALIZAR una acción de usuario sobre una película: marcar como favorita, ver después, vista, puntuar, marcar visibilidad de la actividad
     public function storeOrUpdate(UserFilmActionsRequest $request, $filmId): JsonResponse
     {
         $user = Auth::user();
         $film = Film::findOrFail($filmId);
-
         $validated = $request->validated();
 
-        // Guardar o Actualizar la nota del usuario
+        // Guardar o Actualizar la acción del usuario usando user_id y film_id
         $action = UserFilmActions::updateOrCreate(
-            ['idUser' => $user->id, 'idFilm' => $filmId],
+            ['user_id' => $user->id, 'film_id' => $filmId],
             $validated
         );
 
-        // i ha enviado una nota, recalculamos la media de TODO EL CLUB
-        $newAverage = 0;
-        if (isset($validated['rating'])) {
-            $newAverage = UserFilmActions::where('idFilm', $filmId)
-                ->whereNotNull('rating')
-                ->avg('rating');
+        // FORZAMOS la actualización de 'updated_at' para que las estadísticas de "este año" 
+        // se actualicen aunque solo se haya cambiado la nota o el valor sea el mismo.
+        $action->touch();
 
-            // Guardamos la media en globalRate
-            $film->globalRate = round($newAverage, 1);
-            $film->save();
+        // Si ha enviado una nota (rating), recalculamos la media de TODO EL CLUB para esa película
+        if (isset($validated['rating'])) {
+            $this->recalculateFilmRating($filmId);
         }
 
-        // Para actualizar la estadísticas del perfil del usuario
-        $this->updateUserStats($user->id);
+        // --- NOTA: No se llama a updateUserStats porque no existen esos campos en tu tabla profile ---
 
         return response()->json([
             'success' => true,
@@ -55,29 +47,28 @@ class UserFilmActionController extends Controller
     }
 
 
-   // DESMARCAR acción específica (ej: quitar de favoritos, borrar puntuación, etc.)
- 
+    // DESMARCAR acción específica (ej: quitar de favoritos, borrar puntuación, etc.)
     public function unmarkAction(Request $request, $filmId): JsonResponse
     {
         $user = Auth::user();
 
-        $action = UserFilmActions::where('idUser', $user->id)
-                                ->where('idFilm', $filmId)
+        // Buscamos el registro con user_id y film_id
+        $action = UserFilmActions::where('user_id', $user->id)
+                                ->where('film_id', $filmId)
                                 ->first();
 
         if (!$action) {
             return response()->json(['error' => 'No existe registro para esta película.'], 404);
         }
 
-        $field = $request->input('field'); // campo que el usuario quiere desmarcar
-
+        $field = $request->input('field'); 
         $allowed = ['is_favorite', 'watch_later', 'watched', 'rating', 'short_review'];
 
         if (!in_array($field, $allowed)) {
             return response()->json(['error' => 'Campo no válido para eliminar.'], 400);
         }
 
-        // Poner el campo a su valor “vacío”
+        // Resetear el campo según su tipo
         if (in_array($field, ['is_favorite', 'watch_later', 'watched'])) {
             $action->$field = false;
         } else {
@@ -85,9 +76,14 @@ class UserFilmActionController extends Controller
         }
 
         $action->save();
+        
+        // Al desmarcar también actualizamos el timestamp para que las estadísticas sean coherentes
+        $action->touch();
 
-        // Actualizar estadísticas del perfil
-        $this->updateUserStats($user->id);
+        // Si el usuario elimina su nota, debemos recalcular la media global de la película
+        if ($field === 'rating') {
+            $this->recalculateFilmRating($filmId);
+        }
 
         return response()->json([
             'success' => true,
@@ -97,35 +93,32 @@ class UserFilmActionController extends Controller
     }
 
 
-   // MOSTRAR LISTAS de películas según tipo de acción: favorites, watch_later, watched (user logueado)
+    // MOSTRAR COLECCIONES de películas (favorites, watch_later, watched)
     public function showUserFilmCollection(Request $request): JsonResponse
     {
         $user = Auth::user();
-        $type = $request->query('type'); // ej: ?type=favorites
+        $type = $request->query('type');
 
         $validTypes = [
-            'favorites' => 'is_favorite',
+            'favorites'   => 'is_favorite',
             'watch_later' => 'watch_later',
-            'watched' => 'watched',
-            'rating' => 'films_rated',
-
+            'watched'     => 'watched',
+            'rating'      => 'rating',
         ];
 
-        // Validar el tipo de acción solicitado
         if (!array_key_exists($type, $validTypes)) {
-            return response()->json([
-                'error' => 'Tipo de acción no válido. Usa: favorites, watch_later o watched.'
-            ], 400);
+            return response()->json(['error' => 'Tipo no válido.'], 400);
         }
 
-        // Obtener el campo correspondiente según el tipo
         $column = $validTypes[$type];
 
-        // Consultar las películas según la acción
-        $films = UserFilmActions::with('film')
-            ->where('idUser', $user->id)
-            ->where($column, true)
-            ->get();
+        $query = UserFilmActions::with('film')->where('user_id', $user->id);
+
+        if ($type === 'rating') {
+            $films = $query->whereNotNull($column)->get();
+        } else {
+            $films = $query->where($column, true)->get();
+        }
 
         return response()->json([
             'success' => true,
@@ -135,99 +128,80 @@ class UserFilmActionController extends Controller
         ], 200);
     }
 
-    // MOSTRAR ESTADÍSTICAS de actividad del usuario (admin o logueado)
- 
-    public function showStats($userId = null)
+    // MOSTRAR ESTADÍSTICAS para el perfil (Cálculo dinámico sin columnas extra en DB)
+    public function showStats($userId = null) 
     {
         $targetId = $userId ?? auth()->id();
 
-        //Consultar el perfil y contar las acciones (watched, rating, y vitas este año, )relacionadas
-        $userStats = User::withCount([
-            'filmActions as films_seen_count' => function ($query) {
-                $query->where('watched', true);
-            },
-            'filmActions as films_rated_count' => function ($query) {
-                $query->whereNotNull('rating');
-            },
-            'filmActions as seen_this_year_count' => function ($query) {
-                $query->where('watched', true)
-                    ->whereYear('updated_at', now()->year);
-            }
-        ])
-        ->with('profile') // Traemos también el perfil con la bio, avatar, etc.
-        ->findOrFail($targetId);
+        $userStats = User::where('id', $targetId)
+            ->withCount([
+                // Total histórico: películas vistas O puntuadas
+                'filmActions as films_total_count' => function ($query) {
+                    $query->where(function ($q) {
+                        $q->where('watched', true)->orWhereNotNull('rating');
+                    });
+                },
+                // Total puntuadas
+                'filmActions as films_rated_count' => function ($query) {
+                    $query->whereNotNull('rating');
+                },
+                // Actividad de este año (2026): Cualquier interacción (vista o puntuada) este año
+                'filmActions as watched_this_year_count' => function ($query) {
+                    $query->where(function ($q) {
+                        $q->where('watched', true)->orWhereNotNull('rating');
+                    })->whereYear('updated_at', now()->year);
+                },
+            ])
+            ->with('profile')
+            ->firstOrFail();
 
-        // Devolver la respuesta
         return response()->json([
+            'success' => true,
             'user' => [
                 'name' => $userStats->name,
                 'profile' => $userStats->profile,
                 'stats' => [
-                    'films_seen' => $userStats->films_seen_count,
-                    'films_rated'   => $userStats->films_rated_count,
-                    'films_seen_this_year' => $userStats->seen_this_year_count,
-                    // Añadir 'Listas' aquí contando la relación de listas!!!!!! ***
+                    'films_seen'           => $userStats->films_total_count,
+                    'films_rated'          => $userStats->films_rated_count,
+                    'films_seen_this_year' => $userStats->watched_this_year_count,
                 ]
             ]
         ]);
     }
 
-    //Obtener una campo específico de las acciones del usuario : nota de film, si es fav, watched, puesta en la lista de watched..
-    // UserFilmActionController.php
-
+    // Mostrar el estado de una película para el usuario actual
     public function showAction($filmId): JsonResponse
     {
         $user = Auth::user();
-        
-        // Buscamos el registro para ese usuario y esa película
-        $action = UserFilmActions::where('idUser', $user->id)
-                                ->where('idFilm', $filmId)
+        $action = UserFilmActions::where('user_id', $user->id)
+                                ->where('film_id', $filmId)
                                 ->first();
 
-        // Si no existe, devolvemos un objeto vacío o valores por defecto
         if (!$action) {
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'rating' => 0,
-                    'is_favorite' => false,
-                    'watched' => false,
-                    'watch_later' => false
-                ]
+                'data' => ['rating' => 0, 'is_favorite' => false, 'watched' => false, 'watch_later' => false]
             ], 200);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $action,
-        ], 200);
+        return response()->json(['success' => true, 'data' => $action], 200);
     }
 
-    // Método auxiliar:
-    // Para actualizar estadísticas en el perfil del usuario (favoritas, vistas, vistas este año) que se utiliza en storeOrUpdate()
-     
-    private function updateUserStats(int $userId): void
+    // --- MÉTODOS AUXILIARES ---
+
+    /**
+     * Recalcula la nota media de la película y la guarda en la tabla films (globalRate).
+     */
+    private function recalculateFilmRating($filmId): void
     {
-        $profile = UserProfile::where('user_id', $userId)->first();
-        if (!$profile) return;
-
-        $now = Carbon::now();
-
-        $profile->films_seen = UserFilmActions::where('idUser', $userId)
-            ->where('watched', true)
-            ->count();
-
-        $profile->films_rated = UserFilmActions::where('idUser', $userId)
+        $newAverage = UserFilmActions::where('film_id', $filmId)
             ->whereNotNull('rating')
-            ->count();
+            ->avg('rating');
 
-        $profile->films_seen_this_year = UserFilmActions::where('idUser', $userId)
-            ->where('watched', true)
-            ->whereYear('updated_at', $now->year)
-            ->count();
-
-        $profile->save();
+        $film = Film::find($filmId);
+        if ($film) {
+            $film->globalRate = round($newAverage ?? 0, 1);
+            $film->save();
+        }
     }
 }
-
-
