@@ -184,15 +184,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
 
     // CREAR/ACTUALIZAR una acción de usuario (favorito, ver más tarde, vista, puntuación, etc.)
-    Route::post('/films/createOrEdit/{filmId}', [UserFilmActionController::class, 'storeOrUpdate'])
+    Route::post('/films/createOrEdit/{film_id}', [UserFilmActionController::class, 'storeOrUpdate'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
         ->name('api.films.action.createOrEdit');
 
     // VER UNA ACCIÓN EN ESPECÍFICO: rated, watched, en watch_list...
-    Route::get('/films/show-user-action/{filmId}', [UserFilmActionController::class, 'showAction']);
+    Route::get('/films/show-user-action/{film_id}', [UserFilmActionController::class, 'showAction']);
 
     // DESMARCAR una acción específica (quitar favorito, reseña, etc.)
-    Route::delete('/films/unmarkAction/{filmId}', [UserFilmActionController::class, 'unmarkAction'])
+    Route::delete('/films/unmarkAction/{film_id}', [UserFilmActionController::class, 'unmarkAction'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
         ->name('api.films.action.unmarkAction');
 
@@ -201,7 +201,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('api.user.films.my_films');
 
     // MOSTRAR ESTADÍSTICAS de actividad del usuario (admin o logueado)
-    Route::get('/user_films/stats/{userId?}', [UserFilmActionController::class, 'showStats'])
+    Route::get('/user_films/stats/{user_id?}', [UserFilmActionController::class, 'showStats'])
         ->name('api.user.films.stats');
 });
 
@@ -295,10 +295,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // --USER COMMENTS --
     // UserCommentController: comentarios con polimorfismos para usar en films (comentarios de películas) o en entradas (comentarios en entradas de usuarios)
-     
-    // OBTENER comentarios (de un film o una entry) por IdFilm o o id de la entrada
-    Route::get('/comments/{type}/{id}', [UserCommentController::class, 'index'])
-        ->name('api.comments.index');
 
     // CREAR comentario (en film o entry) por IdFilm o o id de la entrada
     Route::post('/comments/{type}/{id}/create', [UserCommentController::class, 'store'])
@@ -311,6 +307,9 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('api.comments.destroy');
 
 });
+    // OBTENER comentarios (de un film o una entry) por IdFilm o o id de la entrada
+    Route::get('/comments/{type}/{id}', [UserCommentController::class, 'index'])
+        ->name('api.comments.index');
 
 
 /*
