@@ -3,37 +3,38 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/services/api'
 
+
 const route = useRoute()
 
-const isLoading = ref(true)
 const error = ref(null)
-const user_profiles = ref(null) // Declaración necesaria
+const user_profiles = ref(null) 
+const userData_fromFilmsActions = ref(null)
+const isLoading = ref(null)
 
-// Variables que usa tu template y que faltaban:
+///** */
 const contentSections = ref([
   { title: 'Proyectos', btnLabel: 'PROYECTO' },
   { title: 'Colecciones', btnLabel: 'COLECCIÓN' }
-])
+])/////
 
-const statsMap = computed(() => {
-  if (!user_profiles.value) return {}
-  return {
-    'Películas': user_profiles.value.movies_count || 0,
-    'Reseñas': user_profiles.value.reviews_count || 0,
-    'Listas': user_profiles.value.lists_count || 0,
-    'Vistas': user_profiles.value.watched_count || 0
-  }
-})
+const fetchUserStats = async () => {
+  const userId = route.params.id
+  const { data } = await api.get(`/user_films/stats/${userId}`)
+  userData_fromFilmsActions.value = data.user
+}
 
 const fetchProfile = async () => {
+  const userId = route.params.id
+  const { data } = await api.get(`/user_profiles/show/${userId}`)
+  user_profiles.value = data.data
+}
+
+
+const loadAll = async () => {
   isLoading.value = true
   error.value = null
   try {
-    const userId = route.params.id
-    const { data } = await api.get(`user_profiles/show/${userId}`)
-    
-    // Asignamos el objeto que viene en data.data (según tu controlador Laravel)
-    user_profiles.value = data.data 
+    await Promise.all([fetchProfile(), fetchUserStats()])
   } catch (err) {
     console.error(err)
     error.value = "No se pudo cargar el perfil"
@@ -42,15 +43,27 @@ const fetchProfile = async () => {
   }
 }
 
-watch(() => route.params.id, fetchProfile)
-onMounted(fetchProfile)
+watch(
+  () => route.params.id,
+  (newId) => {
+    if (!newId) return
+    loadAll()
+  },
+  { immediate: true }
+)
+
+
+
+
+onMounted(loadAll)
+
 </script>
 
 <template>
   <div class="min-h-screen text-slate-100 font-sans bg-[#0f1113]">
     <div v-if="isLoading" class="flex flex-col items-center justify-center h-screen gap-4">
       <div class="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
-      <p class="text-slate-400">Cargando perfil de cineasta...</p>
+      <p class="text-slate-400">Cargando perfil de usuario...</p>
     </div>
 
     <div v-else-if="user_profiles" class="max-w-7xl mx-auto px-4 md:px-16 py-12">
@@ -70,16 +83,33 @@ onMounted(fetchProfile)
             </div>
             <div class="flex flex-col text-center md:text-left">
               <h1 class="text-4xl font-black tracking-tight text-white">{{ user_profiles.user.name }}</h1>
-              <p class="text-slate-400 font-medium">{{ user_profiles.location || 'Cineasta Errante' }}</p>
+              <p class="text-slate-400 font-medium">{{ user_profiles.location || 'Amante del cine en comunidad' }}</p>
             </div>
           </header>
 
-          <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div v-for="(val, label) in statsMap" :key="label" class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl backdrop-blur-md text-center">
-              <p class="text-2xl font-black text-emerald-400">{{ val }}</p>
-              <p class="text-[10px] uppercase tracking-widest font-bold text-slate-500">{{ label }}</p>
-            </div>
-          </section>
+          <section v-if="userData_fromFilmsActions" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+          <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl text-center">
+            <p class="text-2xl font-black text-emerald-400">{{ userData_fromFilmsActions.stats.films_seen }}</p>
+            <p class="text-[10px] uppercase tracking-widest font-bold text-slate-500">Películas</p>
+          </div>
+
+          <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl text-center">
+            <p class="text-2xl font-black text-emerald-400">{{ userData_fromFilmsActions.stats.films_rated }}</p>
+            <p class="text-[10px] uppercase tracking-widest font-bold text-slate-500">Ratings</p>
+          </div>
+
+          <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl text-center">
+            <p class="text-2xl font-black text-emerald-400">{{ userData_fromFilmsActions.stats.films_seen_this_year }}</p>
+            <p class="text-[10px] uppercase tracking-widest font-bold text-slate-500">Este año</p>
+          </div>
+
+          <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl text-center">
+            <p class="text-2xl font-black text-emerald-400">{{ userData_fromFilmsActions.stats.lists_created }}</p>
+            <p class="text-[10px] uppercase tracking-widest font-bold text-slate-500">Listas</p>
+          </div>
+
+        </section>
 
           <section>
             <div class="flex items-center justify-between mb-6 border-b border-slate-800 pb-2">
