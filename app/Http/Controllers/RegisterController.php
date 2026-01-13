@@ -34,19 +34,12 @@ class RegisterController extends Controller
 
         // Creación automática de perfil de usuario pero VACÍA
         UserProfile::create([
-            'user_id' => $user->id,
-            'bio' => null,
-            'location' => null,
-            'website' => null,
-            'top_5_films' => json_encode([]),
-            'films_seen' => 0,
-            'films_rated' => 0,
-            'films_seen_this_year' => 0,
-            'lists_created' => 0,
-            'lists_saved' => 0,
-            'followers_count' => 0,
-            'followings_count' => 0,
-        ]);
+        'user_id'     => $user->id,
+        'bio'         => null,
+        'location'    => null,
+        'website'     => null,
+        'top_films' => [], 
+    ]);
 
         // Para enviar correo de bienvenida 
         try {

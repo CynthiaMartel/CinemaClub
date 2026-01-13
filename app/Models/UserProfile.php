@@ -13,33 +13,27 @@ class UserProfile extends Model
     protected $table = 'user_profiles';
 
     // Campos que pueden asignarse de forma masiva
+    
     protected $fillable = [
         'user_id',
         'avatar',
         'bio',
         'location',
         'website',
-        'top_5_films', // películas favoritas de usuario para el perfil personal
-        'films_seen',
-        'films_rated',
-        'films_seen_this_year',
-        'lists_created',
-        'lists_saved',
-        'followers_count',
-        'followings_count',
+        'top_films',
     ];
 
-    // Convierte automáticamente el JSON de top_5_films en array PHP
     protected $casts = [
-        'top_5_films' => 'array',
+        'top_films' => 'array',
     ];
 
-    //Relación inversa con User-
-    
+     //Relación inversa con User-
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 }
+
+   
 
 
