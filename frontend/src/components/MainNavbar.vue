@@ -25,6 +25,13 @@ const goFilmsFeed = () => router.push({ name: 'FilmsFeed' })
 
 const openLogin = () => { isLoginOpen.value = true }
 
+const goProfile = () => {
+  isUserMenuOpen.value = false
+  if (auth.user?.id){
+    router.push({name: 'user-profile', params: {id:auth.user.id}})
+  }
+}
+
 const goChangePassword = () => {
   isUserMenuOpen.value = false
   isChangePasswordOpen.value = true
@@ -114,7 +121,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <nav class="bg-slate-900/90 border-b border-slate-800 sticky top-0 z-40 backdrop-blur">
+  <nav class="sticky top-0 z-40 bg-[#14181C]/70 backdrop-blur-md border-b border-white/5">
     <div class="w-full px-4 md:px-6">
       <div class="flex items-center justify-between h-16 gap-4">
         <!-- Logo -->
@@ -140,14 +147,14 @@ onBeforeUnmount(() => {
             @focus="fetchSearch"
             type="search"
             placeholder="Buscar películas…"
-            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100
+            class="w-full bg-slate-900/40 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100
                   placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#BE2B0C]"
           />
 
           <!-- Dropdown resultados -->
           <div
             v-if="isSearchOpen && searchResults.length"
-            class="absolute mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 shadow-xl overflow-hidden z-50"
+            class="absolute mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 shadow-xl overflow-hidden z-50"
           >
             <button
               v-for="film in searchResults"
@@ -206,8 +213,17 @@ onBeforeUnmount(() => {
             >
               <div
                 v-if="isUserMenuOpen"
-                class="absolute right-0 mt-2 w-56 origin-top-right rounded-xl border border-slate-800 bg-slate-900 shadow-xl overflow-hidden"
+                class="absolute right-0 mt-2 w-56 origin-top-right rounded-xl border border-slate-800 bg-slate-900/90 shadow-xl overflow-hidden"
               >
+
+                <button
+                  type="button"
+                  class="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-800"
+                  @click="goProfile"
+                >
+                  Mi perfil
+                </button>
+
                 <button
                   type="button"
                   class="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-800"
@@ -245,6 +261,7 @@ onBeforeUnmount(() => {
   <!-- Modal -->
   <LoginModal v-model="isLoginOpen" />
   <ChangePasswordModal v-model="isChangePasswordOpen" />
+
 </template>
 
 
