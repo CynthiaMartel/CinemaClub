@@ -14,8 +14,8 @@ class UserFilmActions extends Model
 
 
     protected $fillable = [
-        'idUser',
-        'idFilm',
+        'user_id',
+        'film_id',
         'is_favorite',
         'watch_later',
         'watched',
@@ -35,12 +35,12 @@ class UserFilmActions extends Model
   
     public function user()
     {
-        return $this->belongsTo(User::class, 'idUser');
+        return $this->belongsTo(User::class); // **Si ponemos la convección de laravel user_id o film_id, no hace falta que pongamos User:class, user_id porque lo busca automáticamente
     }
 
     public function film()
     {
-        return $this->belongsTo(Film::class, 'idFilm', 'idFilm');
+        return $this->belongsTo(Film::class, 'film_id', 'idFilm');
     }
 
    

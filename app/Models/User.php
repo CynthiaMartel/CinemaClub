@@ -54,7 +54,7 @@ class User extends Authenticatable
 
     public function filmActions()
     {
-        return $this->hasMany(UserFilmAction::class, 'idUser');
+        return $this->hasMany(UserFilmActions::class);
     }
 
     // Seguidores: usuarios que siguen al user (FOLLOWERS)
