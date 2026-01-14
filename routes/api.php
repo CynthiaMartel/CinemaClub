@@ -268,7 +268,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 });
 
-// ----USER LISTS---
+// ----ASIGNACIÓN DE FILMS A ENTRIES (DEBATE, REVIEW,LIST)---
 // UserSavedListController: Listas que crean los usuarios (ej: "Top 5 películas de terror 2025") 
 
 Route::middleware('auth:sanctum')->group(function () {
