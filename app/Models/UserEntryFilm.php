@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+// Pivot para relacionar cada film con user Entry: así podemos tener varios films en una entry (debate, reseña o lista)
 class UserEntryFilm extends Model
 {
     use HasFactory;

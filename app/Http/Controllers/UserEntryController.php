@@ -22,18 +22,18 @@ class UserEntryController extends Controller
         $validated = $request->validated();
         $validated['user_id'] = $user->id;
 
-        // Para crear  entrada
+        // Crear  entrada lista, debate o reseña
         $entry = UserEntry::create($validated);
 
-        // Si es una lista, incrementar contador en perfil para mostrar en el fronted 
-        if ($validated['type'] === 'user_list') {
-            UserProfile::where('user_id', $user->id)->increment('lists_created');
+        // SI HAY films desde array film_ids que enviamos desde fronted EntryFormView ****
+        if ($request->has('film_ids')) {
+            // Este método sync() guarda automáticamente en la tabla 'user_entry_films' asociando el ID den entry con los IDs de films
+            $entry->films()->sync($request->film_ids);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Entrada creada correctamente.',
-            'data' => $entry,
+            'data' => $entry->load('films'), // Devolvemos la entrada con sus películas
         ], 201);
     }
 

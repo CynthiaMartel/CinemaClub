@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 class UserEntryFilmController extends Controller
 {
     /**
-     * 🎬 Asociar una película a una entrada (review o lista)
+     * Asociar una película a una entrada (review o lista)
      */
     public function store(Request $request)
     {
