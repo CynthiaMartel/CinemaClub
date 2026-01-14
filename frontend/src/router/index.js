@@ -4,6 +4,8 @@ import HomeView from '@/views/HomeView.vue'
 import FilmDetailView from '@/views/FilmDetailView.vue'
 import { useAuthStore } from '@/stores/auth'
 import UserProfile from '@/views/UserProfile.vue'
+import EntryPrincipalView from '@/views/EntryPrincipalView.vue'
+import EntryFormView from '@/views/EntryFormView.vue'
 
 const routes = [
   {
@@ -21,7 +23,21 @@ const routes = [
     name: 'user-profile',
     component: UserProfile,
     props: true // permite que el id llegue como prop a la vista
-  }
+  },
+  {
+  path: '/entry/:type/:id', 
+  name: 'entry-detail',
+  component: () => EntryPrincipalView,
+  props: true // Esto permite pasar los parámetros como variables automática
+  },
+  {
+  path: '/create-entry/:id', 
+  name: 'create-entry',
+  component: () => EntryFormView,
+  props: true // Esto permite pasar los parámetros como variables automática
+  },
+  
+
 
   // ******aquí van más rutas después: noticias, perfil, etc.
 ]

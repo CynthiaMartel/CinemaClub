@@ -23,8 +23,6 @@ const goNews = () => router.push({ name: 'news' })
 const goFilmsFeed = () => router.push({ name: 'FilmsFeed' })
 
 
-const openLogin = () => { isLoginOpen.value = true }
-
 const goProfile = () => {
   isUserMenuOpen.value = false
   if (auth.user?.id){
@@ -37,17 +35,19 @@ const goChangePassword = () => {
   isChangePasswordOpen.value = true
 }
 
-const logout = async () => {
-  isUserMenuOpen.value = false
-  await auth.logout()
-  router.push({ name: 'home' })
-}
-
 const goFilm = (film) => {
   isSearchOpen.value = false
   searchQuery.value = ''
   
   router.push({ name: 'film-detail', params: { id: film.idFilm } })
+}
+
+const openLogin = () => { isLoginOpen.value = true }
+
+const logout = async () => {
+  isUserMenuOpen.value = false
+  await auth.logout()
+  router.push({ name: 'home' })
 }
 
 // --- Search ---
