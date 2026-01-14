@@ -5,6 +5,7 @@ import api from '@/services/api'
 
 
 const route = useRoute()
+const router = useRouter()
 
 const error = ref(null)
 const user_profiles = ref(null) 

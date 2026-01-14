@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
 import LoginModal from '@/components/LoginModal.vue'
@@ -12,6 +13,7 @@ import PersonModal from '@/components/CastCrewModal.vue'
 import FilmDetailsModal from '@/components/FilmDetailsModal.vue' 
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const userActionsStore = useUserFilmActionsStore()
 
@@ -28,6 +30,16 @@ const isLoginOpen = ref(false)
 const isSending = ref(false)
 const deletingId = ref(null)
 const isDetailsModalOpen = ref(false)
+
+const goCreateEntry = () => {
+  if (auth.user?.id){
+    router.push({
+      name: 'create-entry', 
+      params: {id:auth.user.id}
+    
+    })
+  } //**** DE PRUEBA!!! ***********************/
+}
 
 // Estado para el modal de listas
 const isListModalOpen = ref(false)
@@ -478,7 +490,9 @@ watch(
             Favoritas de 2024
           </div>
        </div>
-       <button class="w-full py-3 border border-dashed border-slate-700 rounded-xl text-slate-400 text-sm hover:border-yellow-600 hover:text-yellow-600 transition-all font-bold">
+       <button
+        @click="goCreateEntry" 
+        class="w-full py-3 border border-dashed border-slate-700 rounded-xl text-slate-400 text-sm hover:border-yellow-600 hover:text-yellow-600 transition-all font-bold">
          + Crear nueva lista
        </button>
     </div>
