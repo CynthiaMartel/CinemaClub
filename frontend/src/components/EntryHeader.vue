@@ -1,26 +1,45 @@
-<script setup>
-defineProps(['coverImage', 'user', 'title', 'typeLabel']);
-</script>
-
 <template>
-  <div class="relative w-full h-[350px] md:h-[450px] overflow-hidden">
-    <div 
-      class="absolute inset-0 bg-cover bg-center transition-opacity duration-700"
-      :style="{ backgroundImage: `url(${coverImage || '/default-backdrop.jpg'})` }"
-    ></div>
-    <div class="absolute inset-0 bg-gradient-to-b from-black/20 via-[#14181c]/80 to-[#14181c]"></div>
+  <div class="relative w-full pt-12 pb-8 bg-[#17191c] overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-b to-transparent opacity-20" :class="bgGradient"></div>
     
-    <div class="relative max-w-5xl mx-auto px-4 h-full flex flex-col justify-end pb-10">
-      <div class="flex items-center gap-4 mb-4">
-        <img :src="user?.avatar_url || '/default-avatar.png'" class="w-10 h-10 rounded-full border-2 border-gray-500 shadow-xl" alt="Avatar">
-        <p class="text-sm">
-          <span class="text-gray-400">{{ typeLabel }} de</span> 
-          <span class="text-white font-bold hover:text-blue-400 cursor-pointer ml-1">{{ user?.name }}</span>
-        </p>
+    <div class="relative max-w-6xl mx-auto px-6">
+      <div class="flex flex-wrap items-center gap-6 mb-8">
+        <div class="flex items-center gap-2 px-3 py-1 bg-slate-900/80 border border-slate-800 rounded-full shadow-sm">
+          <span class="w-1.5 h-1.5 rounded-full animate-pulse" :class="accentColor.replace('text', 'bg')"></span>
+          <span class="text-[10px] font-black uppercase tracking-[2px]" :class="accentColor">
+            {{ typeLabel }}
+          </span>
+        </div>
+
+        <span class="text-slate-800 font-thin text-2xl select-none">|</span>
+
+        <div class="flex items-center gap-4 group cursor-pointer">
+          <img :src="user?.avatar_url || '/default-avatar.png'" 
+               class="w-8 h-8 rounded-full border border-slate-700 object-cover shadow-xl transition-all duration-300 group-hover:border-orange-500/50">
+          <p class="text-[11px] tracking-tight">
+            <span class="text-slate-500 italic font-light lowercase">escrito por</span>
+            <span class="text-white font-black ml-3 uppercase tracking-[2px] transition-colors group-hover:text-emerald-400">
+              @{{ user?.name }}
+            </span>
+          </p>
+        </div>
       </div>
-      <slot name="title">
-        <h1 class="text-3xl md:text-5xl font-bold text-white tracking-tight leading-tight">{{ title }}</h1>
-      </slot>
+
+      <h1 class="text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tighter leading-[1.1] max-w-4xl drop-shadow-md">
+        {{ title }}
+      </h1>
     </div>
   </div>
 </template>
+
+<script setup>
+import { computed } from 'vue';
+const props = defineProps(['user', 'title', 'type', 'accentColor', 'bgGradient']);
+
+const typeLabel = computed(() => {
+  if (props.type === 'user_list') return 'Colección';
+  if (props.type === 'user_debate') return 'Debate';
+  return 'Crítica';
+});
+</script>
+

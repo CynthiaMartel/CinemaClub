@@ -1,48 +1,40 @@
 <template>
-  <div class="relative w-full max-w-[400px]" ref="searchWrapRef">
-    <div class="relative">
+  <div class="relative w-full max-w-[450px]" ref="searchWrapRef">
+    <div class="relative group">
       <input
         v-model="searchQuery"
         @input="fetchSearch"
         @focus="isSearchOpen = true"
         type="search"
-        placeholder="Buscar películas por título..."
-        class="w-full bg-slate-900/40 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-100
-               placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#00c020] transition-all"
+        placeholder="Añadir películas..."
+        class="w-full bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100
+               placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all backdrop-blur-md"
       />
       
-      <div v-if="isSearching" class="absolute right-3 top-3">
-        <svg class="animate-spin h-4 w-4 text-[#00c020]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
+      <div v-if="isSearching" class="absolute right-4 top-3.5">
+        <div class="w-4 h-4 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
       </div>
     </div>
 
     <div
       v-if="isSearchOpen && searchResults.length"
-      class="absolute mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden z-50 animate-fade-in"
+      class="absolute mt-3 w-full rounded-2xl border border-slate-800 bg-[#1e2227]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[100] animate-fade-in"
     >
       <button
         v-for="film in searchResults"
         :key="film.idFilm"
         type="button"
-        class="w-full text-left px-4 py-3 hover:bg-slate-800 flex items-center gap-3 border-b border-slate-900 last:border-none transition-colors"
+        class="w-full text-left px-4 py-3 hover:bg-emerald-500/10 flex items-center gap-4 border-b border-slate-800/50 last:border-none transition-colors"
         @click="selectFilm(film)"
       >
-        <img :src="film.frame || '/poster-placeholder.jpg'" class="w-10 h-14 object-cover rounded shadow-md" />
+        <img :src="film.frame || film.poster_url" class="w-12 h-16 object-cover rounded shadow-lg" />
         <div class="flex-1 overflow-hidden">
-          <div class="text-sm font-semibold text-slate-100 truncate">{{ film.title }}</div>
-          <div class="text-[11px] text-slate-400 truncate italic">{{ film.original_title }}</div>
+          <div class="text-sm font-bold text-white truncate">{{ film.title }}</div>
+          <div class="text-[10px] text-slate-500 uppercase tracking-widest font-black">
+            {{ film.year || 'S/D' }} • {{ film.genre || 'Cine' }}
+          </div>
         </div>
       </button>
-    </div>
-
-    <div
-      v-else-if="isSearchOpen && !searchResults.length && searchQuery.trim().length > 2 && !isSearching"
-      class="absolute mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 shadow-xl px-4 py-3 text-sm text-slate-400 z-50"
-    >
-      No se encontraron coincidencias.
     </div>
   </div>
 </template>
