@@ -224,9 +224,8 @@ Route::get('{id}/cast-crew', [CastCrewController::class, 'show']);
 // Rutas para entradas de listas, debates, reseñas
 
 //UserEntryController: Para el control de entradas que crean los usuarios (listas, debates y reseñas)
-Route::middleware('auth:sanctum')->group(function () {
 
-    //  MOSTRAR feed general de entradas (reviews, debates, listas)
+    //  MOSTRAR feed general de entradas (reviews, debates, listas): es para usuarios logueados y no logueados
     //  Permite filtrar por tipo de entrada(reviews, listas, debates), usuario o película asociada. 
     // Ejemplo: /api/user_entries/feed?type=user_review&user_name=Cynthia
     Route::get('/user_entries/feed', [UserEntryController::class, 'showEntries'])
@@ -237,6 +236,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user_entries/{id}', [UserEntryController::class, 'show'])
         ->name('api.user_entries.show');
 
+Route::middleware('auth:sanctum')->group(function () {
     //  CREAR nueva lista, debate o reseña
     //  Solo usuarios autenticados pueden crear entradas
     Route::post('/user_entries/create', [UserEntryController::class, 'store'])
