@@ -37,29 +37,30 @@ class UserEntryController extends Controller
         ], 201);
     }
 
-    // MOSTRAR una entrada específica (por ID)
+    // MOSTRAR una entrada específica (por ID) No hace falta estar logueado para ver entradas PÚBLICAS, si son privadas sí!
     
     public function show($id): JsonResponse
     {
-        $authUser = Auth::user();
-        $entry = UserEntry::with(['user:id,name', 'films:idFilm,title', 'comments.user:id,name'])
+        // Auth::user() devolverá null si el usuario no está logueado
+        $authUser = Auth::user(); 
+        
+        $entry = UserEntry::with(['user:id,name', 'films:idFilm,title,frame', 'comments.user:id,name'])
             ->findOrFail($id);
 
-        // Para control de visibilidad : si es privado denegamos el acceso
-        if (
-            $entry->visibility === 'private' &&
-            $entry->user_id !== $authUser->id &&
-            !$authUser->isAdmin()
-        ) {
-            return response()->json(['error' => 'No tienes permiso para ver esta entrada.'], 403);
+        // Vemos la PRIVACIDAD y si es privado no se podrá ver si no está logueado
+        if ($entry->visibility === 'private') {
+            // Si NO hay usuario, o hay usuario pero NO es el dueño y NO es admin
+            if (!$authUser || ($entry->user_id !== $authUser->id && !$authUser->isAdmin())) {
+                return response()->json(['error' => 'No tienes permiso para ver esta entrada.'], 403);
+            }
         }
 
-        if (
-            $entry->status !== 'approved' &&
-            $entry->user_id !== $authUser->id &&
-            !$authUser->isAdmin()
-        ) {
-            return response()->json(['error' => 'La entrada aún no está disponible públicamente.'], 403);
+        // Vemos ESTADO (Moderación) **Esto es para la escalabilidad: si hay entradas con spam, contenido inadecuado, borradores.. con esto se evitaría que se publicase sin ser aprobado antes
+        if ($entry->status !== 'approved') {
+            // Si NO hay usuario, o (hay usuario pero NO es el dueño y NO es admin)
+            if (!$authUser || ($entry->user_id !== $authUser->id && !$authUser->isAdmin())) {
+                return response()->json(['error' => 'La entrada aún no está disponible públicamente.'], 403);
+            }
         }
 
         return response()->json([
