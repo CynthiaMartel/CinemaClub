@@ -36,7 +36,7 @@ export const useUserFilmActionsStore = defineStore('userFilmActions', () => {
     const toggleAction = async (filmId, filmRef, field) => {
         if (isProcessingAction.value || !filmId) return;
 
-        // --- SOLUCIÓN AL ERROR ---
+        
         // Si filmRef.value existe, lo usamos. Si no, usamos filmRef directamente.
         const filmData = filmRef.value !== undefined ? filmRef.value : filmRef;
         
