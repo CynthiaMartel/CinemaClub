@@ -1,8 +1,7 @@
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
-
 
 const route = useRoute()
 const router = useRouter()
@@ -10,13 +9,51 @@ const router = useRouter()
 const error = ref(null)
 const user_profiles = ref(null) 
 const userData_fromFilmsActions = ref(null)
-const isLoading = ref(null)
+const isLoading = ref(true)
 
-///** */
+// Variables para contenido generado y guardado
+const userDebates = ref([])
+const userLists = ref([])
+const savedLists = ref([])
+const userReviews = ref([])
+
+
 const contentSections = ref([
-  { title: 'Proyectos', btnLabel: 'PROYECTO' },
-  { title: 'Colecciones', btnLabel: 'COLECCIÓN' }
-])/////
+  { title: 'Debates Creados', btnLabel: 'DEBATE', type: 'user_debate' },
+  { title: 'Listas Creadas', btnLabel: 'LISTA', type: 'user_list' },
+  { title: 'Reseñas', btnLabel: 'RESEÑA', type: 'user_review' }
+])
+
+// 1. Cargar lo que el usuario HA CREADO 
+
+
+const fetchUserEntries = async () => {
+  const id = route.params.id
+  try{
+    const [listsResponse, debatesResponse, reviewsResponse] = await Promise.all([
+    api.get(`/user_profiles/${id}/lists`),
+    api.get(`/user_profiles/${id}/debates`),
+    api.get(`/user_profiles/${id}/reviews`)
+  ])
+  
+  userLists.value = listsResponse.data.data
+  userDebates.value = debatesResponse.data.data
+  userReviews.value = reviewsResponse.data.data
+  }catch (err){
+    console.error("Error cargando contenido de usuari:", err)
+    }
+}
+
+// 2. Cargar lo que el usuario HA GUARDADO (Colección)
+const fetchSavedLists = async () => {
+  try {
+    const userId = route.params.id
+    const { data } = await api.get(`/user_profiles/${userId}/saved-lists`)
+    savedLists.value = data.data || []
+  } catch (err) {
+    console.error("Error cargando guardadas:", err)
+  }
+}
 
 const fetchUserStats = async () => {
   const userId = route.params.id
@@ -30,187 +67,241 @@ const fetchProfile = async () => {
   user_profiles.value = data.data
 }
 
-
 const loadAll = async () => {
   isLoading.value = true
   error.value = null
   try {
-    await Promise.all([fetchProfile(), fetchUserStats()])
+    await Promise.all([
+      fetchProfile(), 
+      fetchUserStats(), 
+      fetchUserEntries(), 
+      fetchSavedLists()
+    ])
   } catch (err) {
-    console.error(err)
     error.value = "No se pudo cargar el perfil"
   } finally {
     isLoading.value = false
   }
 }
 
-watch(
-  () => route.params.id,
-  (newId) => {
-    if (!newId) return
-    loadAll()
-  },
-  { immediate: true }
-)
+const getSectionData = (type) => {
+  if (type === 'user_debate') return userDebates.value
+  if (type === 'user_list') return userLists.value
+  if (type === 'user_review') return userReviews.value 
+  return []
+}
 
-
-
+watch(() => route.params.id, (newId) => {
+  if (newId) loadAll()
+}, { immediate: true })
 
 onMounted(loadAll)
-
 </script>
 
 <template>
-  <div class="min-h-screen text-slate-100 font-sans bg-[#0f1113]">
+  <div class="min-h-screen text-slate-100 font-sans bg-[#0f1113] overflow-x-hidden">
+    
     <div v-if="isLoading" class="flex flex-col items-center justify-center h-screen gap-4">
-      <div class="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
-      <p class="text-slate-400">Cargando perfil de usuario...</p>
+      <div class="w-12 h-12 border-4 border-slate-800 border-t-brand rounded-full animate-spin"></div>
+      <p class="text-slate-400 text-sm uppercase tracking-widest">Cargando perfil...</p>
     </div>
 
-    <div v-else-if="user_profiles" class="max-w-7xl mx-auto px-4 md:px-16 py-12">
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-12">
+    <div v-else-if="user_profiles" class="max-w-7xl mx-auto px-4 sm:px-6 md:px-16 py-8 md:py-12">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
         
-        <div class="md:col-span-8 flex flex-col gap-10">
+        <div class="lg:col-span-8 flex flex-col gap-12">
           
-          <header class="flex flex-col md:flex-row items-center md:items-end gap-6">
-            <div class="relative group">
-              <img 
-                :src="user_profiles.avatar ? `/storage/${user_profiles.avatar}` : '/default-avatar.webp'" 
-                class="w-32 h-32 rounded-full object-cover border-4 border-slate-800 shadow-2xl"
-              />
-              <button class="absolute bottom-0 right-0 bg-emerald-500 p-2 rounded-full shadow-lg hover:bg-emerald-400 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-900" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path d="M12 4v16m8-8H4"/></svg>
-              </button>
-            </div>
-            <div class="flex flex-col text-center md:text-left">
-              <h1 class="text-4xl font-black tracking-tight text-white">{{ user_profiles.user.name }}</h1>
-              <p class="text-slate-400 font-medium">{{ user_profiles.location || 'Amante del cine en comunidad' }}</p>
+          <header class="flex flex-col md:flex-row items-center md:items-end gap-6 mb-4">
+            <img 
+              :src="user_profiles.avatar ? `/storage/${user_profiles.avatar}` : '/default-avatar.webp'" 
+              class="w-28 h-28 md:w-36 md:h-36 rounded-full object-cover border-4 border-slate-800 shadow-2xl"
+            />
+            <div class="text-center md:text-left">
+              <h1 class="text-4xl md:text-5xl font-black text-white uppercase italic leading-none">{{ user_profiles.user.name }}</h1>
+              <p class="text-slate-400 font-medium uppercase text-[10px] md:text-xs mt-3 tracking-[0.3em]">{{ user_profiles.location || 'Cinéfilo' }}</p>
             </div>
           </header>
 
-          <section v-if="userData_fromFilmsActions" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-
-          <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl text-center">
-            <p class="text-2xl font-black text-emerald-400">{{ userData_fromFilmsActions.stats.films_seen }}</p>
-            <p class="text-[10px] uppercase tracking-widest font-bold text-slate-500">Películas</p>
-          </div>
-
-          <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl text-center">
-            <p class="text-2xl font-black text-emerald-400">{{ userData_fromFilmsActions.stats.films_rated }}</p>
-            <p class="text-[10px] uppercase tracking-widest font-bold text-slate-500">Ratings</p>
-          </div>
-
-          <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl text-center">
-            <p class="text-2xl font-black text-emerald-400">{{ userData_fromFilmsActions.stats.films_seen_this_year }}</p>
-            <p class="text-[10px] uppercase tracking-widest font-bold text-slate-500">Este año</p>
-          </div>
-
-          <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-2xl text-center">
-            <p class="text-2xl font-black text-emerald-400">{{ userData_fromFilmsActions.stats.lists_created }}</p>
-            <p class="text-[10px] uppercase tracking-widest font-bold text-slate-500">Listas</p>
-          </div>
-
-        </section>
-
-          <section>
-            <div class="flex items-center justify-between mb-6 border-b border-slate-800 pb-2">
-              <h2 class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">La Bitácora</h2>
-              <span class="text-[10px] text-emerald-500 cursor-pointer hover:underline">Ver todo</span>
+          <section v-if="userData_fromFilmsActions" class="grid grid-cols-2 md:grid-cols-4 gap-4 border-y border-slate-800 py-6">
+            <div v-for="(stat, label) in { films_seen: 'Películas', films_rated: 'Ratings', films_seen_this_year: 'Este año' }" :key="label" class="text-center border-r border-slate-800/30 last:border-0 md:last:border-r">
+              <p class="text-2xl md:text-3xl font-black text-white">{{ userData_fromFilmsActions.stats[label] }}</p>
+              <p class="text-[9px] md:text-[10px] uppercase tracking-widest font-bold text-slate-500">{{ stat }}</p>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div v-for="i in 4" :key="i" class="group cursor-pointer">
-                <div class="relative aspect-video overflow-hidden rounded-lg border border-slate-800">
-                  <img src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=500" class="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500" />
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-                    <div class="flex gap-0.5">
-                       <svg v-for="s in 5" :key="s" class="w-2 h-2 fill-yellow-500" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                    </div>
-                  </div>
-                </div>
-                <p class="text-[11px] mt-2 font-bold text-slate-300 truncate">Blade Runner 2049</p>
-              </div>
+            <div class="text-center">
+              <p class="text-2xl md:text-3xl font-black text-white">{{ userLists.length }}</p>
+              <p class="text-[9px] md:text-[10px] uppercase tracking-widest font-bold text-slate-500">Listas</p>
             </div>
           </section>
 
-          <section v-for="section in contentSections" :key="section.title">
-             <div class="flex items-center justify-between mb-6 border-b border-slate-800 pb-2">
-              <h2 class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">{{ section.title }}</h2>
-              <button class="bg-slate-800 hover:bg-slate-700 text-[9px] px-3 py-1 rounded-full transition-colors flex items-center gap-1">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 4v16m8-8H4"/></svg>
-                CREAR {{ section.btnLabel }}
-              </button>
+          <section v-for="section in contentSections" :key="section.title" class="flex flex-col">
+            <div class="flex items-center justify-between mb-6 border-b border-slate-800 pb-2">
+              <h2 class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">{{ section.title }}</h2>
+              <button class="text-brand text-[10px] font-bold uppercase tracking-widest">+ CREAR</button>
             </div>
-            <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-              <div v-for="n in 3" :key="n" class="min-w-[200px] bg-slate-900/60 border border-slate-800 p-4 rounded-xl">
-                 <div class="h-24 bg-slate-800 rounded-lg mb-3 animate-pulse"></div>
-                 <div class="h-3 w-3/4 bg-slate-700 rounded mb-2"></div>
-                 <div class="h-2 w-1/2 bg-slate-800 rounded"></div>
+
+            <div v-if="getSectionData(section.type).length > 0" class="brand-scroll flex flex-row-reverse gap-8 overflow-x-auto pb-8 pt-4 rtl-container">
+              
+              <div 
+                v-for="item in getSectionData(section.type)" 
+                :key="item.id" 
+                @click="router.push(`/entry/${item.type}/${item.id}`)"
+                class="flex-shrink-0 group cursor-pointer ltr-content"
+                :class="section.type === 'user_review' ? 'w-[160px] md:w-[200px]' : 'w-auto'"
+              >
+                
+                <div v-if="section.type === 'user_list'" class="w-[180px] md:w-[220px]">
+                  <div class="poster-stack-container">
+                    <ul class="poster-list-overlapped">
+                      <li v-for="(film, idx) in item.films?.slice(0, 5)" :key="idx" class="poster-item" :style="{ zIndex: idx * 10 }">
+                        <img :src="film.frame || '/default-poster.webp'" class="poster-img" />
+                      </li>
+                    </ul>
+                  </div>
+                  <h3 class="text-[12px] font-black text-white uppercase mt-4 truncate group-hover:text-brand transition-colors">{{ item.title }}</h3>
+                  <p class="text-[9px] text-slate-500 font-bold uppercase mt-1 italic">{{ item.films?.length }} FILMS</p>
+                </div>
+
+                <div v-else-if="section.type === 'user_review'" class="review-vertical-card flex flex-col h-full bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden hover:border-brand/50 transition-all">
+                  <div class="relative aspect-[2/3] w-full overflow-hidden">
+                    <img :src="item.films?.[0]?.frame || '/default-poster.webp'" class="w-full h-full object-cover opacity-50" />
+                    <div class="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-[8px] font-bold text-slate-200">
+                      {{ new Date(item.created_at).toLocaleDateString() }}
+                    </div>
+                  </div>
+                  <div class="p-3 flex flex-col gap-1.5">
+                    <h3 class="text-[11px] font-black text-brand uppercase leading-tight line-clamp-2">
+                      {{ item.title }}
+                    </h3>
+                    <p class="text-[9px] font-bold text-slate-400 uppercase truncate">
+                      {{ item.films?.[0]?.title }}
+                    </p>
+                    <p class="text-[9px] text-slate-500 line-clamp-2 italic mt-1">"{{ item.content }}"</p>
+                  </div>
+                </div>
+
+                <div v-else class="flex flex-col">
+                  <div class="relative w-36 md:w-44 aspect-video bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-lg">
+                    <img :src="item.films?.[0]?.frame || '/default-debate.webp'" class="w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-700" />
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                  </div>
+                  <h3 class="text-[10px] font-black text-white uppercase mt-3 truncate w-32 md:w-40 group-hover:text-brand transition-colors px-1">{{ item.title }}</h3>
+                </div>
+
               </div>
+            </div>
+            <div v-else class="py-10 border border-dashed border-slate-800 rounded text-center opacity-40 text-[9px] uppercase tracking-widest italic">Nada por aquí</div>
+          </section>
+
+          <section class="mt-4">
+            <div class="flex items-center justify-between mb-6 border-b border-slate-800 pb-2">
+              <h2 class="text-[11px] font-bold uppercase tracking-[0.2em] text-yellow-600 italic">Listas Guardadas</h2>
+            </div>
+
+            <div v-if="savedLists.length > 0" class="brand-scroll flex flex-row-reverse gap-10 overflow-x-auto pb-10 pt-4 rtl-container">
+              <div 
+                v-for="list in savedLists" 
+                :key="list.id"
+                @click="router.push(`/user_entries/${list.id}`)"
+                class="flex-shrink-0 group cursor-pointer ltr-content w-[180px] md:w-[220px]"
+              >
+                <div class="poster-stack-container mb-4">
+                  <ul class="poster-list-overlapped">
+                    <li v-for="(film, idx) in list.films?.slice(0, 5)" :key="idx" class="poster-item" :style="{ zIndex: idx * 10 }">
+                      <img :src="film.frame || '/default-poster.webp'" class="poster-img" />
+                    </li>
+                  </ul>
+                </div>
+                
+                <h3 class="font-black text-[12px] text-slate-100 uppercase truncate group-hover:text-yellow-500 transition-colors">{{ list.title }}</h3>
+                <p class="text-[9px] text-slate-500 font-bold uppercase mt-1">De: {{ list.user?.name }}</p>
+
+                <div class="flex gap-1.5 mt-3 border-t border-slate-800 pt-3 opacity-60 group-hover:opacity-100 transition-opacity">
+                  <div v-for="(film, fIdx) in list.films?.slice(0, 4)" :key="fIdx" class="w-8 h-12 md:w-10 md:h-14 rounded bg-slate-800 overflow-hidden border border-slate-700">
+                    <img :src="film.frame" class="w-full h-full object-cover" />
+                  </div>
+                  <div v-if="list.films?.length > 4" class="w-8 h-12 md:w-10 md:h-14 bg-slate-900 border border-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-600">
+                    +{{ list.films.length - 4 }}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="py-10 border border-dashed border-slate-800 rounded text-center opacity-40">
+              <p class="text-slate-500 text-[9px] uppercase tracking-widest italic">Aún no has guardado ninguna lista.</p>
             </div>
           </section>
 
         </div>
 
-        <aside class="md:col-span-4 flex flex-col gap-10">
-          
-          <section class="bg-slate-900/20 p-6 rounded-3xl border border-slate-800/50">
-            <h2 class="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 mb-6 text-center">Cinco Imprescindibles</h2>
-            
-            <div class="grid grid-cols-3 gap-2 mb-2">
-              <div v-for="f in 3" :key="f" class="aspect-[2/3] bg-slate-800 rounded-md overflow-hidden border border-slate-700 hover:border-emerald-500/50 transition-colors cursor-pointer">
-                <img src="https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=300" class="w-full h-full object-cover" />
-              </div>
-            </div>
-            
-            <div class="flex gap-2">
-              <div v-for="f in 2" :key="f" class="flex-1 aspect-[2/3] bg-slate-800 rounded-md overflow-hidden border border-slate-700 hover:border-emerald-500/50 transition-colors cursor-pointer">
-                <img src="https://images.unsplash.com/photo-1440404653325-ab127d49abc1?q=80&w=300" class="w-full h-full object-cover" />
-              </div>
-              <button class="w-10 flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded-md border border-slate-700 text-slate-500 hover:text-emerald-400 transition-all">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-              </button>
+        <aside class="lg:col-span-4 flex flex-col gap-10">
+          <section class="bg-slate-900/20 p-6 rounded-2xl border border-slate-800/50">
+            <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-6 text-center italic">Imprescindibles</h2>
+            <div class="grid grid-cols-3 gap-2">
+               <div v-for="f in 6" :key="f" class="aspect-[2/3] bg-slate-800 rounded-md overflow-hidden border border-slate-700 hover:border-brand/50 transition-colors">
+                  <img src="https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=300" class="w-full h-full object-cover" />
+               </div>
             </div>
           </section>
-
-          <section class="flex flex-col gap-8 px-2">
-            <div>
-              <h3 class="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4 flex justify-between">
-                Siguiendo <span>{{ user_profiles.followings_count }}</span>
-              </h3>
-              <div class="flex flex-wrap gap-2">
-                <div v-for="u in 6" :key="u" class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 overflow-hidden hover:scale-110 transition-transform cursor-pointer">
-                  <img :src="`https://i.pravatar.cc/150?u=${u}`" />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 class="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4 flex justify-between">
-                Seguidores <span>{{ user_profiles.followers_count }}</span>
-              </h3>
-              <div class="flex flex-wrap gap-2">
-                <div v-for="u in 6" :key="u" class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 overflow-hidden hover:scale-110 transition-transform cursor-pointer">
-                  <img :src="`https://i.pravatar.cc/150?u=${u+10}`" />
-                </div>
-              </div>
-            </div>
-          </section>
-
         </aside>
+
       </div>
     </div>
   </div>
 </template>
 
-
-
 <style scoped>
-/* Para ocultar scrollbar en las listas horizontales */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
+/* SCROLLBAR BRAND */
+.brand-scroll::-webkit-scrollbar { height: 5px; }
+.brand-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); border-radius: 10px; }
+.brand-scroll::-webkit-scrollbar-thumb { 
+  background: #10b981; 
+  border-radius: 10px; 
 }
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+
+
+/* LÓGICA RTL */
+.rtl-container { direction: rtl; }
+.ltr-content { direction: ltr; }
+
+/* POSTER SOLAPADO */
+.poster-list-overlapped {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  height: 150px;
+  position: relative;
+}
+
+.poster-item {
+  position: relative;
+  width: 100px;  
+  height: 150px; 
+  margin-left: -75px; /* Deja ver solo el 25% */
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.poster-item:first-child { margin-left: 0; }
+
+.poster-img {
+  width: 100px;
+  height: 150px;
+  object-fit: cover;
+  border: 1.5px solid #0f1113;
+  border-radius: 4px;
+  box-shadow: 4px 0 12px rgba(0,0,0,0.6);
+}
+
+.group:hover .poster-item {
+  transform: translateY(-8px) rotate(-1deg);
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .poster-list-overlapped { height: 120px; }
+  .poster-item { width: 80px; height: 120px; margin-left: -60px; }
+  .poster-img { width: 80px; height: 120px; }
+  
+  /* Ajuste para reseñas en móvil */
+  .review-vertical-card { width: 150px; }
 }
 </style>
