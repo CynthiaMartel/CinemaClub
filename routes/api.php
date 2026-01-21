@@ -228,13 +228,14 @@ Route::get('{id}/cast-crew', [CastCrewController::class, 'show']);
     //  MOSTRAR feed general de entradas (reviews, debates, listas): es para usuarios logueados y no logueados
     //  Permite filtrar por tipo de entrada(reviews, listas, debates), usuario o película asociada. 
     // Ejemplo: /api/user_entries/feed?type=user_review&user_name=Cynthia
-    Route::get('/user_entries/feed', [UserEntryController::class, 'showEntries'])
+    Route::get('/user_entries/feed', [UserEntryController::class, 'showEntriesFeed'])
         ->name('api.user_entries.feed');
 
-    //  MOSTRAR una entrada concreta por ID de entrada
+    //  MOSTRAR UNA entrada concreta por ID de entrada
     //  Permite ver el detalle completo de una lista, debate o reseña (según visibilidad)
-    Route::get('/user_entries/{id}', [UserEntryController::class, 'show'])
-        ->name('api.user_entries.show');
+    Route::get('/user_entries/{id}/show', [UserEntryController::class, 'show'])
+    ->middleware('auth:sanctum');
+
 
 Route::middleware('auth:sanctum')->group(function () {
     //  CREAR nueva lista, debate o reseña
@@ -256,15 +257,21 @@ Route::middleware('auth:sanctum')->group(function () {
 
     //  GUARDAR o quitar una lista (en user_saved_lists) SOLO TIPO USER_LISTS
     //  Permite a los usuarios guardar o eliminar listas y después lo mostamos en su perfil
-    Route::post('/user_entries_lists/{entryId}/save', [UserEntryController::class, 'toggleSaveList'])
+    Route::post('/user_entries_lists/{entryId}/save', [UserSavedListController::class, 'toggleSaveList'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
         ->name('api.user_entries.toggleSaveList');
 
-    //  MOSTRAR las listas creadas por un usuario (para uso en su perfil personal)
-    //  Muestra todas las listas creadas por un usuario concreto en su perfil personal
-    Route::get('/user_profiles/{userId}/lists', [UserEntryController::class, 'showUserLists'])
-        ->name('api.user_profiles.lists');
 
+    //  MOSTRAR las listas guardadas del usuario USERSAVEDLISTCONTROLLER
+    Route::get('/user_profiles/{userId}/saved-lists', [UserSavedListController::class, 'getSavedLists']);
+
+    // MOSTRAR COLECCIÓN DE LISTAS, DEBATES, REVIEWS CREADAS por el usuario
+    Route::prefix('user_profiles/{userId}')->group(function () {
+    Route::get('/lists', [UserEntryController::class, 'getCreatedLists']);
+    Route::get('/debates', [UserEntryController::class, 'getCreatedDebates']);
+    Route::get('/reviews', [UserEntryController::class, 'getCreatedReviews']);
+
+    });
 
 });
 
@@ -273,10 +280,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
 
-    // GUARDAR O ELIMINAR listas (solo type = user_list)  
-    Route::post('/user_entries/{entryId}/save', [UserSavedListController::class, 'toggle'])
+    // GUARDAR O ELIMINAR listas (solo type = user_list)  : *ESTÁ YA EN UNAS LÍNEAS MÁS ARRIBA ASÍ QUE LO COMENTO PARA NO SATURAR CÓDDIGO*
+    /* Route::post('/user_entries_lists/{entryId}/save', [UserSavedListController::class, 'toggleSaveList'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
-        ->name('api.user_saved_lists.toggle');
+        ->name('api.user_entries.toggleSaveList'); */
 
      // ASOCIAR entradas a películas
     Route::post('/user_entry_films/create', [UserEntryFilmController::class, 'store'])
