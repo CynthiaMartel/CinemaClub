@@ -1,9 +1,11 @@
 <script setup>
 import { computed } from 'vue'
 
+
 const props = defineProps({
   modelValue: Boolean, 
   film: Object
+ 
 })
 
 const emit = defineEmits(['update:modelValue', 'openPerson'])
@@ -65,6 +67,15 @@ const formattedOtherTitles = computed(() => {
   }
 });
 
+const awardsProcessed = computed(() => {
+  const awardsList = cleanList(props.film.awards);
+  return awardsList && awardsList > 0;
+})
+const nominationsProcessed = computed(() => {
+  const nominationsList = cleanList(props.film.awards);
+  return nominationsList && nominationsList > 0;
+})
+
 // --- REFERENCIAS DE IMAGEN ---
 
 const directorPhoto = computed(() => {
@@ -103,29 +114,30 @@ const cleanList = (data) => {
   return data.split('\n').filter(item => item.trim() !== '')
 }
 </script>
-
 <template>
-  <div v-if="modelValue" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
-    <div class="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden max-h-[94vh] flex flex-col relative">
+  <div v-if="modelValue" class="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md">
+    <div class="absolute inset-0 bg-slate-950/40" @click="close"></div>
+
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden max-h-[94vh] flex flex-col relative transition-all">
       
-      <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900 z-20">
-        <div>
-          <h2 class="text-xl font-black text-white uppercase tracking-tighter">{{ film.title }}</h2>
-          <div class="flex items-center gap-4 mt-1">
-             <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Ficha Técnica</p>
+      <div class="p-5 md:p-6 border-b border-slate-800 flex justify-between items-center bg-[#1b2228] z-20">
+        <div class="min-w-0 flex-1">
+          <h2 class="text-xl md:text-2xl font-black text-white uppercase tracking-tighter truncate">{{ film.title }}</h2>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2 mt-1">
+             <p class="text-[9px] text-slate-500 font-black uppercase tracking-[0.2em]">Ficha Técnica</p>
              
-             <div v-if="truncatedVote" class="flex items-center gap-1.5">
+             <div v-if="truncatedVote" class="flex items-center gap-1.5 border-l border-slate-700 pl-4">
                 <span class="text-[9px] text-slate-500 font-bold uppercase">TMDB</span>
-                <span class="bg-yellow-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded">{{ truncatedVote }}</span>
+                <span class="bg-yellow-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-sm">{{ truncatedVote }}</span>
              </div>
 
-             <a :href="tmdbUrl" target="_blank" class="text-[10px] text-yellow-500 hover:text-yellow-700 font-bold uppercase flex items-center gap-1 transition-colors">
+             <a :href="tmdbUrl" target="_blank" class="text-[9px] text-yellow-500 hover:text-yellow-600 font-black uppercase flex items-center gap-1 transition-colors">
                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
-               Ver en TMDB
+               TMDB
              </a>
           </div>
         </div>
-        <button @click="close" class="bg-slate-900 hover:bg-slate-800 text-white p-2 rounded-full transition-colors">
+        <button @click="close" class="ml-4 bg-slate-900 hover:bg-slate-800 text-white p-2 rounded-full transition-all border border-slate-700">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -134,97 +146,97 @@ const cleanList = (data) => {
 
       <div class="overflow-y-auto relative flex-1 custom-scrollbar bg-slate-900">
         <div class="absolute inset-0 z-0 pointer-events-none">
-          <img v-if="backdropUrl" :src="backdropUrl" class="w-full h-full object-cover opacity-90" />
-          <div class="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/90 to-slate-900"></div>
+          <img v-if="backdropUrl" :src="backdropUrl" class="w-full h-full object-cover opacity-30" />
+          <div class="absolute inset-0 bg-gradient-to-b from-slate-900/80 via-slate-900/95 to-slate-900"></div>
         </div>
 
         <div class="relative z-10">
           <div class="p-6 md:p-10 flex flex-col md:flex-row gap-8 items-center md:items-start">
             
-            <div class="flex flex-col gap-4 shrink-0 w-40 md:w-48">
-              <div class="relative">
+            <div class="flex flex-col gap-4 shrink-0 w-48 md:w-56">
+              <div class="relative group">
                 <img 
                   v-if="film.frame" 
                   :src="film.frame" 
-                  class="w-full h-52 md:h-64 object-cover rounded-2xl border-2 border-slate-700/50 shadow-2xl" 
+                  class="w-full aspect-[2/3] object-cover rounded-2xl border border-slate-700 shadow-2xl transition-transform duration-500 group-hover:scale-[1.02]" 
                 />
-                <div v-else class="w-full h-52 md:h-64 bg-slate-800 rounded-2xl flex items-center justify-center border-2 border-slate-700">
-                  <span class="text-slate-500 text-xs font-bold uppercase">Sin foto</span>
+                <div v-else class="w-full aspect-[2/3] bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-700">
+                  <span class="text-slate-500 text-[10px] font-black uppercase">Sin foto</span>
                 </div>
               </div>
 
-              <div v-if="formattedOtherTitles" class="bg-black/40 backdrop-blur-md p-3 rounded-xl border border-white/5">
-                <span class="block text-[9px] font-bold text-yellow-500/70 mb-2 uppercase tracking-tighter">Otros Títulos</span>
-                <div class="text-[10px] text-slate-300 leading-relaxed" v-html="formattedOtherTitles"></div>
+              <div v-if="formattedOtherTitles" class="bg-black/40 backdrop-blur-md p-4 rounded-2xl border border-white/5">
+                <span class="block text-[9px] font-black text-yellow-500/70 mb-2 uppercase tracking-widest">Títulos Alternativos</span>
+                <div class="text-[11px] text-slate-300 leading-relaxed italic font-serif" v-html="formattedOtherTitles"></div>
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 w-full text-left">
-              <div class="bg-slate-900/60 backdrop-blur-md p-4 rounded-2xl border border-white/10 col-span-full shadow-lg">
-                <span class="block text-[10px] text-yellow-500 font-bold uppercase mb-1">Lanzamiento oficial</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 w-full text-left">
+              <div class="bg-slate-900/60 backdrop-blur-md p-5 rounded-2xl border border-white/10 col-span-full shadow-lg">
+                <span class="block text-[9px] text-red-500 font-black uppercase tracking-widest mb-1">Lanzamiento oficial</span>
                 <div class="flex flex-wrap items-baseline gap-2">
-                  <span class="text-2xl text-white font-black">{{ filmYear }}</span>
-                  <span class="text-xs text-slate-400 font-mono">[{{ formattedReleaseDate }}]</span>
+                  <span class="text-3xl text-white font-black leading-none">{{ filmYear }}</span>
+                  <span class="text-[10px] text-slate-500 font-mono tracking-tighter uppercase">{{ formattedReleaseDate }}</span>
                 </div>
               </div>
 
-              <div class="bg-slate-900/60 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-lg">
-                <span class="block text-[10px] text-slate-400 font-bold uppercase mb-1">Duración</span>
-                <span class="text-lg text-white font-semibold">{{ filmDuration || 'N/A' }}</span>
+              <div class="bg-slate-900/60 backdrop-blur-md p-5 rounded-2xl border border-white/10 shadow-lg">
+                <span class="block text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Duración</span>
+                <span class="text-xl text-white font-black">{{ filmDuration || 'N/A' }}</span>
               </div>
 
-              <div class="bg-slate-900/60 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-lg">
-                <span class="block text-[10px] text-slate-400 font-bold uppercase mb-1">Géneros</span>
-                <div class="flex flex-wrap gap-1 mt-1">
+              <div class="bg-slate-900/60 backdrop-blur-md p-5 rounded-2xl border border-white/10 shadow-lg">
+                <span class="block text-[9px] text-slate-500 font-black uppercase tracking-widest mb-2">Géneros</span>
+                <div class="flex flex-wrap gap-1.5">
                   <span v-for="g in (film.genre?.split(',') || [])" :key="g" 
-                    class="text-[9px] bg-white/10 px-2 py-0.5 rounded-full text-slate-200 border border-white/10">
+                    class="text-[9px] bg-white/5 px-2 py-0.5 rounded border border-white/10 text-slate-200 font-bold uppercase">
                     {{ g.trim() }}
                   </span>
                 </div>
               </div>
 
-              <div v-if="film.awards" class="bg-red-500/10 backdrop-blur-md p-4 rounded-2xl border border-red-500/20 col-span-1 shadow-lg">
-                <span class="block text-[10px] text-er-400 font-bold uppercase mb-2">Premios</span>
-                <ul class="space-y-1 max-h-[80px] overflow-y-auto custom-scrollbar pr-1">
-                   <li v-for="a in cleanList(film.awards)" :key="a" class="text-[11px] text-red-100/80 leading-tight">• {{ a }}</li>
+              <div v-if="awardsProcessed" class="bg-red-500/5 backdrop-blur-md p-5 rounded-2xl border border-red-500/20 shadow-lg">
+                <span class="block text-[9px] text-red-400 font-black uppercase tracking-widest mb-3">Premios</span>
+                <ul class="space-y-2 max-h-[100px] overflow-y-auto custom-scrollbar-thin">
+                   <li v-for="a in awardsProcessed" :key="a" class="text-[11px] text-red-100/70 leading-tight">• {{ a }}</li>
                 </ul>
               </div>
 
-              <div v-if="film.nominations" class="bg-amber-500/10 backdrop-blur-md p-4 rounded-2xl border border-amber-500/20 col-span-1 shadow-lg">
-                <span class="block text-[10px] text-amber-400 font-bold uppercase mb-2">Nominaciones</span>
-                <ul class="space-y-1 max-h-[80px] overflow-y-auto custom-scrollbar pr-1">
-                   <li v-for="n in cleanList(film.nominations)" :key="n" class="text-[11px] text-amber-100/80 leading-tight">• {{ n }}</li>
+              <div v-if="nominationsProcessed" class="bg-amber-500/5 backdrop-blur-md p-5 rounded-2xl border border-amber-500/20 shadow-lg">
+                <span class="block text-[9px] text-amber-400 font-black uppercase tracking-widest mb-3">Nominaciones</span>
+                <ul class="space-y-2 max-h-[100px] overflow-y-auto custom-scrollbar-thin">
+                   <li v-for="n in nominationsProcessed" :key="n" class="text-[11px] text-amber-100/70 leading-tight">• {{ n }}</li>
                 </ul>
               </div>
             </div>
           </div>
 
-          <div class="p-8 md:p-10 pt-0">
-            <div class="bg-slate-900/60 backdrop-blur-sm rounded-3xl p-6 border border-white/10 shadow-2xl">
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div class="p-6 md:p-10 pt-0">
+            <div class="bg-slate-900/40 backdrop-blur-sm rounded-3xl p-6 md:p-8 border border-white/5 shadow-2xl">
+              <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
                 
-                <div class="md:col-span-1 border-r border-white/5 pr-4">
-                  <h4 class="text-[10px] font-bold text-yellow-600 uppercase tracking-[0.2em] mb-4">Dirección</h4>
-                  <div class="space-y-4">
+                <div class="lg:col-span-1 lg:border-r lg:border-white/5 lg:pr-8">
+                  <h4 class="text-[9px] font-black text-yellow-600 uppercase tracking-[0.3em] mb-6">Dirección</h4>
+                  <div class="space-y-6">
                     <div v-for="dir in directors" :key="dir.idPerson" 
                       @click="emit('openPerson', dir.idPerson)" 
                       class="group cursor-pointer">
-                      <p class="text-white group-hover:text-yellow-500 font-bold transition-colors leading-tight">{{ dir.name }}</p>
-                      <p class="text-[9px] text-slate-500 uppercase mt-0.5">Director Principal</p>
+                      <p class="text-white group-hover:text-yellow-500 font-black transition-colors leading-tight text-lg tracking-tight">{{ dir.name }}</p>
+                      <p class="text-[9px] text-slate-500 font-black uppercase mt-1 tracking-widest">Director Principal</p>
                       
-                      <div v-if="directorPhoto" class="mt-4 overflow-hidden rounded-xl border border-white/10 shadow-xl w-32 aspect-[2/3] group-hover:border-yellow-500/50 transition-colors">
+                      <div v-if="directorPhoto" class="mt-4 overflow-hidden rounded-2xl border border-white/10 shadow-xl w-32 aspect-[2/3] transition-all duration-500 group-hover:border-yellow-500/50">
                         <img :src="directorPhoto" :alt="dir.name" class="w-full h-full object-cover" />
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div class="md:col-span-2">
-                  <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Reparto Principal</h4>
-                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-6">
-                    <div v-for="actor in actors.slice(0, 12)" :key="actor.idPerson" @click="emit('openPerson', actor.idPerson)" class="group cursor-pointer">
-                      <p class="text-sm text-slate-200 group-hover:text-red-500 transition-colors font-bold leading-none mb-1">{{ actor.name }}</p>
-                      <p class="text-[10px] text-slate-500 italic truncate">{{ actor.pivot?.character_name }}</p>
+                <div class="lg:col-span-2">
+                  <h4 class="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6">Reparto Principal</h4>
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-6">
+                    <div v-for="actor in actors.slice(0, 15)" :key="actor.idPerson" @click="emit('openPerson', actor.idPerson)" class="group cursor-pointer">
+                      <p class="text-sm text-slate-200 group-hover:text-red-500 transition-colors font-black leading-tight mb-1 uppercase tracking-tighter">{{ actor.name }}</p>
+                      <p class="text-[10px] text-slate-500 italic truncate font-serif">{{ actor.pivot?.character_name }}</p>
                     </div>
                   </div>
                 </div>
@@ -239,17 +251,24 @@ const cleanList = (data) => {
 </template>
 
 <style scoped>
+.font-serif {
+  font-family: 'Tiempos Headline', Georgia, serif;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 5px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(0, 0, 0, 0.1);
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: #1e293b;
   border-radius: 10px;
 }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+.custom-scrollbar-thin::-webkit-scrollbar {
+  width: 3px;
+}
+.custom-scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.05);
 }
 </style>

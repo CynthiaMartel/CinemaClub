@@ -69,15 +69,6 @@ const filmDuration = computed(() => {
   return h > 0 ? `${h}h ${m}m` : `${m}m`
 })
 
-const formattedTMDB = computed(() => {
-  return film.value?.vote_average ? Number(film.value.vote_average).toFixed(1) : '—'
-})
-
-const hasExtraDetails = computed(() => {
-  return (film.value?.awards?.length > 0) || 
-         (film.value?.nominations?.length > 0) || 
-         (film.value?.alternative_titles?.length > 0);
-})
 
 // Carga de datos
 const fetchFilm = async () => {
@@ -124,157 +115,164 @@ onMounted(fetchFilm)
 </script>
 
 <template>
-  <div class="min-h-screen text-slate-100 font-sans bg-[#17191c]">
+  <div class="min-h-screen text-[#9ab] font-sans bg-[#14181c] selection:bg-[#BE2B0C]/40">
 
-    <div v-if="isLoading" class="flex flex-col items-center justify-center h-screen gap-4">
-      <div class="w-12 h-12 border-4 border-slate-800 border-t-[#BE2B0C] rounded-full animate-spin"></div>
-      <p class="text-slate-500 font-black uppercase tracking-widest text-[10px]">Consultando archivos de CinemaClub...</p>
+    <div v-if="isLoading" class="flex flex-col items-center justify-center h-screen gap-6">
+      <div class="w-14 h-14 border-4 border-slate-800 border-t-[#BE2B0C] rounded-full animate-spin"></div>
+      <p class="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px]">CinemaClub is loading...</p>
     </div>
 
-    <div v-else-if="error" class="flex items-center justify-center h-screen">
-      <div class="bg-red-500/10 border border-[#BE2B0C]/50 p-6 rounded-2xl text-center">
-        <p class="text-[#BE2B0C] font-bold">{{ error }}</p>
-        <button @click="fetchFilm" class="mt-4 text-slate-300 underline cursor-pointer uppercase text-[10px] font-black tracking-widest">Reintentar</button>
+    <div v-else-if="error" class="flex items-center justify-center h-screen px-4">
+      <div class="bg-red-950/20 border border-red-900/50 p-8 rounded-3xl text-center max-w-sm backdrop-blur-md">
+        <p class="text-red-500 font-bold mb-6 text-sm uppercase tracking-widest">{{ error }}</p>
+        <button @click="fetchFilm" class="w-full py-3 bg-red-900/20 hover:bg-red-900/40 text-red-200 rounded-xl transition-all uppercase text-[10px] font-black tracking-widest border border-red-900/30">Reintentar</button>
       </div>
     </div>
 
-    <div v-else-if="film" class="flex flex-col">
-      <header
-        class="relative h-64 md:h-[450px] flex items-end px-6 md:px-16 bg-cover bg-center"
-        :style="{ backgroundImage: `url(${film.backdrop || film.frame || ''})` }"
-      >
-        <div class="absolute inset-0 bg-gradient-to-t from-[#17191c] via-[#17191c]/40 to-transparent" />
-      </header> 
+    <div v-else-if="film" class="relative">
+      
+      <header class="absolute top-0 left-0 w-full h-[550px] overflow-hidden z-0">
+        <div 
+          class="absolute inset-0 bg-cover bg-center transition-transform duration-[4s] scale-105 opacity-50"
+          :style="{ backgroundImage: `url(${film.backdrop || film.frame || ''})` }"
+        ></div>
+        
+        <div class="absolute inset-0 bg-gradient-to-t from-[#14181c] via-transparent to-transparent"></div>
+        
+        <div class="absolute inset-0 hidden md:block bg-gradient-to-r from-[#14181c] via-transparent to-[#14181c]"></div>
+        <div class="absolute inset-0 hidden md:block shadow-[inset_0_0_150px_rgba(20,24,28,1)]"></div>
+      </header>
 
-      <main class="max-w-7xl mx-auto px-4 md:px-16 pb-12 relative -mt-32 z-10">
-        <section class="grid gap-10 md:grid-cols-12 items-start">
+      <div class="content-wrap relative z-10 mx-auto max-w-[1200px] px-6 sm:px-12 md:px-24">
+        
+        <div class="film-page-wrapper pt-[280px] grid grid-cols-1 md:grid-cols-[230px_1fr] gap-x-16 pb-20">
+          
+          <aside class="flex flex-col gap-6 md:sticky md:top-10 self-start">
+            <div class="relative group w-full shadow-[0_0_20px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border border-white/10 bg-[#1b2228] transition-all duration-500 hover:scale-[1.05] hover:border-white/30 cursor-pointer">
+              <img v-if="film.frame" :src="film.frame" class="w-full h-auto object-cover block" />
+              <div class="absolute inset-0 ring-1 ring-inset ring-white/20 rounded-lg group-hover:ring-white/40 transition-all"></div>
+            </div>
 
-          <aside class="md:col-span-4 lg:col-span-3 sticky top-6">
-            <div class="flex flex-col gap-4 max-w-[240px] mx-auto md:mx-0">
-              
-              <div class="flex flex-wrap items-center gap-1.5 mb-2">
-                <div v-if="filmYear" class="text-[9px] bg-slate-900/80 text-slate-300 px-2 py-1 rounded border border-slate-700 uppercase font-black tracking-wider">{{ filmYear }}</div>
-                <div v-if="filmDuration" class="text-[9px] bg-slate-900/80 text-slate-300 px-2 py-1 rounded border border-slate-700 uppercase font-black tracking-wider">{{ filmDuration }}</div>
+            <div class="actions-panel relative bg-[#1b2228] border border-white/5 rounded-lg p-5 group/actions">
+              <div class="text-center w-full mb-4">
+                <span class="block text-[9px] text-[#899] font-black uppercase tracking-[0.2em] mb-1">Club Score</span>
+                <span class="text-3xl font-black text-white tracking-tighter leading-none">
+                  {{ film.globalRate > 0 ? Number(film.globalRate).toFixed(1) : '—' }}
+                </span>
               </div>
 
-              <div class="relative group overflow-hidden rounded-xl shadow-2xl border border-slate-700/50 bg-slate-900">
-                <img v-if="film.frame" :src="film.frame" class="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-110" />
-                <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <RatingIt :filmId="film.idFilm" :filmRef="film" />
+
+              <div class="grid grid-cols-4 gap-2 mt-5 pt-5 border-t border-white/5 text-[#9ab]">
+                <button @click="userActionsStore.toggleFavorite(film.idFilm, film)" :class="film.user_action?.is_favorite ? 'text-[#BE2B0C] bg-[#BE2B0C]/10' : 'hover:text-white'" class="aspect-square flex items-center justify-center rounded transition-all">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
+                </button>
+                <button @click="userActionsStore.toggleWatched(film.idFilm, film)" :class="film.user_action?.watched ? 'text-[#00c020] bg-[#00c020]/10' : 'hover:text-white'" class="aspect-square flex items-center justify-center rounded transition-all">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                </button>
+                <button @click="userActionsStore.toggleWatchLater(film.idFilm, film)" :class="film.user_action?.watch_later ? 'text-[#34a8c4] bg-[#34a8c4]/10' : 'hover:text-white'" class="aspect-square flex items-center justify-center rounded transition-all">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                </button>
+                <button @click="isListModalOpen = true" class="aspect-square flex items-center justify-center rounded hover:text-white transition-all">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
               </div>
 
-              <div class="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl shadow-xl backdrop-blur-md">
-                <h3 class="text-[9px] font-black text-slate-500 uppercase tracking-[3px] text-center border-b border-slate-800/50 pb-3 mb-3">Rating Club</h3>
-                <div class="text-center">
-                  <p class="text-[#BE2B0C] font-black text-3xl tracking-tighter">{{ film.globalRate > 0 ? Number(film.globalRate).toFixed(1) : '—' }}</p>
-                </div>
-              </div>
-
-              <div class="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl shadow-xl backdrop-blur-md relative group">
-                <RatingIt v-if="auth.isAuthenticated || true" :filmId="film.idFilm" :filmRef="film" />
-                
-                <div class="flex items-center justify-around mt-4 pt-4 border-t border-slate-800/50">
-                  <button @click="userActionsStore.toggleFavorite(film.idFilm, film)" :class="film.user_action?.is_favorite ? 'text-[#BE2B0C]' : 'text-slate-500 hover:text-[#BE2B0C]'" class="transition-all duration-300 cursor-pointer p-1 transform hover:scale-125">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
-                  </button>
-                  <button @click="userActionsStore.toggleWatched(film.idFilm, film)" :class="film.user_action?.watched ? 'text-yellow-600' : 'text-slate-500 hover:text-yellow-600'" class="transition-all duration-300 cursor-pointer p-1 transform hover:scale-125">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                  </button>
-                  <button @click="userActionsStore.toggleWatchLater(film.idFilm, film)" :class="film.user_action?.watch_later ? 'text-emerald-400' : 'text-slate-500 hover:text-emerald-400'" class="transition-all duration-300 cursor-pointer p-1 transform hover:scale-125">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                  </button>
-                  <button @click="isListModalOpen = true" class="text-slate-500 hover:text-yellow-500 transition-all duration-300 cursor-pointer p-1 transform hover:scale-125">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                  </button>
-                </div>
-
-                <div v-if="!auth.isAuthenticated" @click="openLogin" class="absolute inset-0 bg-slate-950/90 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl cursor-pointer z-20">
-                  <p class="text-[9px] font-black text-[#BE2B0C] uppercase tracking-[2px] text-center px-4">Login para interactuar</p>
-                </div>
-                <p v-if="isSavingRate" class="text-[8px] text-orange-500 text-center animate-pulse mt-1 font-black uppercase tracking-tighter">Guardando...</p>
+              <div v-if="!auth.isAuthenticated" 
+                   @click="openLogin" 
+                   class="absolute inset-0 bg-slate-950/90 backdrop-blur-sm opacity-0 group-hover/actions:opacity-100 transition-all duration-300 flex items-center justify-center rounded-lg cursor-pointer p-4 text-center z-20">
+                <p class="text-[9px] font-black text-white uppercase tracking-[0.2em]">Login para interactuar</p>
               </div>
             </div>
           </aside>
 
-          <div class="md:col-span-8 lg:col-span-9 flex flex-col gap-10">
-            <div class="space-y-6">
-              <div class="flex flex-col gap-y-4 border-b border-slate-800 pb-8">
-                <h1 class="text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tighter leading-[1.1] max-w-4xl drop-shadow-md">
-                  {{ film.title }}
-                </h1>
-                
-                <div v-if="directors.length" class="flex items-center gap-3">
-                  <span class="text-[10px] font-black text-slate-500 uppercase tracking-[3px] whitespace-nowrap">Dirigida por</span>
-                  <div class="flex flex-wrap gap-2">
-                    <template v-for="(dir, index) in directors" :key="dir.idPerson">
-                      <span @click="openPerson(dir.idPerson)" class="text-sm font-black text-yellow-600 hover:text-yellow-500 transition-colors cursor-pointer uppercase tracking-tight">
-                        {{ dir.name }}
+          <div class="flex flex-col pt-10 md:pt-20 max-w-full md:max-w-[800px]">
+            
+            <section class="film-header mb-8">
+              <h1 class="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight mb-4 drop-shadow-lg font-serif">
+                {{ film.title }}
+              </h1>
+              
+              <div class="flex flex-wrap items-center gap-4 text-sm font-bold">
+                <span v-if="filmYear" class="text-slate-300">{{ filmYear }}</span>
+                <div v-if="directors.length" class="flex gap-2 text-[#899]">
+                  <span class="font-normal">Directed by</span>
+                  <template v-for="(dir, index) in directors" :key="dir.idPerson">
+                    <span @click="openPerson(dir.idPerson)" class="text-slate-100 hover:text-white border-b border-slate-700 hover:border-slate-100 cursor-pointer">
+                      {{ dir.name }}
+                    </span>
+                    <span v-if="index < directors.length - 1">,</span>
+                  </template>
+                </div>
+              </div>
+            </section>
+
+            <section class="synopsis mb-10">
+              <p class="text-slate-300 text-lg leading-relaxed italic opacity-90">
+                {{ film.overview || 'Sinopsis no disponible.' }}
+              </p>
+            </section>
+
+            <div class="details-tabs bg-[#1b2228] border border-white/5 rounded-lg overflow-hidden mb-12 shadow-xl">
+              <header class="flex justify-between items-center px-6 py-3 border-b border-white/5 bg-white/[0.02]">
+                <h3 class="text-[9px] font-black text-yellow-800 uppercase tracking-[0.3em]">Detalles</h3>
+                <button @click="isDetailsModalOpen = true" class="text-[9px] font-black text-[#9ab] hover:text-white transition-colors">
+                  VER MÁS +
+                </button>
+              </header>
+
+              <div class="p-6 md:p-8 space-y-10">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div class="space-y-1">
+                    <span class="text-[9px] text-[#678] font-black uppercase">Idioma</span>
+                    <p class="text-sm text-white uppercase">{{ film.original_language || '—' }}</p>
+                  </div>
+                  <div class="space-y-1">
+                    <span class="text-[9px] text-[#678] font-black uppercase">Duración</span>
+                    <p class="text-sm text-white">{{ filmDuration || '—' }}</p>
+                  </div>
+                  <div class="space-y-1">
+                    <span class="text-[9px] text-[#678] font-black uppercase">Género</span>
+                    <div class="flex flex-wrap gap-x-2 gap-y-1">
+                      <span class="text-[11px] font-bold text-slate-100 bg-white/5 px-2 py-1 rounded hover:bg-[#BE2B0C]/20 hover:text-white cursor-pointer transition-all">{{ film.genre}}</span>
+                    </div>
+                  </div>
+                  
+                </div>
+
+                <div v-if="actors.length" class="pt-6 border-t border-white/5">
+                  <span class="text-[9px] text-[#678] font-black uppercase tracking-widest block mb-4">Reparto Principal</span>
+                  <div class="flex flex-wrap gap-x-2 gap-y-1">
+                    <template v-for="(actor, index) in actors" :key="actor.idPerson">
+                      <span @click="openPerson(actor.idPerson)" class="text-[11px] font-bold text-slate-100 bg-white/5 px-2 py-1 rounded hover:bg-[#BE2B0C]/20 hover:text-white cursor-pointer transition-all">
+                        {{ actor.name }}
                       </span>
-                      <span v-if="index < directors.length - 1" class="text-slate-700">/</span>
                     </template>
                   </div>
                 </div>
               </div>
-
-              <div class="pt-4 max-w-3xl">
-                <p class="text-slate-300 text-xl leading-relaxed font-serif italic border-l-2 border-[#BE2B0C]/30 pl-8">
-                  {{ film.overview || 'No hay sinopsis disponible en los archivos.' }}
-                </p>
-              </div>
             </div>
 
-            <div class="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden shadow-xl backdrop-blur-sm">
-              <div class="bg-slate-900/50 px-6 py-4 border-b border-slate-800 flex justify-between items-center">
-                <h3 class="text-[10px] font-black text-yellow-600 uppercase tracking-[3px]">Especificaciones</h3>
-                <button v-if="hasExtraDetails" @click="isDetailsModalOpen = true" class="text-[9px] font-black bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-1.5 rounded-full transition-all uppercase tracking-widest flex items-center gap-2 border border-slate-700">
-                  <span>Detalles Pro</span>
-                </button>
-              </div>
-              <div class="p-6 space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div v-if="film.original_title" class="flex flex-col">
-                    <span class="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Título original</span>
-                    <span class="text-sm text-slate-200 font-medium italic font-serif">{{ film.original_title }}</span>
-                  </div>
-                  <div class="flex flex-col">
-                    <span class="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">TMDB Score</span>
-                    <span class="text-sm text-yellow-500 font-black">{{ formattedTMDB }}</span>
-                  </div>
-                </div>
-
-                <div v-if="actors.length" class="flex flex-col pt-4 border-t border-slate-800/60">
-                  <span class="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-4">Cast / Reparto</span>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6">
-                    <div v-for="actor in actors" :key="actor.idPerson" class="text-xs flex items-baseline gap-2 group">
-                      <span @click="openPerson(actor.idPerson)" class="text-slate-200 group-hover:text-yellow-600 transition-colors cursor-pointer font-bold">{{ actor.name }}</span>
-                      <span v-if="actor.pivot?.character_name" class="text-slate-600 italic text-[10px] truncate font-serif">{{ actor.pivot.character_name }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-10">
-              <CommentSection 
-                type="film" 
-                :entry-id="film.idFilm" 
-                :is-authenticated="auth.isAuthenticated" 
-                :current-user-id="auth.user?.id"
-                accent-class="bg-yellow-700"
-              />
-            </div>
+            <CommentSection 
+              type="film" 
+              :entry-id="film.idFilm" 
+              :is-authenticated="auth.isAuthenticated" 
+              :current-user-id="auth.user?.id"
+              accent-class="bg-[#BE2B0C]"
+            />
 
           </div>
-        </section>
-      </main>
+        </div>
+      </div>
     </div>
   </div>
 
   <div v-if="isListModalOpen" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-slate-950/90 backdrop-blur-md" @click="isListModalOpen = false"></div>
-    <div class="relative bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-8 shadow-2xl">
-        <h3 class="text-xl font-black text-white uppercase tracking-tighter mb-8">Archivar en lista</h3>
-        <button @click="goCreateEntry" class="w-full py-4 border border-dashed border-slate-700 rounded-xl text-slate-500 text-[10px] hover:border-yellow-600 hover:text-yellow-600 transition-all font-black uppercase tracking-widest">
-          + Nueva Colección
+    <div class="relative bg-[#1b2228] border border-white/10 w-full max-w-sm rounded-xl p-8 shadow-2xl">
+        <h3 class="text-lg font-black text-white uppercase tracking-tighter mb-6 text-center">Añadir a una lista</h3>
+        <button @click="goCreateEntry" class="w-full py-4 border-2 border-dashed border-white/10 rounded-lg text-slate-500 text-[10px] hover:border-[#BE2B0C] hover:text-[#BE2B0C] transition-all font-black uppercase tracking-widest">
+          + Crear Nueva Lista
         </button>
     </div>
   </div>
@@ -285,9 +283,18 @@ onMounted(fetchFilm)
 </template>
 
 <style scoped>
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #BE2B0C; }
+.font-serif {
+  font-family: 'Tiempos Headline', Georgia, serif;
+}
+
+@media (min-width: 768px) {
+  .film-page-wrapper {
+    grid-template-columns: 230px 1fr;
+  }
+}
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #14181c; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
 </style>
-
-
