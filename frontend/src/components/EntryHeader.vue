@@ -37,7 +37,7 @@ import { computed } from 'vue';
 const props = defineProps(['user', 'title', 'type', 'accentColor', 'bgGradient']);
 
 const typeLabel = computed(() => {
-  if (props.type === 'user_list') return 'Colección';
+  if (props.type === 'user_list') return 'Lista';
   if (props.type === 'user_debate') return 'Debate';
   return 'Crítica';
 });
