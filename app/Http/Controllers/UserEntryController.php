@@ -37,7 +37,7 @@ class UserEntryController extends Controller
         ], 201);
     }
 
-    // MOSTRAR una entrada específica (por ID) No hace falta estar logueado para ver entradas PÚBLICAS, si son privadas sí!
+    // MOSTRAR UNA entrada ESPECÍFICA (por ID) No hace falta estar logueado para ver entradas PÚBLICAS, si son privadas sí!
     
     public function show($id): JsonResponse
     {
@@ -63,15 +63,24 @@ class UserEntryController extends Controller
             }
         }
 
+        // Comprobar si el usuario ya guardó esta lista'
+        $entry->saved = false; 
+
+        if ($authUser && $entry->type === 'user_list') {
+            $entry->saved = UserSavedList::where('user_id', $authUser->id)
+                ->where('user_entry_id', $id)
+                ->exists(); // Devolvemos true o false
+        }
+
         return response()->json([
             'success' => true,
-            'data' => $entry,
-        ], 200);
+            'data' => array_merge($entry->toArray(), ['saved' => $entry->saved]), 
+        ]   , 200);
     }
 
-    // MOSTRAR feed filtrado de entradas (reviews, debates, listas)
+    // MOSTRAR FEED FILTRADO de entradas (reviews, debates, listas)
 
-    public function showEntries(Request $request): JsonResponse
+    public function showEntriesFeed(Request $request): JsonResponse
     {
         $authUser = Auth::user();
 
@@ -143,22 +152,53 @@ class UserEntryController extends Controller
         ], 200);
     }
 
+    // MOSTRAR COLECCIÓN DE LISTS, DEBATES Y REVIEWS que el usuario haya creado
 
-    // MOSTRAR las listas creadas por un usuario (para perfil en fronted)
-    
-    public function showUserLists($userId): JsonResponse
+    public function getCreatedLists($userId): JsonResponse
     {
         $lists = UserEntry::where('user_id', $userId)
             ->where('type', 'user_list')
-            ->with('films:idFilm,title')
+            ->where('status', 'approved') // Opcional: solo las aprobadas si es para perfil público
+            ->with(['films:idFilm,frame']) 
+            ->orderBy('created_at', 'desc')
             ->get();
 
         return response()->json([
             'success' => true,
-            'total' => $lists->count(),
-            'data' => $lists,
+            'data' => $lists
         ], 200);
     }
+
+    public function getCreatedDebates($userId): JsonResponse
+    {
+        $debates = UserEntry::where('user_id', $userId)
+            ->where('type', 'user_debate')
+            ->where('status', 'approved')
+            ->with(['films:idFilm,frame']) // Por si el debate tiene pelis asociadas
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $debates
+        ], 200);
+    }
+
+    public function getCreatedReviews($userId): JsonResponse
+    {
+        $reviews = UserEntry::where('user_id', $userId)
+            ->where('type', 'user_review')
+            ->where('status', 'approved')
+            ->with(['films:idFilm,frame']) 
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $reviews
+        ], 200);
+    }
+  
 }
 
 
