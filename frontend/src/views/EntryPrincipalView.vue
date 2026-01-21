@@ -54,6 +54,27 @@
       </div>
 
       <div v-else-if="entry.type === 'user_list'" class="max-w-4xl mx-auto">
+        
+        <div class="flex justify-end mb-8">
+          <button 
+            v-if="auth.isAuthenticated"
+            @click="toggleSaveList"
+            :disabled="isSaving"
+            :class="[
+              'group flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 border',
+              isSaved 
+                ? 'bg-yellow-600/10 border-yellow-600/50 text-yellow-600' 
+                : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-yellow-600 hover:text-yellow-600'
+            ]"
+          >
+            <span v-if="isSaving" class="animate-spin mr-1">○</span>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" :fill="isSaved ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+            {{ isSaved ? 'Lista Guardada' : 'Guardar Lista' }}
+          </button>
+        </div>
+
         <div class="text-center mb-12">
           <p class="text-yellow-600 text-3xl mb-2 font-serif">--</p>
           <p class="text-slate-400 text-lg italic leading-relaxed px-10">{{ entry.content }}</p>
@@ -119,6 +140,9 @@ const route = useRoute();
 const auth = useAuthStore();
 const entry = ref(null);
 
+const isSaved = ref(false);
+const isSaving = ref(false);
+
 const themeClasses = computed(() => {
   if (entry.value?.type === 'user_list') return {
     text: 'text-yellow-600',
@@ -152,11 +176,33 @@ const mappedFilms = computed(() => {
   })) || [];
 });
 
+const toggleSaveList = async () => {
+  if (!entry.value || isSaving.value) return;
+  
+  isSaving.value = true;
+  try {
+    await api.post(`/user_entries_lists/${entry.value.id}/save`);
+    isSaved.value = !isSaved.value;
+  } catch (e) {
+    console.error("Error al guardar/quitar la lista:", e);
+  } finally {
+    isSaving.value = false;
+  }
+};
 const loadData = async () => {
   try {
-    const { data } = await api.get(`/user_entries/${route.params.id}`);
-    entry.value = data.data || data;
-  } catch (e) { console.error("Error cargando la entrada:", e); }
+    // Usamos GET para consultar (show)
+    const { data } = await api.get(`/user_entries/${route.params.id}/show`);
+    
+    const entryData = data.data; 
+    entry.value = entryData;
+    
+    isSaved.value = !!entryData.saved; // El !! lo convierte a booleano real
+    
+    console.log("Estado de guardado cargado:", isSaved.value);
+  } catch (e) { 
+    console.error("Error cargando la entrada:", e); 
+  }
 };
 
 onMounted(loadData);
