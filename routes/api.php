@@ -233,8 +233,8 @@ Route::get('{id}/cast-crew', [CastCrewController::class, 'show']);
 
     //  MOSTRAR UNA entrada concreta por ID de entrada
     //  Permite ver el detalle completo de una lista, debate o reseña (según visibilidad)
-    Route::get('/user_entries/{id}/show', [UserEntryController::class, 'show'])
-    ->middleware('auth:sanctum');
+    Route::get('/user_entries/{id}/show', [UserEntryController::class, 'show']);
+   
 
 
 Route::middleware('auth:sanctum')->group(function () {
