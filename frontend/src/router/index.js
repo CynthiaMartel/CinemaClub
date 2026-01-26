@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import UserProfile from '@/views/UserProfile.vue'
 import EntryPrincipalView from '@/views/EntryPrincipalView.vue'
 import EntryFormView from '@/views/EntryFormView.vue'
+import EntryFeedView from '@/views/EntryFeedView.vue'
 
 const routes = [
   {
@@ -34,6 +35,12 @@ const routes = [
   path: '/create-entry/:id', 
   name: 'create-entry',
   component: () => EntryFormView,
+  props: true // Esto permite pasar los parámetros como variables automática
+  },
+  {
+   path: '/entry-feed/', 
+  name: 'create-entry',
+  component: () => EntryFeedView,
   props: true // Esto permite pasar los parámetros como variables automática
   },
   
