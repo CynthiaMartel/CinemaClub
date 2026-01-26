@@ -41,8 +41,8 @@ class UserEntryController extends Controller
     
     public function show($id): JsonResponse
     {
-        // Auth::user() devolverá null si el usuario no está logueado
-        $authUser = Auth::user(); 
+        // Auth::guard() devolverá null si el usuario no está logueado
+        $authUser = Auth::guard('sanctum')->user();
         
         $entry = UserEntry::with(['user:id,name', 'films:idFilm,title,frame', 'comments.user:id,name'])
             ->findOrFail($id);
@@ -72,9 +72,17 @@ class UserEntryController extends Controller
                 ->exists(); // Devolvemos true o false
         }
 
+        $entry->is_like = false; 
+        if ($authUser) {
+            $entry->is_like = UserEntryLike::where('user_id', $authUser->id)
+                ->where('user_entry_id', $id)
+                ->exists(); // Devolvemos true o false
+        }
+
+        // Comprobar si el usuario ya le dio like
         return response()->json([
             'success' => true,
-            'data' => array_merge($entry->toArray(), ['saved' => $entry->saved]), 
+            'data' => array_merge($entry->toArray(), ['saved' => $entry->saved, 'like'=> $entry->is_like]), 
         ]   , 200);
     }
 
@@ -82,42 +90,51 @@ class UserEntryController extends Controller
 
     public function showEntriesFeed(Request $request): JsonResponse
     {
-        $authUser = Auth::user();
+        // 1. Usamos Auth::guard('sanctum')->user() para que funcione con invitados y logueados
+        $authUser = Auth::guard('sanctum')->user();
 
-        $query = UserEntry::with(['user:id,name', 'films:idFilm,title'])
-            ->orderBy('created_at', 'desc');
+        // 2. Iniciamos la consulta con el conteo de likes
+        $query = UserEntry::with(['user:id,name', 'films:idFilm,title,frame'])
+            ->withCount('likes'); // Esto añade el campo 'likes_count' automáticamente
 
+        if ($authUser) {
+            $query->withExists(['likes as i_liked' => function($q) use ($authUser) {
+                $q->where('user_id', $authUser->id);
+            }]); // Para devolver boolean si el usuario ha dado me gusta a esa entry para mostrarlo en el feed
+        }
+
+        // 3. Lógica de Ordenación (Popularidad vs Recientes)
+        if ($request->query('sort') === 'popular') {
+            $query->orderBy('likes_count', 'desc'); // Ordenar por más likes
+        } else {
+            $query->orderBy('created_at', 'desc'); // Por defecto: más recientes
+        }
+
+        // --- Filtros existentes ---
         if ($type = $request->query('type')) {
             $query->where('type', $type);
         }
 
         if ($userId = $request->query('user_id')) {
             $query->where('user_id', $userId);
-        } elseif ($userName = $request->query('user_name')) {
-            $query->whereHas('user', fn($q) => $q->where('name', 'LIKE', "%$userName%"));
         }
 
         if ($filmId = $request->query('idFilm')) {
             $query->whereHas('films', fn($q) => $q->where('films.idFilm', $filmId));
         }
 
-          // Para filtrar por título de la entrada
-        if ($title = $request->query('title')) {
-            $query->where('title', 'LIKE', "%$title%");
-        }
-
-        if (!$authUser->isAdmin()) {
+        // 4. SEGURIDAD CORREGIDA (Evitar error 500 si $authUser es null)
+        if (!$authUser || !$authUser->isAdmin()) {
             $query->where('visibility', 'public')
-                  ->where('status', 'approved');
+                ->where('status', 'approved');
         }
 
-        $entries = $query->paginate(10);
+        // 5. PAGINACIÓN: Definimos 15 por página
+        $entries = $query->paginate(15);
 
         return response()->json([
             'success' => true,
-            'filters' => $request->all(),
-            'total' => $entries->total(),
-            'data' => $entries,
+            'data' => $entries, // Laravel ya incluye aquí total, current_page, etc.
         ], 200);
     }
 
