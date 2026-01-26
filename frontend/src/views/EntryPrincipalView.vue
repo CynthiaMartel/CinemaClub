@@ -27,6 +27,27 @@
               {{ entry.content }}
             </p>
           </div>
+
+          <div class="mt-10 flex items-center gap-4">
+            <button 
+              v-if="auth.isAuthenticated"
+              @click="toggleLike"
+              :disabled="savingLike"
+              :class="[
+                'group flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 border',
+                likeSaved 
+                  ? 'bg-red-500/10 border-red-500/50 text-red-500' 
+                  : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-red-500 hover:text-red-500'
+              ]"
+            >
+              <span v-if="savingLike" class="animate-spin mr-1">○</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" :fill="likeSaved ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+              </svg>
+              {{ likeSaved ? 'Te gusta' : 'Me gusta' }}
+              <span v-if="entry.likes_count > 0" class="ml-1 opacity-60">{{ entry.likes_count }}</span>
+            </button>
+          </div>
         </article>
         
         <aside class="lg:col-span-4">
@@ -55,32 +76,51 @@
 
       <div v-else-if="entry.type === 'user_list'" class="max-w-4xl mx-auto">
         
-        <div class="flex justify-end mb-8">
+        <div class="flex justify-end items-center gap-3 mb-8">
+          <button 
+            v-if="auth.isAuthenticated"
+            @click="toggleLike"
+            :disabled="savingLike"
+            :class="[
+              'group flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 border',
+              likeSaved 
+                ? 'bg-red-500/10 border-red-500/50 text-red-500' 
+                : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-red-500 hover:text-red-500'
+            ]"
+          >
+            <span v-if="savingLike" class="animate-spin mr-1">○</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" :fill="likeSaved ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+            </svg>
+            {{ likeSaved ? 'Te gusta' : 'Me gusta' }}
+            <span v-if="entry.likes_count > 0" class="ml-1 opacity-60">{{ entry.likes_count }}</span>
+          </button>
+
           <button 
             v-if="auth.isAuthenticated"
             @click="toggleSaveList"
-            :disabled="isSaving"
+            :disabled="isSavingList"
             :class="[
               'group flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 border',
-              isSaved 
+              isSavedList 
                 ? 'bg-yellow-600/10 border-yellow-600/50 text-yellow-600' 
                 : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-yellow-600 hover:text-yellow-600'
             ]"
           >
-            <span v-if="isSaving" class="animate-spin mr-1">○</span>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" :fill="isSaved ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <span v-if="isSavingList" class="animate-spin mr-1">○</span>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" :fill="isSavedList ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
             </svg>
-            {{ isSaved ? 'Lista Guardada' : 'Guardar Lista' }}
+            {{ isSavedList ? 'Lista Guardada' : 'Guardar Lista' }}
           </button>
         </div>
-
+        
         <div class="text-center mb-12">
           <p class="text-yellow-600 text-3xl mb-2 font-serif">--</p>
           <p class="text-slate-400 text-lg italic leading-relaxed px-10">{{ entry.content }}</p>
         </div>
         <div class="bg-gradient-to-b from-slate-900/40 to-transparent p-6 border-t border-slate-800/50 rounded-3xl shadow-2xl">
-           <MovieGrid :films="mappedFilms" show-numbers />
+            <MovieGrid :films="mappedFilms" show-numbers />
         </div>
       </div>
 
@@ -106,6 +146,27 @@
            <p class="text-xl md:text-2xl leading-[1.9] text-slate-200 font-light first-letter:text-6xl first-letter:font-black first-letter:text-[#BE2B0C] first-letter:mr-4 first-letter:float-left first-letter:mt-1">
              {{ entry.content }}
            </p>
+
+           <div class="mt-12 flex items-center gap-4">
+            <button 
+              v-if="auth.isAuthenticated"
+              @click="toggleLike"
+              :disabled="savingLike"
+              :class="[
+                'group flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 border',
+                likeSaved 
+                  ? 'bg-red-500/10 border-red-500/50 text-red-500' 
+                  : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-red-500 hover:text-red-500'
+              ]"
+            >
+              <span v-if="savingLike" class="animate-spin mr-1">○</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" :fill="likeSaved ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+              </svg>
+              {{ likeSaved ? 'Te gusta' : 'Me gusta' }}
+              <span v-if="entry.likes_count > 0" class="ml-1 opacity-60">{{ entry.likes_count }}</span>
+            </button>
+           </div>
            
            <div v-if="mappedFilms.length > 1" class="mt-20 pt-10 border-t border-slate-800/50">
              <h4 class="text-slate-600 text-[10px] font-black uppercase tracking-[3px] mb-8">Otras películas analizadas</h4>
@@ -140,8 +201,11 @@ const route = useRoute();
 const auth = useAuthStore();
 const entry = ref(null);
 
-const isSaved = ref(false);
-const isSaving = ref(false);
+const isSavedList = ref(false);
+const isSavingList = ref(false);
+
+const savingLike = ref(false);
+const likeSaved = ref(false);
 
 const themeClasses = computed(() => {
   if (entry.value?.type === 'user_list') return {
@@ -177,18 +241,40 @@ const mappedFilms = computed(() => {
 });
 
 const toggleSaveList = async () => {
-  if (!entry.value || isSaving.value) return;
+  if (!entry.value || isSavingList.value) return;
   
-  isSaving.value = true;
+  isSavingList.value = true;
   try {
     await api.post(`/user_entries_lists/${entry.value.id}/save`);
-    isSaved.value = !isSaved.value;
+    isSavedList.value = !isSavedList.value;
   } catch (e) {
     console.error("Error al guardar/quitar la lista:", e);
   } finally {
-    isSaving.value = false;
+    isSavingList.value = false;
   }
 };
+
+
+const toggleLike = async () => {
+  if (!entry.value || savingLike.value) return;
+  
+  savingLike.value = true;
+  try {
+    const { data } = await api.post(`/user_entries/${entry.value.id}/like`);
+    
+    likeSaved.value = !likeSaved.value;
+
+    if (entry.value && data.likes_count !== undefined) {
+      entry.value.likes_count = data.likes_count;
+    }
+
+  } catch (e) {
+    console.error("Error en like dar/quitar", e);
+  } finally {
+    savingLike.value = false;
+  }
+};
+
 const loadData = async () => {
   try {
     // Usamos GET para consultar (show)
@@ -197,9 +283,11 @@ const loadData = async () => {
     const entryData = data.data; 
     entry.value = entryData;
     
-    isSaved.value = !!entryData.saved; // El !! lo convierte a booleano real
+    isSavedList.value = !!entryData.saved; // El !! lo convierte a booleano real
     
-    console.log("Estado de guardado cargado:", isSaved.value);
+    likeSaved.value = !!entryData.is_like
+    
+    console.log("Estado de guardado cargado:", isSavedList.value);
   } catch (e) { 
     console.error("Error cargando la entrada:", e); 
   }
