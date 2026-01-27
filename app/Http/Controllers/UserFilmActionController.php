@@ -94,7 +94,7 @@ class UserFilmActionController extends Controller
 
 
     // MOSTRAR COLECCIONES de películas (favorites, watch_later, watched)
-    public function showUserFilmCollection(Request $request): JsonResponse
+    public function showUserFilmDiary(Request $request): JsonResponse
     {
         $user = Auth::user();
         $type = $request->query('type');
