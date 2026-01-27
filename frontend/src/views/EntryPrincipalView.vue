@@ -10,6 +10,7 @@
       :type="entry.type"
       :accent-color="themeClasses.text"
       :bg-gradient="themeClasses.gradient"
+      :films="entry.films"
     />
 
     <main class="max-w-6xl mx-auto px-6 mt-4">

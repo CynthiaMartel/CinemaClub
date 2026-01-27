@@ -16,6 +16,7 @@ const userDebates = ref([])
 const userLists = ref([])
 const savedLists = ref([])
 const userReviews = ref([])
+const userDiary = ref([])
 
 
 const contentSections = ref([
@@ -55,6 +56,16 @@ const fetchSavedLists = async () => {
   }
 }
 
+const fetchUserDiary = async () => { /////////************************ */
+  try {
+    const userId = route.params.id
+    const { data } = await api.get(`/my_films_diary/my_films_diary/${userId}`) 
+    userDiary.value = data.data || []
+  } catch (err) {
+    console.error("Error cargando diario:", err)
+  }
+}
+
 const fetchUserStats = async () => {
   const userId = route.params.id
   const { data } = await api.get(`/user_films/stats/${userId}`)
@@ -75,7 +86,8 @@ const loadAll = async () => {
       fetchProfile(), 
       fetchUserStats(), 
       fetchUserEntries(), 
-      fetchSavedLists()
+      fetchSavedLists(),
+      fetchUserStats()
     ])
   } catch (err) {
     error.value = "No se pudo cargar el perfil"
@@ -99,7 +111,7 @@ onMounted(loadAll)
 </script>
 
 <template>
-  <div class="min-h-screen text-slate-100 font-sans bg-[#0f1113] overflow-x-hidden">
+  <div class="min-h-screen text-slate-100 font-sans bg-[#14181c] overflow-x-hidden">
     
     <div v-if="isLoading" class="flex flex-col items-center justify-center h-screen gap-4">
       <div class="w-12 h-12 border-4 border-slate-800 border-t-brand rounded-full animate-spin"></div>
@@ -126,10 +138,6 @@ onMounted(loadAll)
             <div v-for="(stat, label) in { films_seen: 'Películas', films_rated: 'Ratings', films_seen_this_year: 'Este año' }" :key="label" class="text-center border-r border-slate-800/30 last:border-0 md:last:border-r">
               <p class="text-2xl md:text-3xl font-black text-white">{{ userData_fromFilmsActions.stats[label] }}</p>
               <p class="text-[9px] md:text-[10px] uppercase tracking-widest font-bold text-slate-500">{{ stat }}</p>
-            </div>
-            <div class="text-center">
-              <p class="text-2xl md:text-3xl font-black text-white">{{ userLists.length }}</p>
-              <p class="text-[9px] md:text-[10px] uppercase tracking-widest font-bold text-slate-500">Listas</p>
             </div>
           </section>
 
