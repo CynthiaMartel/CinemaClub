@@ -30,6 +30,13 @@ const goProfile = () => {
   }
 }
 
+const goCommunity = () => {
+  isUserMenuOpen.value = false
+  
+    router.push({name: 'entry-feed'})
+  }
+
+
 const goChangePassword = () => {
   isUserMenuOpen.value = false
   isChangePasswordOpen.value = true
@@ -222,6 +229,14 @@ onBeforeUnmount(() => {
                   @click="goProfile"
                 >
                   Mi perfil
+                </button>
+
+                <button
+                  type="button"
+                  class="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-800"
+                  @click="goCommunity"
+                >
+                  Comunidad
                 </button>
 
                 <button
