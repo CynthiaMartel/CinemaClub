@@ -39,7 +39,7 @@ const routes = [
   },
   {
    path: '/entry-feed/', 
-  name: 'create-entry',
+  name: 'entry-feed',
   component: () => EntryFeedView,
   props: true // Esto permite pasar los parámetros como variables automática
   },
