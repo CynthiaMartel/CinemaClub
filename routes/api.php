@@ -197,8 +197,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('api.films.action.unmarkAction');
 
     // MOSTRAR LISTAS de películas según tipo de acción (favorites, watch_later, watched, rating)
-    Route::get('/my_films', [UserFilmActionController::class, 'showUserFilmCollection'])
-        ->name('api.user.films.my_films');
+    Route::get('/my_films_diary/{user_id?}', [UserFilmActionController::class, 'showUserFilmDiary'])
+        ->name('api.user.films.my_films_diary');
 
     // MOSTRAR ESTADÍSTICAS de actividad del usuario (admin o logueado)
     Route::get('/user_films/stats/{user_id?}', [UserFilmActionController::class, 'showStats'])

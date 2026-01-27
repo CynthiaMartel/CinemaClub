@@ -44,7 +44,7 @@ class UserEntryController extends Controller
         // Auth::guard() devolverá null si el usuario no está logueado
         $authUser = Auth::guard('sanctum')->user();
         
-        $entry = UserEntry::with(['user:id,name', 'films:idFilm,title,frame', 'comments.user:id,name'])
+        $entry = UserEntry::with(['user:id,name', 'films:idFilm,title,frame,backdrop', 'comments.user:id,name'])
             ->findOrFail($id);
 
         // Vemos la PRIVACIDAD y si es privado no se podrá ver si no está logueado
