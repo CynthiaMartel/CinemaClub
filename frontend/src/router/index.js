@@ -34,7 +34,7 @@ const routes = [
   {
   path: '/create-entry/:id', 
   name: 'create-entry',
-  component: () => EntryFormView,
+  component: EntryFormView,
   props: true // Esto permite pasar los parámetros como variables automática
   },
   {

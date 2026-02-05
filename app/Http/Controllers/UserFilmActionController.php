@@ -93,59 +93,83 @@ class UserFilmActionController extends Controller
     }
 
 
-    // MOSTRAR COLECCIONES de películas (favorites, watch_later, watched)
-    public function showUserFilmDiary(Request $request): JsonResponse
+    // MOSTRAR COLECCIONES de películas (favorites, watch_later, watched) (Con Paginación)
+    public function showUserFilmDiary(Request $request, $user_id = null): JsonResponse
     {
-        $user = Auth::user();
+        $targetId = $user_id ?? Auth::id();
         $type = $request->query('type');
+        
+        // Cantidad por página (puedes recibirlo por URL o dejarlo fijo en 20 o 50)
+        $perPage = $request->query('per_page', 20); 
 
         $validTypes = [
             'favorites'   => 'is_favorite',
             'watch_later' => 'watch_later',
             'watched'     => 'watched',
             'rating'      => 'rating',
+            'diary'       => 'diary'
         ];
 
         if (!array_key_exists($type, $validTypes)) {
             return response()->json(['error' => 'Tipo no válido.'], 400);
         }
 
-        $column = $validTypes[$type];
+        $query = UserFilmActions::with('film')->where('user_id', $targetId);
 
-        $query = UserFilmActions::with('film')->where('user_id', $user->id);
-
-        if ($type === 'rating') {
-            $films = $query->whereNotNull($column)->get();
+        // Construimos la query según el tipo
+        if ($type === 'diary') {
+            $query->where(function($q) {
+                $q->where('watched', true)
+                  ->orWhereNotNull('rating');
+            });
+        } elseif ($type === 'rating') {
+            $query->whereNotNull('rating');
         } else {
-            $films = $query->where($column, true)->get();
+            $column = $validTypes[$type];
+            $query->where($column, true);
         }
 
+        // Ordenamos
+        $query->orderBy('updated_at', 'desc');
+
+        // --- CAMBIO CLAVE: Usamos paginate en lugar de get ---
+        $paginated = $query->paginate($perPage);
+
+        // Laravel paginate devuelve una estructura específica, la adaptamos a tu respuesta JSON
         return response()->json([
             'success' => true,
             'type' => $type,
-            'total' => $films->count(),
-            'data' => $films,
+            'pagination' => [
+                'total' => $paginated->total(),
+                'current_page' => $paginated->currentPage(),
+                'last_page' => $paginated->lastPage(),
+                'per_page' => $paginated->perPage(),
+            ],
+            'data' => $paginated->items(), // Los items de la página actual
         ], 200);
     }
-
+    
+    
     // MOSTRAR ESTADÍSTICAS para el perfil (Cálculo dinámico sin columnas extra en DB)
     public function showStats($userId = null) 
     {
-        $targetId = $userId ?? auth()->id();
+        $targetId = $userId ?? Auth::id();
+
+        // 3. SEGURIDAD: Si un usuario NO logueado intenta ver esto sin pasar ID, paramos.
+        if (!$targetId) {
+            return response()->json(['error' => 'Usuario no encontrado.'], 404);
+        }
 
         $userStats = User::where('id', $targetId)
             ->withCount([
-                // Total histórico: películas vistas O puntuadas
                 'filmActions as films_total_count' => function ($query) {
                     $query->where(function ($q) {
                         $q->where('watched', true)->orWhereNotNull('rating');
                     });
                 },
-                // Total puntuadas
                 'filmActions as films_rated_count' => function ($query) {
                     $query->whereNotNull('rating');
                 },
-                // Actividad de este año (2026): Cualquier interacción (vista o puntuada) este año
                 'filmActions as watched_this_year_count' => function ($query) {
                     $query->where(function ($q) {
                         $q->where('watched', true)->orWhereNotNull('rating');
@@ -168,6 +192,7 @@ class UserFilmActionController extends Controller
             ]
         ]);
     }
+
 
     // Mostrar el estado de una película para el usuario actual
     public function showAction($filmId): JsonResponse

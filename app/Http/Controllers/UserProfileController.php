@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UserProfileRequest;
 use App\Models\UserProfile;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
@@ -11,10 +12,11 @@ use Illuminate\Http\JsonResponse;
 class UserProfileController extends Controller
 {
     
-   // Listar todos los perfiles (para solo ADMIN)
+    // Listar todos los perfiles (para solo ADMIN)
      
     public function index(): JsonResponse
     {
+        /** @var User $user */
         $user = Auth::user();
 
         if (!$user->isAdmin()) {
@@ -33,6 +35,7 @@ class UserProfileController extends Controller
     
     public function store(UserProfileRequest $request): JsonResponse
     {
+        /** @var User $user */
         $user = Auth::user();
 
         if (!$user->isAdmin()) {
@@ -40,6 +43,11 @@ class UserProfileController extends Controller
         }
 
         $validated = $request->validated();
+
+        // Convertir el string JSON a Array PHP
+        if (isset($validated['top_films'])) {
+            $validated['top_films'] = json_decode($validated['top_films'], true);
+        }
 
         // Guardar avatar si se sube
         if ($request->hasFile('avatar')) {
@@ -62,6 +70,7 @@ class UserProfileController extends Controller
      
     public function show($userId = null): JsonResponse
     {
+        /** @var User $authUser */
         $authUser = Auth::user();
 
         // Si no se pasa ID, se muestra el perfil del propio usuario ya logueado
@@ -93,23 +102,26 @@ class UserProfileController extends Controller
      
     public function update(UserProfileRequest $request, $userId): JsonResponse
     {
-        // Buscar el perfil asociado al usuario
         $profile = UserProfile::where('user_id', $userId)->first();
 
         if (!$profile) {
             return response()->json(['error' => 'No se encontró el perfil del usuario.'], 404);
         }
 
+        /** @var User $authUser */
         $authUser = Auth::user();
 
-        // Verificar permisos: solo admin o  usuario logueado
         if (!$authUser->isAdmin() && $authUser->id !== $profile->user_id) {
             return response()->json(['error' => 'No puedes modificar este perfil.'], 403);
         }
 
         $validated = $request->validated();
 
-        // Si hay nueva imagen, borrar la anterior y guardar la nueva
+        // Convertir el string JSON a Array PHP ya que lo enviamos en el request como string para la base de datos
+        if (isset($validated['top_films'])) {
+            $validated['top_films'] = json_decode($validated['top_films'], true);
+        }
+
         if ($request->hasFile('avatar')) {
             if ($profile->avatar && Storage::disk('public')->exists($profile->avatar)) {
                 Storage::disk('public')->delete($profile->avatar);
@@ -131,6 +143,7 @@ class UserProfileController extends Controller
         //  Eliminar perfil (para solo ADMIN) por ID de usuario
     public function destroy($userId): JsonResponse
     {
+        /** @var User $authUser */
         $authUser = Auth::user();
 
         // limitación a que solo administradores pueden eliminar perfiles
@@ -158,9 +171,7 @@ class UserProfileController extends Controller
         ], 200);
     }
 
-
 }
-
 
 
 

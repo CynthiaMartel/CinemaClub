@@ -26,7 +26,7 @@ class UserProfileRequest extends FormRequest
             'bio' => 'nullable|string|max:1000',
             'location' => 'nullable|string|max:255',
             'website' => 'nullable|url|max:255',
-            'top_5_films' => 'nullable|array|max:5',
+            'top_films' => 'nullable|string',
         ];
 
         // En creación (store) se valida también el user_id
@@ -38,7 +38,7 @@ class UserProfileRequest extends FormRequest
     }
 
     /**
-     * Mensajes personalizados (opcional)
+     * Mensajes personalizados 
      */
     public function messages(): array
     {
@@ -47,7 +47,7 @@ class UserProfileRequest extends FormRequest
             'avatar.max' => 'La imagen no debe superar los 2 MB.',
             'bio.max' => 'La biografía no puede tener más de 1000 caracteres.',
             'website.url' => 'El campo sitio web debe ser una URL válida.',
-            'top_5_films.array' => 'El top 5 debe ser una lista válida de películas.',
+            'top_films.array' => 'El top 5 debe ser una lista válida de películas.',
         ];
     }
 }

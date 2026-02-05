@@ -1,33 +1,47 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
+import EditProfileModal from '@/components/EditProfileModal.vue'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const error = ref(null)
 const user_profiles = ref(null) 
 const userData_fromFilmsActions = ref(null)
 const isLoading = ref(true)
+const isEditProfileModalOpen = ref(false)
 
-// Variables para contenido generado y guardado
+// Variables para contenido
 const userDebates = ref([])
 const userLists = ref([])
 const savedLists = ref([])
 const userReviews = ref([])
 const userDiary = ref([])
+const userWatchlist = ref([])
 
+// --- PAGINACIÓN DIARY ---
+const diaryPage = ref(1)
+const diaryLastPage = ref(1)
+const isLoadingDiary = ref(false)
 
+// Orden de Secciones (Izquierda): Debates, Reviews, Listas Creadas
 const contentSections = ref([
   { title: 'Debates Creados', btnLabel: 'DEBATE', type: 'user_debate' },
-  { title: 'Listas Creadas', btnLabel: 'LISTA', type: 'user_list' },
-  { title: 'Reseñas', btnLabel: 'RESEÑA', type: 'user_review' }
+  { title: 'Reseñas', btnLabel: 'RESEÑA', type: 'user_review' },
+  { title: 'Listas Creadas', btnLabel: 'LISTA', type: 'user_list' }
 ])
 
+const goCreateEntry = () => {
+  if (auth.user?.id) {
+    router.push({ name: 'create-entry', params: { id: auth.user.id } })
+  }
+}
+
 // 1. Cargar lo que el usuario HA CREADO 
-
-
 const fetchUserEntries = async () => {
   const id = route.params.id
   try{
@@ -45,7 +59,7 @@ const fetchUserEntries = async () => {
     }
 }
 
-// 2. Cargar lo que el usuario HA GUARDADO (Colección)
+// 2. Cargar lo que el usuario HA GUARDADO (Su Colección )
 const fetchSavedLists = async () => {
   try {
     const userId = route.params.id
@@ -56,13 +70,53 @@ const fetchSavedLists = async () => {
   }
 }
 
-const fetchUserDiary = async () => { /////////************************ */
+// 3.Cargar DIARIO (Películas vistas o puntuadas  ) con PAGINACIÓN
+const fetchUserDiary = async (page = 1, append = false) => { 
   try {
+    if (page === 1) isLoading.value = true
+    else isLoadingDiary.value = true
+
     const userId = route.params.id
-    const { data } = await api.get(`/my_films_diary/my_films_diary/${userId}`) 
-    userDiary.value = data.data || []
+    
+    const { data } = await api.get(`/my_films_diary/${userId}`, { 
+        params: { 
+            type: 'diary',
+            page: page,
+            per_page: 20 
+        } 
+    }) 
+    
+    if (append) {
+        userDiary.value = [...userDiary.value, ...data.data]
+    } else {
+        userDiary.value = data.data || []
+    }
+
+    diaryPage.value = data.pagination.current_page
+    diaryLastPage.value = data.pagination.last_page
+
   } catch (err) {
     console.error("Error cargando diario:", err)
+  } finally {
+    if (page === 1) isLoading.value = false
+    isLoadingDiary.value = false
+  }
+}
+
+const loadMoreDiary = () => {
+    if (diaryPage.value < diaryLastPage.value) {
+        fetchUserDiary(diaryPage.value + 1, true)
+    }
+}
+
+// 4. Cargar WATCHLIST (es lo que el usuario marca para Ver más tarde en la vista de cada film (filmDetailview.vue)
+const fetchUserWatchlist = async () => {
+  try {
+    const userId = route.params.id
+    const { data } = await api.get(`/my_films_diary/${userId}`, { params: { type: 'watch_later' } })
+    userWatchlist.value = data.data || []
+  } catch (err) {
+    console.error("Error cargando watchlist:", err)
   }
 }
 
@@ -81,13 +135,18 @@ const fetchProfile = async () => {
 const loadAll = async () => {
   isLoading.value = true
   error.value = null
+  
+  userDiary.value = []
+  diaryPage.value = 1
+  
   try {
     await Promise.all([
       fetchProfile(), 
       fetchUserStats(), 
       fetchUserEntries(), 
       fetchSavedLists(),
-      fetchUserStats()
+      fetchUserDiary(1, false),
+      fetchUserWatchlist()
     ])
   } catch (err) {
     error.value = "No se pudo cargar el perfil"
@@ -103,6 +162,29 @@ const getSectionData = (type) => {
   return []
 }
 
+const diaryGrouped = computed(() => {
+  if (!userDiary.value || userDiary.value.length === 0) return {}
+
+  const grouped = {}
+  const monthNames = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
+
+  userDiary.value.forEach(diaryFilm => {
+    const date = new Date(diaryFilm.updated_at)
+    const key = `${monthNames[date.getMonth()]} ${date.getFullYear()}`
+    
+    if (!grouped[key]) {
+      grouped[key] = []
+    }
+    grouped[key].push(diaryFilm)
+  })
+
+  return grouped
+})
+
+const orderedDiaryKeys = computed(() => {
+  return Object.keys(diaryGrouped.value) 
+})
+
 watch(() => route.params.id, (newId) => {
   if (newId) loadAll()
 }, { immediate: true })
@@ -113,38 +195,94 @@ onMounted(loadAll)
 <template>
   <div class="min-h-screen text-slate-100 font-sans bg-[#14181c] overflow-x-hidden">
     
-    <div v-if="isLoading" class="flex flex-col items-center justify-center h-screen gap-4">
+    <div v-if="isLoading && diaryPage === 1" class="flex flex-col items-center justify-center h-screen gap-4">
       <div class="w-12 h-12 border-4 border-slate-800 border-t-brand rounded-full animate-spin"></div>
       <p class="text-slate-400 text-sm uppercase tracking-widest">Cargando perfil...</p>
     </div>
 
-    <div v-else-if="user_profiles" class="max-w-7xl mx-auto px-4 sm:px-6 md:px-16 py-8 md:py-12">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
-        
-        <div class="lg:col-span-8 flex flex-col gap-12">
-          
-          <header class="flex flex-col md:flex-row items-center md:items-end gap-6 mb-4">
-            <img 
-              :src="user_profiles.avatar ? `/storage/${user_profiles.avatar}` : '/default-avatar.webp'" 
-              class="w-28 h-28 md:w-36 md:h-36 rounded-full object-cover border-4 border-slate-800 shadow-2xl"
-            />
-            <div class="text-center md:text-left">
-              <h1 class="text-4xl md:text-5xl font-black text-white uppercase italic leading-none">{{ user_profiles.user.name }}</h1>
-              <p class="text-slate-400 font-medium uppercase text-[10px] md:text-xs mt-3 tracking-[0.3em]">{{ user_profiles.location || 'Cinéfilo' }}</p>
-            </div>
-          </header>
+    <div v-else-if="user_profiles" class="content-wrap relative z-10 mx-auto max-w-[1200px] px-6 sm:px-12 md:px-24 py-10">
+      
+      <header class="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10 mb-12">
+        <div class="flex-shrink-0">
+          <img 
+            :src="user_profiles.avatar ? `/storage/${user_profiles.avatar}` : '/default-avatar.webp'" 
+            class="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-slate-800 shadow-2xl"
+          />
+        </div>
 
+        <div class="flex flex-col flex-grow text-center md:text-left w-full mt-2">
+          <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+            <h1 class="text-3xl md:text-5xl font-black text-white uppercase italic leading-none">
+                {{ user_profiles.user.name }}
+            </h1>
+            
+            <button @click="isEditProfileModalOpen = true" class="bg-brand hover:bg-slate-800 text-white font-bold py-1.5 px-4 rounded shadow-lg disabled:opacity-50 transition-all uppercase tracking-widest text-[10px]">
+              Editar Perfil
+            </button>
+          </div>
+          
+          <div class="flex items-center justify-center md:justify-start gap-2 text-brand font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs my-3">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+              </svg>
+              {{ user_profiles.location || 'Aquí mismo' }}
+          </div>
+
+          <div class="text-slate-300 text-sm leading-relaxed whitespace-pre-line font-light max-w-2xl mx-auto md:mx-0">
+            {{ user_profiles.bio || ' ' }}
+          </div>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
+        
+        <div class="lg:col-span-8 flex flex-col gap-10 order-2 lg:order-1">
+          
           <section v-if="userData_fromFilmsActions" class="grid grid-cols-2 md:grid-cols-4 gap-4 border-y border-slate-800 py-6">
-            <div v-for="(stat, label) in { films_seen: 'Películas', films_rated: 'Ratings', films_seen_this_year: 'Este año' }" :key="label" class="text-center border-r border-slate-800/30 last:border-0 md:last:border-r">
-              <p class="text-2xl md:text-3xl font-black text-white">{{ userData_fromFilmsActions.stats[label] }}</p>
-              <p class="text-[9px] md:text-[10px] uppercase tracking-widest font-bold text-slate-500">{{ stat }}</p>
+             <div class="text-center border-r border-slate-800/30">
+               <p class="text-2xl md:text-3xl font-black text-white">{{ userData_fromFilmsActions.stats.films_seen }}</p>
+               <p class="text-[9px] md:text-[10px] uppercase tracking-widest font-bold text-slate-500">Películas</p>
+             </div>
+             <div class="text-center border-r border-slate-800/30">
+               <p class="text-2xl md:text-3xl font-black text-white">{{ userData_fromFilmsActions.stats.films_seen_this_year }}</p>
+               <p class="text-[9px] md:text-[10px] uppercase tracking-widest font-bold text-slate-500">Este año</p>
+             </div>
+             <div class="text-center border-r border-slate-800/30">
+               <p class="text-2xl md:text-3xl font-black text-white">{{ userData_fromFilmsActions.stats.films_rated }}</p>
+               <p class="text-[9px] md:text-[10px] uppercase tracking-widest font-bold text-slate-500">Ratings</p>
+             </div>
+             <div class="text-center">
+               <p class="text-2xl md:text-3xl font-black text-white">{{ userLists ? userLists.length : 0 }}</p>
+               <p class="text-[9px] md:text-[10px] uppercase tracking-widest font-bold text-slate-500">Listas</p>
+             </div>
+          </section>
+
+          <section class="mt-2" v-if="userWatchlist.length > 0">
+             <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
+              <h2 class="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-400 italic">Watchlist</h2>
+              <span class="text-[10px] font-bold text-slate-500">{{ userWatchlist.length }} FILMS</span>
+            </div>
+            <div class="brand-scroll flex gap-4 overflow-x-auto pb-4">
+                <div 
+                  v-for="item in userWatchlist" 
+                  :key="item.id" 
+                  class="flex-shrink-0 w-[100px] md:w-[120px] group cursor-pointer"
+                   @click="router.push(`/films/${item.film_id}`)"
+                >
+                  <div class="aspect-[2/3] relative rounded overflow-hidden border border-slate-800 group-hover:border-blue-500 transition-colors">
+                      <img 
+                        :src="item.film.frame || '/default-poster.webp'" 
+                        class="w-full h-full object-cover" 
+                        loading="lazy"   decoding="async" />
+                  </div>
+                </div>
             </div>
           </section>
 
           <section v-for="section in contentSections" :key="section.title" class="flex flex-col">
             <div class="flex items-center justify-between mb-6 border-b border-slate-800 pb-2">
               <h2 class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">{{ section.title }}</h2>
-              <button class="text-brand text-[10px] font-bold uppercase tracking-widest">+ CREAR</button>
+              <button @click="goCreateEntry"  class="text-brand text-[10px] font-bold uppercase tracking-widest">+ CREAR</button>
             </div>
 
             <div v-if="getSectionData(section.type).length > 0" class="brand-scroll flex flex-row-reverse gap-8 overflow-x-auto pb-8 pt-4 rtl-container">
@@ -161,7 +299,10 @@ onMounted(loadAll)
                   <div class="poster-stack-container">
                     <ul class="poster-list-overlapped">
                       <li v-for="(film, idx) in item.films?.slice(0, 5)" :key="idx" class="poster-item" :style="{ zIndex: idx * 10 }">
-                        <img :src="film.frame || '/default-poster.webp'" class="poster-img" />
+                        <img 
+                          :src="film.frame || '/default-poster.webp'" 
+                          class="poster-img" 
+                          loading="lazy"   decoding="async" />
                       </li>
                     </ul>
                   </div>
@@ -171,7 +312,9 @@ onMounted(loadAll)
 
                 <div v-else-if="section.type === 'user_review'" class="review-vertical-card flex flex-col h-full bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden hover:border-brand/50 transition-all">
                   <div class="relative aspect-[2/3] w-full overflow-hidden">
-                    <img :src="item.films?.[0]?.frame || '/default-poster.webp'" class="w-full h-full object-cover opacity-50" />
+                    <img :src="item.films?.[0]?.frame || '/default-poster.webp'" 
+                    class="w-full h-full object-cover opacity-50" 
+                    loading="lazy"  decoding="async"  />
                     <div class="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-[8px] font-bold text-slate-200">
                       {{ new Date(item.created_at).toLocaleDateString() }}
                     </div>
@@ -189,7 +332,9 @@ onMounted(loadAll)
 
                 <div v-else class="flex flex-col">
                   <div class="relative w-36 md:w-44 aspect-video bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-lg">
-                    <img :src="item.films?.[0]?.frame || '/default-debate.webp'" class="w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-700" />
+                    <img :src="item.films?.[0]?.frame || '/default-debate.webp'" 
+                    class="w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-700" 
+                    loading="lazy"   decoding="async" />
                     <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
                   </div>
                   <h3 class="text-[10px] font-black text-white uppercase mt-3 truncate w-32 md:w-40 group-hover:text-brand transition-colors px-1">{{ item.title }}</h3>
@@ -215,22 +360,15 @@ onMounted(loadAll)
                 <div class="poster-stack-container mb-4">
                   <ul class="poster-list-overlapped">
                     <li v-for="(film, idx) in list.films?.slice(0, 5)" :key="idx" class="poster-item" :style="{ zIndex: idx * 10 }">
-                      <img :src="film.frame || '/default-poster.webp'" class="poster-img" />
+                      <img :src="film.frame || '/default-poster.webp'" 
+                      class="poster-img" 
+                      loading="lazy"   decoding="async" />
                     </li>
                   </ul>
                 </div>
                 
                 <h3 class="font-black text-[12px] text-slate-100 uppercase truncate group-hover:text-yellow-500 transition-colors">{{ list.title }}</h3>
                 <p class="text-[9px] text-slate-500 font-bold uppercase mt-1">De: {{ list.user?.name }}</p>
-
-                <div class="flex gap-1.5 mt-3 border-t border-slate-800 pt-3 opacity-60 group-hover:opacity-100 transition-opacity">
-                  <div v-for="(film, fIdx) in list.films?.slice(0, 4)" :key="fIdx" class="w-8 h-12 md:w-10 md:h-14 rounded bg-slate-800 overflow-hidden border border-slate-700">
-                    <img :src="film.frame" class="w-full h-full object-cover" />
-                  </div>
-                  <div v-if="list.films?.length > 4" class="w-8 h-12 md:w-10 md:h-14 bg-slate-900 border border-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-600">
-                    +{{ list.films.length - 4 }}
-                  </div>
-                </div>
               </div>
             </div>
             <div v-else class="py-10 border border-dashed border-slate-800 rounded text-center opacity-40">
@@ -240,20 +378,124 @@ onMounted(loadAll)
 
         </div>
 
-        <aside class="lg:col-span-4 flex flex-col gap-10">
+        <aside class="lg:col-span-4 flex flex-col gap-10 order-1 lg:order-2">
+          
           <section class="bg-slate-900/20 p-6 rounded-2xl border border-slate-800/50">
-            <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-6 text-center italic">Imprescindibles</h2>
-            <div class="grid grid-cols-3 gap-2">
-               <div v-for="f in 6" :key="f" class="aspect-[2/3] bg-slate-800 rounded-md overflow-hidden border border-slate-700 hover:border-brand/50 transition-colors">
-                  <img src="https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=300" class="w-full h-full object-cover" />
-               </div>
+            <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-6 text-center italic">
+              Mis imprescindibles
+            </h2>
+            
+            <div class="grid grid-cols-3 gap-3 md:gap-4" v-if="user_profiles">
+            <div 
+              v-for="(film, index) in user_profiles.top_films" 
+              :key="film.idFilm || index"
+              class="aspect-[2/3] bg-slate-800 rounded-md overflow-hidden border border-slate-700 hover:border-brand/80 hover:scale-[1.02] transition-all shadow-lg group relative cursor-pointer"
+               @click="router.push(`/films/${film.id}`)"
+            >
+              <img 
+                :src="film.frame || film.poster_url" 
+                class="w-full h-full object-cover"
+                loading="lazy"   decoding="async"   
+              />
+            </div>
+            <div 
+              v-for="i in Math.max(0, 6 - (user_profiles.top_films?.length || 0))" 
+              :key="'empty-' + i"
+              class="aspect-[2/3] border border-dashed border-slate-800 rounded-md flex items-center justify-center text-slate-700 text-xs"
+            >
+              +
+            </div>
+          </div>
+          </section>
+
+          <section class="bg-slate-900/20 p-6 rounded-2xl border border-slate-800/50">
+            <div class="flex items-center justify-between mb-8 border-b border-slate-800 pb-2">
+              <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-green-500 italic w-full text-center">Diary Film</h2>
+            </div>
+
+            <div v-if="userDiary.length > 0" class="flex flex-col gap-8">
+              <div v-for="monthKey in orderedDiaryKeys" :key="monthKey" class="flex flex-col gap-4">
+                
+                <h3 class="text-xs font-black text-slate-600 uppercase tracking-widest border-l-4 border-brand pl-3 sticky top-0 bg-[#161a1e] z-10 py-2 shadow-sm">
+                  {{ monthKey }}
+                </h3>
+
+                <div class="grid grid-cols-1 gap-2">
+                  <div 
+                    v-for="diaryFilm in diaryGrouped[monthKey]" 
+                    :key="diaryFilm.id"
+                    class="flex items-center group hover:bg-slate-800/60 p-2 rounded transition-colors cursor-pointer"
+                     @click="router.push(`/films/${diaryFilm.film_id}`)"
+                  >
+                    <div class="w-10 flex-shrink-0 text-right pr-3 border-r border-slate-800">
+                      <span class="text-base font-bold text-slate-400 group-hover:text-white block leading-none">
+                          {{ new Date(diaryFilm.updated_at).getDate() }}
+                      </span>
+                      <span class="text-[8px] uppercase text-slate-600 font-bold tracking-widest">Día</span>
+                    </div>
+
+                    <div class="flex items-center gap-3 pl-3 flex-grow">
+                      <div class="w-8 h-[48px] flex-shrink-0 rounded overflow-hidden shadow-sm border border-transparent group-hover:border-slate-500 transition-all">
+                        <img 
+                          :src="diaryFilm.film?.frame || '/default-poster.webp'" 
+                          class="w-full h-full object-cover" 
+                          loading="lazy"   decoding="async" />
+                      </div>
+
+                      <div class="flex flex-col justify-center min-w-0">
+                        <h4 class="text-xs font-bold text-slate-200 group-hover:text-brand transition-colors line-clamp-1 truncate">
+                          {{ diaryFilm.film?.title }}
+                        </h4>
+                        
+                        <div class="flex items-center gap-2 mt-1">
+                          <div v-if="diaryFilm.rating" class="flex text-yellow-500 text-[8px] gap-0.5">
+                              <span class="text-[8px] text-slate-600 uppercase font-bold tracking-wider">Puntuada</span>
+                          </div>
+                          
+                          <div v-else class="text-green-500" title="Vista">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                  <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+                              </svg>
+                          </div>
+                          
+                          <span v-if="diaryFilm.is_favorite" class="text-red-500 text-[8px]">❤</span>
+                      </div>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="diaryPage < diaryLastPage" class="mt-4 text-center">
+                  <button 
+                      @click="loadMoreDiary" 
+                      :disabled="isLoadingDiary"
+                      class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 hover:text-brand transition-colors disabled:opacity-50"
+                  >
+                      <span v-if="isLoadingDiary">Cargando...</span>
+                      <span v-else>+ Cargar más historial</span>
+                  </button>
+              </div>
+
+            </div>
+             <div v-else class="py-8 border border-dashed border-slate-800 rounded text-center opacity-40">
+              <p class="text-slate-500 text-[8px] uppercase tracking-widest italic">Sin actividad.</p>
             </div>
           </section>
+
         </aside>
 
       </div>
     </div>
   </div>
+   <EditProfileModal 
+    v-model="isEditProfileModalOpen" 
+    :userId="route.params.id"
+    :initialData="user_profiles" 
+    @updated="loadAll"  
+  />
 </template>
 
 <style scoped>
@@ -284,7 +526,7 @@ onMounted(loadAll)
   position: relative;
   width: 100px;  
   height: 150px; 
-  margin-left: -75px; /* Deja ver solo el 25% */
+  margin-left: -75px; 
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
