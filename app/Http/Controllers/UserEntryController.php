@@ -90,27 +90,28 @@ class UserEntryController extends Controller
 
     public function showEntriesFeed(Request $request): JsonResponse
     {
-        // 1. Usamos Auth::guard('sanctum')->user() para que funcione con invitados y logueados
         $authUser = Auth::guard('sanctum')->user();
 
-        // 2. Iniciamos la consulta con el conteo de likes
         $query = UserEntry::with(['user:id,name', 'films:idFilm,title,frame'])
-            ->withCount('likes'); // Esto añade el campo 'likes_count' automáticamente
+            ->withCount('likes'); 
 
         if ($authUser) {
             $query->withExists(['likes as i_liked' => function($q) use ($authUser) {
                 $q->where('user_id', $authUser->id);
-            }]); // Para devolver boolean si el usuario ha dado me gusta a esa entry para mostrarlo en el feed
+            }]);
         }
 
-        // 3. Lógica de Ordenación (Popularidad vs Recientes)
+        
         if ($request->query('sort') === 'popular') {
-            $query->orderBy('likes_count', 'desc'); // Ordenar por más likes
+            // Primero los que tienen más likes, luego los más nuevos
+            $query->orderBy('likes_count', 'desc')
+                  ->orderBy('created_at', 'desc');
         } else {
-            $query->orderBy('created_at', 'desc'); // Por defecto: más recientes
+            // Orden por defecto: Solo los más nuevos
+            $query->orderBy('created_at', 'desc');
         }
 
-        // --- Filtros existentes ---
+        //filtro
         if ($type = $request->query('type')) {
             $query->where('type', $type);
         }
@@ -123,18 +124,16 @@ class UserEntryController extends Controller
             $query->whereHas('films', fn($q) => $q->where('films.idFilm', $filmId));
         }
 
-        // 4. SEGURIDAD CORREGIDA (Evitar error 500 si $authUser es null)
         if (!$authUser || !$authUser->isAdmin()) {
             $query->where('visibility', 'public')
                 ->where('status', 'approved');
         }
 
-        // 5. PAGINACIÓN: Definimos 15 por página
         $entries = $query->paginate(15);
 
         return response()->json([
             'success' => true,
-            'data' => $entries, // Laravel ya incluye aquí total, current_page, etc.
+            'data' => $entries,
         ], 200);
     }
 

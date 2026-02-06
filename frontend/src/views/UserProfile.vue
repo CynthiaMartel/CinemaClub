@@ -23,7 +23,7 @@ const userReviews = ref([])
 const userDiary = ref([])
 const userWatchlist = ref([])
 
-// --- PAGINACIÓN DIARY ---
+// --- PAGINACIÓN de diary --
 const diaryPage = ref(1)
 const diaryLastPage = ref(1)
 const isLoadingDiary = ref(false)
@@ -193,14 +193,14 @@ onMounted(loadAll)
 </script>
 
 <template>
-  <div class="min-h-screen text-slate-100 font-sans bg-[#14181c] overflow-x-hidden">
+  <div class="min-h-screen text-slate-100 font-sans bg-[#14181c] overflow-x-hidden pb-20">
     
     <div v-if="isLoading && diaryPage === 1" class="flex flex-col items-center justify-center h-screen gap-4">
       <div class="w-12 h-12 border-4 border-slate-800 border-t-brand rounded-full animate-spin"></div>
       <p class="text-slate-400 text-sm uppercase tracking-widest">Cargando perfil...</p>
     </div>
 
-    <div v-else-if="user_profiles" class="content-wrap relative z-10 mx-auto max-w-[1200px] px-6 sm:px-12 md:px-24 py-10">
+    <div v-else-if="user_profiles" class="content-wrap mx-auto max-w-[1100px] px-6 md:px-10 lg:px-0 py-10 relative z-10">
       
       <header class="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10 mb-12">
         <div class="flex-shrink-0">
@@ -212,7 +212,7 @@ onMounted(loadAll)
 
         <div class="flex flex-col flex-grow text-center md:text-left w-full mt-2">
           <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-            <h1 class="text-3xl md:text-5xl font-black text-white uppercase italic leading-none">
+            <h1 class="text-3xl md:text-5xl font-black text-white uppercase italic leading-none tracking-tighter">
                 {{ user_profiles.user.name }}
             </h1>
             
@@ -270,10 +270,7 @@ onMounted(loadAll)
                    @click="router.push(`/films/${item.film_id}`)"
                 >
                   <div class="aspect-[2/3] relative rounded overflow-hidden border border-slate-800 group-hover:border-blue-500 transition-colors">
-                      <img 
-                        :src="item.film.frame || '/default-poster.webp'" 
-                        class="w-full h-full object-cover" 
-                        loading="lazy"   decoding="async" />
+                      <img :src="item.film.frame || '/default-poster.webp'" class="w-full h-full object-cover" loading="lazy" />
                   </div>
                 </div>
             </div>
@@ -282,27 +279,22 @@ onMounted(loadAll)
           <section v-for="section in contentSections" :key="section.title" class="flex flex-col">
             <div class="flex items-center justify-between mb-6 border-b border-slate-800 pb-2">
               <h2 class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">{{ section.title }}</h2>
-              <button @click="goCreateEntry"  class="text-brand text-[10px] font-bold uppercase tracking-widest">+ CREAR</button>
+              <button @click="goCreateEntry" class="text-brand text-[10px] font-bold uppercase tracking-widest">+ CREAR</button>
             </div>
 
             <div v-if="getSectionData(section.type).length > 0" class="brand-scroll flex flex-row-reverse gap-8 overflow-x-auto pb-8 pt-4 rtl-container">
-              
               <div 
                 v-for="item in getSectionData(section.type)" 
                 :key="item.id" 
                 @click="router.push(`/entry/${item.type}/${item.id}`)"
-                class="flex-shrink-0 group cursor-pointer ltr-content"
+                class="flex-shrink-0 group cursor-pointer ltr-content transition-transform hover:-translate-y-1 duration-300"
                 :class="section.type === 'user_review' ? 'w-[160px] md:w-[200px]' : 'w-auto'"
               >
-                
                 <div v-if="section.type === 'user_list'" class="w-[180px] md:w-[220px]">
                   <div class="poster-stack-container">
                     <ul class="poster-list-overlapped">
                       <li v-for="(film, idx) in item.films?.slice(0, 5)" :key="idx" class="poster-item" :style="{ zIndex: idx * 10 }">
-                        <img 
-                          :src="film.frame || '/default-poster.webp'" 
-                          class="poster-img" 
-                          loading="lazy"   decoding="async" />
+                        <img :src="film.frame || '/default-poster.webp'" class="poster-img" loading="lazy" />
                       </li>
                     </ul>
                   </div>
@@ -310,39 +302,30 @@ onMounted(loadAll)
                   <p class="text-[9px] text-slate-500 font-bold uppercase mt-1 italic">{{ item.films?.length }} FILMS</p>
                 </div>
 
-                <div v-else-if="section.type === 'user_review'" class="review-vertical-card flex flex-col h-full bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden hover:border-brand/50 transition-all">
+                <div v-else-if="section.type === 'user_review'" class="review-vertical-card flex flex-col h-full bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden hover:border-brand/50 transition-all shadow-xl">
                   <div class="relative aspect-[2/3] w-full overflow-hidden">
-                    <img :src="item.films?.[0]?.frame || '/default-poster.webp'" 
-                    class="w-full h-full object-cover opacity-50" 
-                    loading="lazy"  decoding="async"  />
+                    <img :src="item.films?.[0]?.frame || '/default-poster.webp'" class="w-full h-full object-cover opacity-50" loading="lazy" />
                     <div class="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-[8px] font-bold text-slate-200">
                       {{ new Date(item.created_at).toLocaleDateString() }}
                     </div>
                   </div>
                   <div class="p-3 flex flex-col gap-1.5">
-                    <h3 class="text-[11px] font-black text-brand uppercase leading-tight line-clamp-2">
-                      {{ item.title }}
-                    </h3>
-                    <p class="text-[9px] font-bold text-slate-400 uppercase truncate">
-                      {{ item.films?.[0]?.title }}
-                    </p>
-                    <p class="text-[9px] text-slate-500 line-clamp-2 italic mt-1">"{{ item.content }}"</p>
+                    <h3 class="text-[11px] font-black text-brand uppercase leading-tight line-clamp-2">{{ item.title }}</h3>
+                    <p class="text-[9px] font-bold text-slate-400 uppercase truncate">{{ item.films?.[0]?.title }}</p>
+                    <p class="text-[10px] text-slate-500 italic line-clamp-2 mt-1">"{{ item.content }}"</p>
                   </div>
                 </div>
 
                 <div v-else class="flex flex-col">
                   <div class="relative w-36 md:w-44 aspect-video bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-lg">
-                    <img :src="item.films?.[0]?.frame || '/default-debate.webp'" 
-                    class="w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-700" 
-                    loading="lazy"   decoding="async" />
+                    <img :src="item.films?.[0]?.frame || '/default-debate.webp'" class="w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-700" loading="lazy" />
                     <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
                   </div>
                   <h3 class="text-[10px] font-black text-white uppercase mt-3 truncate w-32 md:w-40 group-hover:text-brand transition-colors px-1">{{ item.title }}</h3>
                 </div>
-
               </div>
             </div>
-            <div v-else class="py-10 border border-dashed border-slate-800 rounded text-center opacity-40 text-[9px] uppercase tracking-widest italic">Nada por aquí</div>
+            <div v-else class="py-10 border border-dashed border-slate-800 rounded text-center opacity-40 text-[9px] uppercase tracking-widest italic font-bold">Nada por aquí</div>
           </section>
 
           <section class="mt-4">
@@ -360,19 +343,16 @@ onMounted(loadAll)
                 <div class="poster-stack-container mb-4">
                   <ul class="poster-list-overlapped">
                     <li v-for="(film, idx) in list.films?.slice(0, 5)" :key="idx" class="poster-item" :style="{ zIndex: idx * 10 }">
-                      <img :src="film.frame || '/default-poster.webp'" 
-                      class="poster-img" 
-                      loading="lazy"   decoding="async" />
+                      <img :src="film.frame || '/default-poster.webp'" class="poster-img" loading="lazy" />
                     </li>
                   </ul>
                 </div>
-                
                 <h3 class="font-black text-[12px] text-slate-100 uppercase truncate group-hover:text-yellow-500 transition-colors">{{ list.title }}</h3>
                 <p class="text-[9px] text-slate-500 font-bold uppercase mt-1">De: {{ list.user?.name }}</p>
               </div>
             </div>
             <div v-else class="py-10 border border-dashed border-slate-800 rounded text-center opacity-40">
-              <p class="text-slate-500 text-[9px] uppercase tracking-widest italic">Aún no has guardado ninguna lista.</p>
+              <p class="text-slate-500 text-[9px] uppercase tracking-widest italic font-bold">Aún no has guardado ninguna lista.</p>
             </div>
           </section>
 
@@ -386,26 +366,22 @@ onMounted(loadAll)
             </h2>
             
             <div class="grid grid-cols-3 gap-3 md:gap-4" v-if="user_profiles">
-            <div 
-              v-for="(film, index) in user_profiles.top_films" 
-              :key="film.idFilm || index"
-              class="aspect-[2/3] bg-slate-800 rounded-md overflow-hidden border border-slate-700 hover:border-brand/80 hover:scale-[1.02] transition-all shadow-lg group relative cursor-pointer"
-               @click="router.push(`/films/${film.id}`)"
-            >
-              <img 
-                :src="film.frame || film.poster_url" 
-                class="w-full h-full object-cover"
-                loading="lazy"   decoding="async"   
-              />
+              <div 
+                v-for="(film, index) in user_profiles.top_films" 
+                :key="film.idFilm || index"
+                class="aspect-[2/3] bg-slate-800 rounded-md overflow-hidden border border-slate-700 hover:border-brand/80 hover:scale-[1.02] transition-all shadow-lg group relative cursor-pointer"
+                 @click="router.push(`/films/${film.id}`)"
+              >
+                <img :src="film.frame || film.poster_url" class="w-full h-full object-cover" loading="lazy" />
+              </div>
+              <div 
+                v-for="i in Math.max(0, 6 - (user_profiles.top_films?.length || 0))" 
+                :key="'empty-' + i"
+                class="aspect-[2/3] border border-dashed border-slate-800 rounded-md flex items-center justify-center text-slate-700 text-xs"
+              >
+                +
+              </div>
             </div>
-            <div 
-              v-for="i in Math.max(0, 6 - (user_profiles.top_films?.length || 0))" 
-              :key="'empty-' + i"
-              class="aspect-[2/3] border border-dashed border-slate-800 rounded-md flex items-center justify-center text-slate-700 text-xs"
-            >
-              +
-            </div>
-          </div>
           </section>
 
           <section class="bg-slate-900/20 p-6 rounded-2xl border border-slate-800/50">
@@ -415,8 +391,7 @@ onMounted(loadAll)
 
             <div v-if="userDiary.length > 0" class="flex flex-col gap-8">
               <div v-for="monthKey in orderedDiaryKeys" :key="monthKey" class="flex flex-col gap-4">
-                
-                <h3 class="text-xs font-black text-slate-600 uppercase tracking-widest border-l-4 border-brand pl-3 sticky top-0 bg-[#161a1e] z-10 py-2 shadow-sm">
+                <h3 class="text-[10px] font-black text-slate-600 uppercase tracking-widest border-l-4 border-brand pl-3 sticky top-0 bg-[#14181c] z-10 py-2">
                   {{ monthKey }}
                 </h3>
 
@@ -424,7 +399,7 @@ onMounted(loadAll)
                   <div 
                     v-for="diaryFilm in diaryGrouped[monthKey]" 
                     :key="diaryFilm.id"
-                    class="flex items-center group hover:bg-slate-800/60 p-2 rounded transition-colors cursor-pointer"
+                    class="flex items-center group hover:bg-slate-800/40 p-2 rounded transition-colors cursor-pointer"
                      @click="router.push(`/films/${diaryFilm.film_id}`)"
                   >
                     <div class="w-10 flex-shrink-0 text-right pr-3 border-r border-slate-800">
@@ -435,11 +410,8 @@ onMounted(loadAll)
                     </div>
 
                     <div class="flex items-center gap-3 pl-3 flex-grow">
-                      <div class="w-8 h-[48px] flex-shrink-0 rounded overflow-hidden shadow-sm border border-transparent group-hover:border-slate-500 transition-all">
-                        <img 
-                          :src="diaryFilm.film?.frame || '/default-poster.webp'" 
-                          class="w-full h-full object-cover" 
-                          loading="lazy"   decoding="async" />
+                      <div class="w-8 h-[48px] flex-shrink-0 rounded overflow-hidden border border-transparent group-hover:border-slate-500">
+                        <img :src="diaryFilm.film?.frame || '/default-poster.webp'" class="w-full h-full object-cover" loading="lazy" />
                       </div>
 
                       <div class="flex flex-col justify-center min-w-0">
@@ -448,22 +420,15 @@ onMounted(loadAll)
                         </h4>
                         
                         <div class="flex items-center gap-2 mt-1">
-                          <div v-if="diaryFilm.rating" class="flex text-yellow-500 text-[8px] gap-0.5">
-                              <span class="text-[8px] text-slate-600 uppercase font-bold tracking-wider">Puntuada</span>
+                          <div v-if="diaryFilm.rating" class="flex items-center gap-0.5">
+                              <span class="text-[8px] text-slate-500 uppercase font-black">Rated</span>
+                              <span class="text-yellow-500 text-[8px]">★</span>
                           </div>
-                          
-                          <div v-else class="text-green-500" title="Vista">
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
-                                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                                  <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
-                              </svg>
-                          </div>
-                          
+                          <span v-else class="text-green-500 text-[8px] font-black uppercase">Watched</span>
                           <span v-if="diaryFilm.is_favorite" class="text-red-500 text-[8px]">❤</span>
-                      </div>
+                        </div>
                       </div>
                     </div>
-
                   </div>
                 </div>
               </div>
@@ -472,86 +437,88 @@ onMounted(loadAll)
                   <button 
                       @click="loadMoreDiary" 
                       :disabled="isLoadingDiary"
-                      class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 hover:text-brand transition-colors disabled:opacity-50"
+                      class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-brand transition-colors disabled:opacity-50"
                   >
-                      <span v-if="isLoadingDiary">Cargando...</span>
-                      <span v-else>+ Cargar más historial</span>
+                    {{ isLoadingDiary ? 'Cargando...' : '+ Ver más historial' }}
                   </button>
               </div>
-
             </div>
-             <div v-else class="py-8 border border-dashed border-slate-800 rounded text-center opacity-40">
+            <div v-else class="py-8 border border-dashed border-slate-800 rounded text-center opacity-40">
               <p class="text-slate-500 text-[8px] uppercase tracking-widest italic">Sin actividad.</p>
             </div>
           </section>
-
         </aside>
 
       </div>
     </div>
+
+    <EditProfileModal 
+      v-model="isEditProfileModalOpen" 
+      :userId="route.params.id"
+      :initialData="user_profiles" 
+      @updated="loadAll"  
+    />
   </div>
-   <EditProfileModal 
-    v-model="isEditProfileModalOpen" 
-    :userId="route.params.id"
-    :initialData="user_profiles" 
-    @updated="loadAll"  
-  />
 </template>
 
 <style scoped>
-/* SCROLLBAR BRAND */
-.brand-scroll::-webkit-scrollbar { height: 5px; }
-.brand-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); border-radius: 10px; }
-.brand-scroll::-webkit-scrollbar-thumb { 
-  background: #10b981; 
-  border-radius: 10px; 
+/* Alineación principal */
+.content-wrap {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
 }
 
+/* Scrollbar personalizado */
+.brand-scroll::-webkit-scrollbar {
+    height: 4px;
+    width: 4px;
+}
+.brand-scroll::-webkit-scrollbar-track {
+    background: #1e293b; 
+    border-radius: 10px;
+}
+.brand-scroll::-webkit-scrollbar-thumb {
+    background: #de6f25; 
+    border-radius: 10px;
+}
 
-/* LÓGICA RTL */
+/* RTL para scrolls horizontales */
 .rtl-container { direction: rtl; }
 .ltr-content { direction: ltr; }
 
-/* POSTER SOLAPADO */
+/* POSTER STACK (Efecto solapado) */
 .poster-list-overlapped {
-  display: flex;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  height: 150px;
-  position: relative;
+    display: flex;
+    height: 150px;
+    position: relative;
+    padding-left: 20px;
 }
-
 .poster-item {
-  position: relative;
-  width: 100px;  
-  height: 150px; 
-  margin-left: -75px; 
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    width: 80px;
+    height: 120px;
+    margin-left: -40px; 
+    transition: all 0.3s ease;
 }
-
 .poster-item:first-child { margin-left: 0; }
-
 .poster-img {
-  width: 100px;
-  height: 150px;
-  object-fit: cover;
-  border: 1.5px solid #0f1113;
-  border-radius: 4px;
-  box-shadow: 4px 0 12px rgba(0,0,0,0.6);
+    width: 80px;
+    height: 120px;
+    object-fit: cover;
+    border: 2px solid #14181c;
+    border-radius: 4px;
+    box-shadow: 4px 0 15px rgba(0,0,0,0.5);
 }
-
 .group:hover .poster-item {
-  transform: translateY(-8px) rotate(-1deg);
+    transform: translateY(-5px);
 }
 
-/* RESPONSIVE */
-@media (max-width: 768px) {
-  .poster-list-overlapped { height: 120px; }
-  .poster-item { width: 80px; height: 120px; margin-left: -60px; }
-  .poster-img { width: 80px; height: 120px; }
-  
-  /* Ajuste para reseñas en móvil */
-  .review-vertical-card { width: 150px; }
+/* Truncados */
+.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+@media (hover: none) {
+    .brand-scroll::-webkit-scrollbar { height: 0px; }
 }
 </style>

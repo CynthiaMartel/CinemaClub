@@ -100,15 +100,16 @@ class AuthController extends Controller
         $token     = $user->createToken($tokenName)->plainTextToken;
 
         // Respuesta json si no entra en ningún if:
-        return response()->json([
-            'success' => 1,
-            'message' => 'Inicio de sesión exitoso. ¡Bienvenida!',
-            'token'   => $token,
-            'user'    => [
-                'id'    => $user->id,
-                'name'  => $user->name,
-                'email' => $user->email,
-                'role'  => optional($user->role)->rolType,
+       return response()->json([
+        'success' => 1,
+        'message' => 'Inicio de sesión exitoso. ¡Bienvenida!',
+        'token'   => $token,
+        'user'    => [
+            'id'    => $user->id,
+            'name'  => $user->name,
+            'email' => $user->email,
+            'idRol' => $user->idRol, // <--- AÑADE ESTA LÍNEA
+            'role'  => optional($user->role)->rolType,
             ],
         ], 200);
     }
@@ -138,19 +139,17 @@ class AuthController extends Controller
         $user = $request->user();
 
         return response()->json([
-            'success' => 1,
-            'user' => [
-                'id'            => $user->id,
-                'name'          => $user->name,
-                'email'         => $user->email,
-                'role'          => optional($user->role)->rolType, //optional por si el usuario no tiene asignado el rol para que pueda existir este campo con null sin romper código ()
-                'blocked'       => (bool) $user->blocked,
-                'passwordChangedAt' => optional($user->password_changed_at)->toDateTimeString(), //optional por si el usuario nunca ha cambiado la contraseña para que pueda existir este campo con null sin romper código (hay una llamada a un método dentro de este campo y si fuese null, de devolvería un error fatal)
-
-                'lastAccessAt'  => optional($user->dateHourLastAccess)->toDateTimeString(), //optinal por si el usuario no ha iniciado sesión todavía  para que pueda existir este campo con null sin romper código (hay una llamada a un método dentro de este campo y si fuese null, de devolvería un error fatal)
-                'lastAccessIp'  => $user->ipLastAccess,
+        'success' => 1,
+        'user' => [
+            'id'            => $user->id,
+            'name'          => $user->name,
+            'email'         => $user->email,
+            'idRol'         => $user->idRol, // <--- AÑADE ESTA LÍNEA
+            'role'          => optional($user->role)->rolType,
+            'blocked'       => (bool) $user->blocked,
+            // ... resto de campos igual
             ],
-        ]);
+        ]); 
     }
 }
 
