@@ -19,12 +19,15 @@ use App\Http\Controllers\UserEntryFilmController;
 use App\Http\Controllers\UserFriendsController;
 use App\Http\Controllers\UserFilmActionController;
 
+
+
 use App\Http\Controllers\UserFeedController;
 use App\Http\Controllers\UserController;
 
 use Illuminate\Support\Facades\Route;
 
 use Illuminate\Http\Request;
+
 
 
 // web.php -> contiene rutas "públicas" (consumibles por usuarios y rutas consumidas para el fronted)
@@ -39,7 +42,11 @@ Route::get('/user', function (Request $request) {
 |  --RUTAS DE FILMS--
 |--------------------------------------------------------------------------
 */
+//*** */ Mostrar las películas con las que interacciona el usuario
+    Route::get('/films/trending', [UserFilmActionController::class, 'getTrendingFilms'])
+    ->name('api.films.trending');
 
+    
 // BÚSQUEDA barra de búsqueda -> PÚBLICAS
 // Ejemplo: GET http://cinemaclub.test/api/films/search?q=alien
 Route::get('/films/search', [FilmController::class, 'search'])
@@ -182,6 +189,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // Rutas para Crear o actualizar sección de favs, watch later, watched... ; eliminar alguna de estas; mostrar listas de favs, ratings, etc; mostrar estadísticas
 
     Route::middleware('auth:sanctum')->group(function () {
+
 
     // CREAR/ACTUALIZAR una acción de usuario (favorito, ver más tarde, vista, puntuación, etc.)
     Route::post('/films/createOrEdit/{film_id}', [UserFilmActionController::class, 'storeOrUpdate'])

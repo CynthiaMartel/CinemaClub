@@ -6,53 +6,143 @@ use App\Http\Requests\UserFilmActionsRequest;
 use App\Models\User; 
 use App\Models\UserFilmActions;
 use App\Models\Film;
-use App\Models\UserProfile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class UserFilmActionController extends Controller
 {
 
-    // CREAR O ACTUALIZAR una acción de usuario sobre una película: marcar como favorita, ver después, vista, puntuar, marcar visibilidad de la actividad
+    //Crear o actualizar si usuario marca como watched, puntúa
     public function storeOrUpdate(UserFilmActionsRequest $request, $filmId): JsonResponse
     {
         $user = Auth::user();
-        $film = Film::findOrFail($filmId);
         $validated = $request->validated();
 
-        // Guardar o Actualizar la acción del usuario usando user_id y film_id
-        $action = UserFilmActions::updateOrCreate(
-            ['user_id' => $user->id, 'film_id' => $filmId],
-            $validated
-        );
+        $action = UserFilmActions::firstOrNew(['user_id' => $user->id, 'film_id' => $filmId]);
 
-        // FORZAMOS la actualización de 'updated_at' para que las estadísticas de "este año" 
-        // se actualicen aunque solo se haya cambiado la nota o el valor sea el mismo.
-        $action->touch();
+        // Lógica de Watched_at (Diario)
+        $isNewWatch = isset($validated['watched']) && $validated['watched'] == true;
+        $isNewRating = isset($validated['rating']) && $validated['rating'] > 0;
 
-        // Si ha enviado una nota (rating), recalculamos la media de TODO EL CLUB para esa película
+        if (($isNewWatch || $isNewRating) && !$action->watched_at) {
+            $action->watched_at = now(); 
+        }
+        
+        $action->fill($validated);
+        $action->save(); 
+
         if (isset($validated['rating'])) {
             $this->recalculateFilmRating($filmId);
         }
 
-        // --- NOTA: No se llama a updateUserStats porque no existen esos campos en tu tabla profile ---
-
         return response()->json([
             'success' => true,
-            'message' => 'Acción actualizada correctamente.',
+            'message' => 'Acción actualizada.',
             'data' => $action,
         ], 200);
     }
+    
+    // MOSTRAR DIARIO / WATCHLIST / FAVORITOS
+    public function showUserFilmDiary(Request $request, $user_id = null): JsonResponse
+    {
+        $targetId = $user_id ?? Auth::id();
+        $type = $request->query('type');
+        $perPage = $request->query('per_page', 20); 
 
+        $validTypes = [
+            'favorites'   => 'is_favorite',
+            'watch_later' => 'watch_later',
+            'watched'     => 'watched',
+            'rating'      => 'rating',
+            'diary'       => 'diary'
+        ];
 
-    // DESMARCAR acción específica (ej: quitar de favoritos, borrar puntuación, etc.)
+        if (!array_key_exists($type, $validTypes)) {
+            return response()->json(['error' => 'Tipo no válido.'], 400);
+        }
+
+        $query = UserFilmActions::select('user_film_actions.*')
+            ->join('films', 'user_film_actions.film_id', '=', 'films.idFilm') 
+            ->with('film')
+            ->where('user_film_actions.user_id', $targetId);
+
+        if ($type === 'diary') {
+            $query->where(function($q) {
+                $q->where('user_film_actions.watched', true)
+                ->orWhereNotNull('user_film_actions.rating');
+            });
+            $orderByField = 'user_film_actions.watched_at'; 
+            
+        } elseif ($type === 'rating') {
+            $query->whereNotNull('user_film_actions.rating');
+            $orderByField = 'user_film_actions.watched_at';
+            
+        } else {
+            // Favoritos / Watchlist
+            $column = $validTypes[$type];
+            $query->where('user_film_actions.' . $column, true);
+            $orderByField = 'user_film_actions.updated_at';
+        }
+
+        $query->orderBy($orderByField, 'desc')
+            ->orderBy('films.release_date', 'desc');
+
+        $paginated = $query->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'type' => $type,
+            'pagination' => [
+                'total' => $paginated->total(),
+                'current_page' => $paginated->currentPage(),
+                'last_page' => $paginated->lastPage(),
+                'per_page' => $paginated->perPage(),
+            ],
+            'data' => $paginated->items(),
+        ], 200);
+    }
+
+  //Mostrar tendencia en homeview para films watched o puntuadas más recientemente
+    public function getTrendingFilms(Request $request): JsonResponse
+    {
+        $perPage = $request->query('per_page', 15);
+
+        // obtenemos los IDs de las películas con interacción reciente
+        // Usamos una subconsulta para que el GROUP BY no rompa los campos del SELECT
+        $trendingIdsQuery = UserFilmActions::select('film_id')
+            ->selectRaw('MAX(updated_at) as last_act')
+            ->where(function($q) {
+                $q->where('watched', true)
+                  ->orWhereNotNull('rating');
+            })
+            ->groupBy('film_id');
+
+        // traemos todas las películas haciendo un LEFT JOIN con esa subconsulta
+        // Esto garantiza que si no hay actividad, el orden por release_datese priorice
+        $films = Film::select('films.*', 'sub.last_act')
+            ->leftJoinSub($trendingIdsQuery, 'sub', function ($join) {
+                $join->on('films.idFilm', '=', 'sub.film_id');
+            })
+            // ORDEN 1: Actividad más reciente
+            ->orderByRaw('sub.last_act DESC')
+            // ORDEN 2: Fecha de estreno (desempate)
+            ->orderBy('films.release_date', 'desc')
+            ->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $films->items(),
+            'pagination' => [
+                'has_more' => $films->hasMorePages()
+            ]
+        ], 200);
+    }
+    // DESMARCAR ACCIÓN
     public function unmarkAction(Request $request, $filmId): JsonResponse
     {
         $user = Auth::user();
-
-        // Buscamos el registro con user_id y film_id
         $action = UserFilmActions::where('user_id', $user->id)
                                 ->where('film_id', $filmId)
                                 ->first();
@@ -68,7 +158,6 @@ class UserFilmActionController extends Controller
             return response()->json(['error' => 'Campo no válido para eliminar.'], 400);
         }
 
-        // Resetear el campo según su tipo
         if (in_array($field, ['is_favorite', 'watch_later', 'watched'])) {
             $action->$field = false;
         } else {
@@ -76,11 +165,8 @@ class UserFilmActionController extends Controller
         }
 
         $action->save();
-        
-        // Al desmarcar también actualizamos el timestamp para que las estadísticas sean coherentes
         $action->touch();
 
-        // Si el usuario elimina su nota, debemos recalcular la media global de la película
         if ($field === 'rating') {
             $this->recalculateFilmRating($filmId);
         }
@@ -91,71 +177,12 @@ class UserFilmActionController extends Controller
             'data' => $action
         ], 200);
     }
-
-
-    // MOSTRAR COLECCIONES de películas (favorites, watch_later, watched) (Con Paginación)
-    public function showUserFilmDiary(Request $request, $user_id = null): JsonResponse
-    {
-        $targetId = $user_id ?? Auth::id();
-        $type = $request->query('type');
-        
-        // Cantidad por página (puedes recibirlo por URL o dejarlo fijo en 20 o 50)
-        $perPage = $request->query('per_page', 20); 
-
-        $validTypes = [
-            'favorites'   => 'is_favorite',
-            'watch_later' => 'watch_later',
-            'watched'     => 'watched',
-            'rating'      => 'rating',
-            'diary'       => 'diary'
-        ];
-
-        if (!array_key_exists($type, $validTypes)) {
-            return response()->json(['error' => 'Tipo no válido.'], 400);
-        }
-
-        $query = UserFilmActions::with('film')->where('user_id', $targetId);
-
-        // Construimos la query según el tipo
-        if ($type === 'diary') {
-            $query->where(function($q) {
-                $q->where('watched', true)
-                  ->orWhereNotNull('rating');
-            });
-        } elseif ($type === 'rating') {
-            $query->whereNotNull('rating');
-        } else {
-            $column = $validTypes[$type];
-            $query->where($column, true);
-        }
-
-        // Ordenamos
-        $query->orderBy('updated_at', 'desc');
-
-        // --- CAMBIO CLAVE: Usamos paginate en lugar de get ---
-        $paginated = $query->paginate($perPage);
-
-        // Laravel paginate devuelve una estructura específica, la adaptamos a tu respuesta JSON
-        return response()->json([
-            'success' => true,
-            'type' => $type,
-            'pagination' => [
-                'total' => $paginated->total(),
-                'current_page' => $paginated->currentPage(),
-                'last_page' => $paginated->lastPage(),
-                'per_page' => $paginated->perPage(),
-            ],
-            'data' => $paginated->items(), // Los items de la página actual
-        ], 200);
-    }
     
-    
-    // MOSTRAR ESTADÍSTICAS para el perfil (Cálculo dinámico sin columnas extra en DB)
+    // MOSTRAR ESTADÍSTICAS
     public function showStats($userId = null) 
     {
         $targetId = $userId ?? Auth::id();
 
-        // 3. SEGURIDAD: Si un usuario NO logueado intenta ver esto sin pasar ID, paramos.
         if (!$targetId) {
             return response()->json(['error' => 'Usuario no encontrado.'], 404);
         }
@@ -193,8 +220,7 @@ class UserFilmActionController extends Controller
         ]);
     }
 
-
-    // Mostrar el estado de una película para el usuario actual
+    // MOSTRAR UNA ACCIÓN
     public function showAction($filmId): JsonResponse
     {
         $user = Auth::user();
@@ -212,11 +238,7 @@ class UserFilmActionController extends Controller
         return response()->json(['success' => true, 'data' => $action], 200);
     }
 
-    // --- MÉTODOS AUXILIARES ---
-
-    /**
-     * Recalcula la nota media de la película y la guarda en la tabla films (globalRate).
-     */
+    // AUXILIAR
     private function recalculateFilmRating($filmId): void
     {
         $newAverage = UserFilmActions::where('film_id', $filmId)

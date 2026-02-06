@@ -22,6 +22,7 @@ class UserFilmActions extends Model
         'rating',
         'short_review',
         'visibility',
+        'watched_at',
     ];
 
    
@@ -30,6 +31,7 @@ class UserFilmActions extends Model
         'watch_later' => 'boolean',
         'watched'     => 'boolean',
         'rating'      => 'integer',
+        'watched_at' => 'datetime',
     ];
 
   
