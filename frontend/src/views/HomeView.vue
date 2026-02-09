@@ -4,6 +4,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import RegisterModal from '@/components/RegisterModal.vue'
+import HomeBackdropModal from '@/components/HomeBackdropModal.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -11,8 +12,9 @@ const router = useRouter()
 // --- ESTADO ---
 const isRegisterOpen = ref(false)
 const isLoading = ref(false)
+const isBackdropModalOpen = ref(false)
 
-// Persistencia del fondo del Hero (Bugonia 5190 por defecto)
+// Persistencia del fondo del Hero
 const heroFilmId = ref(localStorage.getItem('home_hero_id') || 5190)
 const heroFilmData = ref(null)
 
@@ -22,7 +24,7 @@ const popularDebates = ref([])
 const popularLists = ref([])
 const popularReviews = ref([])
 
-// Saludo personalizado
+// Saludo personalizado con nombre de usuario logueado
 const welcomeMessage = computed(() => {
   if (!auth.user?.name) return "La red social para amantes del cine."
   const name = auth.user.name.charAt(0).toUpperCase() + auth.user.name.slice(1).toLowerCase()
@@ -31,21 +33,20 @@ const welcomeMessage = computed(() => {
 
 const isAdmin = computed(() => {
   if (!auth.isAuthenticated || !auth.user) return false;
-  
-  // Comprobamos el ID numérico o el nombre del rol por si acaso
   const roleId = parseInt(auth.user.idRol);
   const roleName = String(auth.user.role || '').toLowerCase();
-  
   return roleId === 1 || roleName === 'admin';
 });
 
 const openRegister = () => { isRegisterOpen.value = true }
 
+const openBackdropModal = () => {
+    isBackdropModalOpen.value = true
+}
 
 const sortContentByRecent = (contentArray) => {
     return contentArray.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
 }
-
 
 const fetchDashboardData = async () => {
   isLoading.value = true
@@ -69,7 +70,7 @@ const fetchDashboardData = async () => {
     }
 
     if (heroResult.status === 'fulfilled') {
-        heroFilmData.value = heroResult.value.data.data;
+        heroFilmData.value = heroResult.value.data;
     }
 
   } catch (error) {
@@ -79,13 +80,21 @@ const fetchDashboardData = async () => {
   }
 }
 
-// Función Admin para cambiar fondo
-const changeBackdrop = () => {
-    const newId = prompt("Introduce el ID de la película para el fondo del Home:", heroFilmId.value)
-    if (newId && !isNaN(newId)) {
-        heroFilmId.value = newId
-        localStorage.setItem('home_hero_id', newId)
-        fetchDashboardData()
+const handleBackdropChange = async (film) => {
+    if (!film) return;
+
+    try {
+        // Actualizamos persistencia
+        heroFilmId.value = film.idFilm
+        localStorage.setItem('home_hero_id', film.idFilm)
+        
+        // Cargamos datos full 
+        const res = await api.get(`/films/${film.idFilm}`)
+        
+        heroFilmData.value = res.data.data || res.data 
+        
+    } catch (e) {
+        console.error("Error cambiando backdrop", e)
     }
 }
 
@@ -112,11 +121,22 @@ onMounted(() => {
         <div class="absolute inset-0 bg-gradient-to-t from-[#14181c] via-[#14181c]/20 to-[#14181c]/60"></div>
       </div>
 
-      <div v-if="isAdmin" class="absolute top-10 right-10 z-50">
-          <button @click="changeBackdrop" class="flex items-center gap-2 bg-brand/20 hover:bg-brand text-white border border-brand/50 px-4 py-2 rounded text-[10px] font-black uppercase tracking-widest transition-all">
-              <i class="bi bi-pencil-square"></i> Cambiar Backdrop
-          </button>
+   
+      <div class="...">  
+        <div v-if="isAdmin" class="absolute top-10 right-10 z-50">   
+              <button @click="openBackdropModal" class="flex items-center gap-2 bg-brand/20 hover:bg-brand text-white border border-brand/50 px-4 py-2 rounded text-[10px] font-black uppercase tracking-widest transition-all"> 
+                  <i class="bi bi-pencil-square"></i> Cambiar Backdrop
+              </button>
+          </div>
+
+        <HomeBackdropModal 
+            v-model="isBackdropModalOpen" 
+            @change-backdrop="handleBackdropChange" 
+        />
       </div>
+
+
+    
 
       <div class="relative z-10 text-center px-6 max-w-4xl animate-fade-in-up">
         <h1 class="text-4xl md:text-6xl lg:text-7xl font-black text-white uppercase italic tracking-tighter leading-[0.9] mb-4">
@@ -128,7 +148,7 @@ onMounted(() => {
 
         <div class="flex flex-col items-center gap-8">
             <p class="text-slate-300 text-sm md:text-lg max-w-2xl font-light leading-relaxed">
-                Descubre películas, puntúalas, crea listas y debate con otras personas cinéfilas. Únete a la conversación hoy mismo.
+                Descubre películas, puntúalas, crea listas y debate con otras personas. La comunidad cinéfila empieza aquí.
             </p>
             
             <button 
