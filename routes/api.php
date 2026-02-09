@@ -42,7 +42,7 @@ Route::get('/user', function (Request $request) {
 |  --RUTAS DE FILMS--
 |--------------------------------------------------------------------------
 */
-//*** */ Mostrar las películas con las que interacciona el usuario
+//* Mostrar las películas con las que interacciona el usuario
     Route::get('/films/trending', [UserFilmActionController::class, 'getTrendingFilms'])
     ->name('api.films.trending');
 
@@ -152,6 +152,9 @@ Route::delete('/post-destroy/{id}', [PostController::class, 'destroy'])
 |     -- RUTAS DE API USER PROFILE --
 |--------------------------------------------------------------------------
 */
+// MOSTRAR PERFIL POR ID DEL USER -> Si es ADMIN o USER REGULAR LOGEUADO 
+    Route::get('/user_profiles/show/{userId?}', [UserProfileController::class, 'show'])
+        ->name('api.user_profiles.show');
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -163,10 +166,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/user_profiles/store', [UserProfileController::class, 'store'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
         ->name('api.user_profiles.store');
-
-    // MOSTRAR PERFIL POR ID DEL USER -> Si es ADMIN o USER REGULAR LOGEUADO 
-    Route::get('/user_profiles/show/{userId?}', [UserProfileController::class, 'show'])
-        ->name('api.user_profiles.show');
 
     // ACTUALIZAR PERFIL -> Si es ADMIN o USER LOGUEADO
     Route::put('/user_profiles/update/{userId}', [UserProfileController::class, 'update'])
@@ -187,9 +186,16 @@ Route::middleware('auth:sanctum')->group(function () {
 |--------------------------------------------------------------------------
 */
 // Rutas para Crear o actualizar sección de favs, watch later, watched... ; eliminar alguna de estas; mostrar listas de favs, ratings, etc; mostrar estadísticas
+// MOSTRAR ESTADÍSTICAS de actividad del usuario (admin o logueado)
+    Route::get('/user_films/stats/{user_id?}', [UserFilmActionController::class, 'showStats'])
+        ->name('api.user.films.stats');
+
+    // MOSTRAR LISTAS de películas según tipo de acción (favorites, watch_later, watched, rating)
+    Route::get('/my_films_diary/{user_id?}', [UserFilmActionController::class, 'showUserFilmDiary'])
+        ->name('api.user.films.my_films_diary');
+        
 
     Route::middleware('auth:sanctum')->group(function () {
-
 
     // CREAR/ACTUALIZAR una acción de usuario (favorito, ver más tarde, vista, puntuación, etc.)
     Route::post('/films/createOrEdit/{film_id}', [UserFilmActionController::class, 'storeOrUpdate'])
@@ -204,13 +210,6 @@ Route::middleware('auth:sanctum')->group(function () {
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
         ->name('api.films.action.unmarkAction');
 
-    // MOSTRAR LISTAS de películas según tipo de acción (favorites, watch_later, watched, rating)
-    Route::get('/my_films_diary/{user_id?}', [UserFilmActionController::class, 'showUserFilmDiary'])
-        ->name('api.user.films.my_films_diary');
-
-    // MOSTRAR ESTADÍSTICAS de actividad del usuario (admin o logueado)
-    Route::get('/user_films/stats/{user_id?}', [UserFilmActionController::class, 'showStats'])
-        ->name('api.user.films.stats');
 });
 
 /*
@@ -245,6 +244,18 @@ Route::get('{id}/cast-crew', [CastCrewController::class, 'show']);
    
 
 
+
+//  MOSTRAR las listas guardadas del usuario USERSAVEDLISTCONTROLLER
+Route::get('/user_profiles/{userId}/saved-lists', [UserSavedListController::class, 'getSavedLists']);
+
+// MOSTRAR COLECCIÓN DE LISTAS, DEBATES, REVIEWS CREADAS por el usuario
+Route::prefix('user_profiles/{userId}')->group(function () {
+Route::get('/lists', [UserEntryController::class, 'getCreatedLists']);
+Route::get('/debates', [UserEntryController::class, 'getCreatedDebates']);
+Route::get('/reviews', [UserEntryController::class, 'getCreatedReviews']);
+
+});
+
 Route::middleware('auth:sanctum')->group(function () {
     //  CREAR nueva lista, debate o reseña
     //  Solo usuarios autenticados pueden crear entradas
@@ -268,18 +279,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/user_entries_lists/{entryId}/save', [UserSavedListController::class, 'toggleSaveList'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
         ->name('api.user_entries.toggleSaveList');
-
-
-    //  MOSTRAR las listas guardadas del usuario USERSAVEDLISTCONTROLLER
-    Route::get('/user_profiles/{userId}/saved-lists', [UserSavedListController::class, 'getSavedLists']);
-
-    // MOSTRAR COLECCIÓN DE LISTAS, DEBATES, REVIEWS CREADAS por el usuario
-    Route::prefix('user_profiles/{userId}')->group(function () {
-    Route::get('/lists', [UserEntryController::class, 'getCreatedLists']);
-    Route::get('/debates', [UserEntryController::class, 'getCreatedDebates']);
-    Route::get('/reviews', [UserEntryController::class, 'getCreatedReviews']);
-
-    });
 
 });
 

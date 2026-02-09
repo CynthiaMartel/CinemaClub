@@ -15,6 +15,9 @@ const userData_fromFilmsActions = ref(null)
 const isLoading = ref(true)
 const isEditProfileModalOpen = ref(false)
 
+const isFollowing = ref(false) 
+const savingFollow = ref(false)
+
 // Variables para contenido
 const userDebates = ref([])
 const userLists = ref([])
@@ -128,8 +131,18 @@ const fetchUserStats = async () => {
 
 const fetchProfile = async () => {
   const userId = route.params.id
-  const { data } = await api.get(`/user_profiles/show/${userId}`)
-  user_profiles.value = data.data
+  try {
+      const { data } = await api.get(`/user_profiles/show/${userId}`)
+      user_profiles.value = data.data
+      
+      if (data.meta && data.meta.is_following) {
+          isFollowing.value = true
+      } else {
+          isFollowing.value = false
+      }
+  } catch (e) {
+      console.error(e)
+  }
 }
 
 const loadAll = async () => {
@@ -185,13 +198,53 @@ const orderedDiaryKeys = computed(() => {
   return Object.keys(diaryGrouped.value) 
 })
 
+
+//////
+const toggleFollow = async () => {
+  // Evitamos que el usuario le de a folow muchas veces (pulsaciones múltiples)
+  if (savingFollow.value) return;
+  
+  // Obtenemos el ID del perfil que estamos viendo
+  const profileId = route.params.id; 
+  
+  // Verificamos si es nuestro propio perfil (si estamos en nuestro propio perfil no nos vamos a seguir)
+  if (auth.user?.id == profileId) return; 
+
+  savingFollow.value = true;
+  
+  // Guardamos el estado anterior 
+  const previousState = isFollowing.value;
+
+  try {
+    isFollowing.value = !isFollowing.value;
+
+    if (previousState === true) {
+        // Si antes era TRUE, ahora dejar de seguir -> UNFOLLOW
+        await api.delete(`/user_friends/${profileId}/unfollow`);
+    } else {
+        // Si antes era FALSE ahora seguir -> FOLLOW
+        await api.post(`/user_friends/${profileId}/follow`);
+    }
+
+  
+
+  } catch (e) {
+    console.error("Error en Follow/Unfollow", e);
+    isFollowing.value = previousState;
+    
+  } finally {
+    savingFollow.value = false;
+  }
+};
+///////////
+
+
 watch(() => route.params.id, (newId) => {
   if (newId) loadAll()
 }, { immediate: true })
 
 onMounted(loadAll)
 </script>
-
 <template>
   <div class="min-h-screen text-slate-100 font-sans bg-[#14181c] overflow-x-hidden pb-20">
     
@@ -216,7 +269,11 @@ onMounted(loadAll)
                 {{ user_profiles.user.name }}
             </h1>
             
-            <button @click="isEditProfileModalOpen = true" class="bg-brand hover:bg-slate-800 text-white font-bold py-1.5 px-4 rounded shadow-lg disabled:opacity-50 transition-all uppercase tracking-widest text-[10px]">
+            <button 
+              v-if="auth.user?.id === user_profiles.user.id"
+              @click="isEditProfileModalOpen = true" 
+              class="bg-brand hover:bg-slate-800 text-white font-bold py-1.5 px-4 rounded shadow-lg disabled:opacity-50 transition-all uppercase tracking-widest text-[10px]"
+            >
               Editar Perfil
             </button>
           </div>
@@ -231,6 +288,23 @@ onMounted(loadAll)
           <div class="text-slate-300 text-sm leading-relaxed whitespace-pre-line font-light max-w-2xl mx-auto md:mx-0">
             {{ user_profiles.bio || ' ' }}
           </div>
+
+          <div v-if="auth.user?.id !== user_profiles.user.id" class="mt-6 flex justify-center md:justify-start">
+            <button 
+              @click="toggleFollow" 
+              :disabled="savingFollow"
+              class="font-black py-2 px-8 rounded-full shadow-lg transition-all uppercase tracking-[0.15em] text-[10px] flex items-center gap-2 group border border-transparent"
+              :class="isFollowing 
+                ? 'bg-slate-800 text-slate-400 border-slate-700 hover:border-red-900/50 hover:text-red-400' 
+                : 'bg-[#BE2B0C] text-white hover:bg-[#a3240a]'"
+            >
+              <span v-if="savingFollow" class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+              <span v-else>
+                 {{ isFollowing ? 'Siguiendo' : 'Seguir' }}
+              </span>
+            </button>
+          </div>
+
         </div>
       </header>
 
@@ -458,6 +532,8 @@ onMounted(loadAll)
       :initialData="user_profiles" 
       @updated="loadAll"  
     />
+
+    <LoginModal v-model="isLoginOpen" />
   </div>
 </template>
 
@@ -469,7 +545,7 @@ onMounted(loadAll)
     margin-right: auto;
 }
 
-/* Scrollbar personalizado */
+/* Scrollbar */
 .brand-scroll::-webkit-scrollbar {
     height: 4px;
     width: 4px;

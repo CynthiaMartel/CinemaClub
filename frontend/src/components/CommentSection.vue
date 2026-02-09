@@ -2,6 +2,7 @@
 import { ref, onMounted, watch } from 'vue'; 
 import api from '@/services/api';
 import LoginModal from '@/components/LoginModal.vue'
+import { useNavigation } from '@/composables/useNavigation';
 
 
 const props = defineProps({
@@ -30,6 +31,7 @@ const fetchComments = async () => {
   }
 };
 
+const { goProfile } = useNavigation();
 
 watch(() => props.entryId, () => {
   fetchComments();
@@ -95,14 +97,16 @@ onMounted(fetchComments);
 
     <div class="space-y-6">
       <div v-for="comment in comments" :key="comment.id" class="flex gap-5 animate-fade-in group">
-        <div class="w-11 h-11 bg-slate-800 rounded-full flex items-center justify-center text-yellow-600 font-black shrink-0 border border-slate-700 text-lg shadow-md">
+        <div @click="goProfile(comment.user.id)"
+        class="w-11 h-11 bg-slate-800 rounded-full flex items-center justify-center text-yellow-600 font-black shrink-0 border border-slate-700 text-lg shadow-md">
                     {{ comment.user?.name?.charAt(0).toUpperCase() || 'U' }}
         </div>
         
         <div class="flex-1">
           <div class="bg-slate-800/30 border border-slate-800/60 p-5 rounded-2xl rounded-tl-none group-hover:border-slate-700 transition-colors">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-white font-bold text-sm">@{{ comment.user?.name }}</span>
+              <span @click="goProfile(comment.user.id)"
+              class="text-white font-bold text-sm">@{{ comment.user?.name }}</span>
               <span class="text-[9px] text-slate-500 uppercase font-black tracking-tighter">
                 {{ formatDate(comment.created_at) }}
               </span>

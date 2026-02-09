@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
+use App\Models\UserFriend;
 
 class UserProfileController extends Controller
 {
@@ -68,33 +69,53 @@ class UserProfileController extends Controller
      // - Si eres admin: puedes ver cualquier perfil pasando user_id
      // - Si eres el propio usuario logueado: puedes ver tu propio perfil
      
-    public function show($userId = null): JsonResponse
+   public function show($userId = null): JsonResponse
     {
         /** @var User $authUser */
-        $authUser = Auth::user();
+        $authUser = Auth::user(); // Esto será NULL si es un invitado
 
-        // Si no se pasa ID, se muestra el perfil del propio usuario ya logueado
+        // Si no viene ID en la URL, intentamos usar el del usuario logueado
         if (!$userId) {
+            if (!$authUser) {
+                return response()->json(['error' => 'Usuario no especificado.'], 404);
+            }
             $userId = $authUser->id;
         }
 
-        // Para buscar el perfil asociado al usuario
+        // Buscar el perfil
         $profile = UserProfile::with('user')->where('user_id', $userId)->first();
 
         if (!$profile) {
             return response()->json(['error' => 'No se encontró el perfil de este usuario.'], 404);
         }
 
-        // Permitir acceso si es ADMIN o el propio user
-        if (!$authUser->isAdmin() && $authUser->id !== $profile->user_id) {
-            return response()->json(['error' => 'No tienes permiso para ver este perfil.'], 403);
+        // Lógica para saber si el que mira es el dueño o admin
+        $isOwner = $authUser && $authUser->id === $profile->user_id;
+        $isAdmin = $authUser && $authUser->isAdmin();
+
+    
+        $isFollowing = false;
+
+        // Solo comprobamos si:
+        // Hay alguien logueado ($authUser existe)
+        // No se está mirando a sí mismo (no puedes seguirte a ti mismo)
+        if ($authUser && !$isOwner) {
+            $isFollowing = UserFriend::where('follower_id', $authUser->id)
+                ->where('followed_id', $profile->user_id)
+                ->where('status', 'accepted') // Importante: que no esté bloqueado
+                ->exists(); // Devuelve true o false directamente
         }
+        // ---------------------------------------------------------------------------------------------
 
         return response()->json([
             'success' => true,
-            'data' => $profile
+            'data' => $profile,
+            'meta' => [
+                'can_edit' => $isOwner || $isAdmin,
+                'is_following' => $isFollowing // quí enviamos el dato al frontend
+            ]
         ], 200);
-    }
+}
 
 
 
