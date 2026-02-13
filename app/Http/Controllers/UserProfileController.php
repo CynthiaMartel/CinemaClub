@@ -71,10 +71,17 @@ class UserProfileController extends Controller
      
    public function show($userId = null): JsonResponse
     {
-        /** @var User $authUser */
-        $authUser = Auth::user(); // Esto será NULL si es un invitado
+        // INTENTAMOS OBTENER EL USUARIO DESDE EL TOKEN
+        // Usamos el guard sanctum
+        $authUser = Auth::guard('sanctum')->user(); 
 
-        // Si no viene ID en la URL, intentamos usar el del usuario logueado
+        // Debug para ver en el log quién es quién (opcional, bórralo luego)
+        \Illuminate\Support\Facades\Log::info('Perfil Show Debug:', [
+             'Quien_mira_ID' => $authUser ? $authUser->id : 'INVITADO',
+             'Perfil_que_se_ve_ID' => $userId
+        ]);
+
+        // 2. Resolver el ID del perfil que queremos ver
         if (!$userId) {
             if (!$authUser) {
                 return response()->json(['error' => 'Usuario no especificado.'], 404);
@@ -82,40 +89,61 @@ class UserProfileController extends Controller
             $userId = $authUser->id;
         }
 
-        // Buscar el perfil
+        // LÓGICA DE BLOQUEO (Hard Block)
+        // -------------------------------------------------------
+        if ($authUser && $authUser->id != $userId) {
+            
+            // CASO ¿yo bloquee a este perfil?
+            $iBlockedHim = UserFriend::where('follower_id', $authUser->id)
+                ->where('followed_id', $userId)
+                ->where('status', 'blocked')
+                ->exists();
+
+            if ($iBlockedHim) {
+                return response()->json(['message' => 'Has bloqueado a este usuario. Desbloquéalo para ver su perfil.'], 403);
+            }
+
+            // CASO ¿ÉL/ella me bloqueó a m´í?
+            // Aquí comprobamos si EL (userId) me tiene bloqueado a MI (authUser->id)
+            $heBlockedMe = UserFriend::where('follower_id', $userId)
+                ->where('followed_id', $authUser->id)
+                ->where('status', 'blocked')
+                ->exists();
+
+            if ($heBlockedMe) {
+                return response()->json(['message' => 'Este perfil no está disponible.'], 403);
+            }
+        }
+        // ----------------------------------------------------
+
+        // Buscar el perfil (solo llegamos aquí si NO hay bloqueo)
         $profile = UserProfile::with('user')->where('user_id', $userId)->first();
 
         if (!$profile) {
             return response()->json(['error' => 'No se encontró el perfil de este usuario.'], 404);
         }
 
-        // Lógica para saber si el que mira es el dueño o admin
+        // lógica de permisos y seguimiento
         $isOwner = $authUser && $authUser->id === $profile->user_id;
         $isAdmin = $authUser && $authUser->isAdmin();
-
-    
         $isFollowing = false;
 
-        // Solo comprobamos si:
-        // Hay alguien logueado ($authUser existe)
-        // No se está mirando a sí mismo (no puedes seguirte a ti mismo)
         if ($authUser && !$isOwner) {
             $isFollowing = UserFriend::where('follower_id', $authUser->id)
                 ->where('followed_id', $profile->user_id)
-                ->where('status', 'accepted') // Importante: que no esté bloqueado
-                ->exists(); // Devuelve true o false directamente
+                ->where('status', 'accepted')
+                ->exists();
         }
-        // ---------------------------------------------------------------------------------------------
 
         return response()->json([
             'success' => true,
             'data' => $profile,
             'meta' => [
                 'can_edit' => $isOwner || $isAdmin,
-                'is_following' => $isFollowing // quí enviamos el dato al frontend
+                'is_following' => $isFollowing
             ]
         ], 200);
-}
+    }
 
 
 

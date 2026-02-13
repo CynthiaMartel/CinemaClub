@@ -332,6 +332,15 @@ Route::middleware('auth:sanctum')->group(function () {
 |--------------------------------------------------------------------------
 */
 // Rutas para relaciones de amigos del user en UserFriendsController (flistas followers, followings, seguir, bloquear...)
+
+// VER lista de followers
+    Route::get('/user_friends/followers/{id?}', [UserFriendsController::class, 'followers'])
+        ->name('api.user_friends.followers');
+
+    // VER LISTA de followings
+    Route::get('/user_friends/followings/{id?}', [UserFriendsController::class, 'followings'])
+        ->name('api.user_friends.followings');
+
 Route::middleware('auth:sanctum')->group(function () {
 
     // SEGUIR a un usuario
@@ -353,14 +362,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/user_friends/{id}/unblock', [UserFriendsController::class, 'unblock'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
         ->name('api.user_friends.unblock');
-
-    // VER lista de followers
-    Route::get('/user_friends/followers/{id?}', [UserFriendsController::class, 'followers'])
-        ->name('api.user_friends.followers');
-
-    // VER LISTA de followings
-    Route::get('/user_friends/followings/{id?}', [UserFriendsController::class, 'followings'])
-        ->name('api.user_friends.followings');
 
     // VER LISTA de bloqueados
     Route::get('/user_friends/blocked', [UserFriendsController::class, 'blocked'])

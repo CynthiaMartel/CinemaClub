@@ -13,37 +13,57 @@ class UserFriendsController extends Controller
     // Para SEGUIR a un user con FOLLOW
     public function follow($followed_id)
     {
-        $follower_id = Auth::id();
+        $follower_id = Auth::id(); // Yo, el que intenta seguir
 
+        // 1. Evitar seguirse a uno mismo
         if ($follower_id == $followed_id) {
-            return response()->json(['error' => 'No puedes seguirte a ti misma.'], 400);
+            return response()->json(['error' => 'No puedes seguirte a ti mismo.'], 400);
         }
 
-        // Para ver si el seguido ha bloqueado
-        $blocked = UserFriend::where('follower_id', $followed_id)
-            ->where('followed_id', $follower_id)
+        // VALIDACIÓN: ¿Me bloqueó este usuario?
+        // 
+        // Buscamos si EL OTRO USUARIO ($followed_id) creó un registro de bloqueo contra MÍ ($follower_id
+        $imBlocked = UserFriend::where('follower_id', $followed_id) // El que bloqueó 
+            ->where('followed_id', $follower_id) // El bloqueado
             ->where('status', 'blocked')
             ->exists();
 
-        if ($blocked) {
-            return response()->json(['error' => 'No puedes seguir a este usuario.'], 403);
+        if ($imBlocked) {
+            return response()->json(['message' => 'Este usuario te ha bloqueado. No puedes seguirle.'], 403);
         }
 
-        // Para evitar duplicados al seguir a un user
+        // VALIDACIÓN EXTRA: ¿Le he bloqueé yo?
+        // -----------------------------
+        $iBlockedHim = UserFriend::where('follower_id', $follower_id)
+            ->where('followed_id', $followed_id)
+            ->where('status', 'blocked')
+            ->exists();
+
+        if ($iBlockedHim) {
+            return response()->json(['message' => 'Tú has bloqueado a este usuario. Debes desbloquearlo para seguirle.'], 403);
+        }
+
+
+        // Lógica normal de Seguir
+        // -----------
+        
+        // Verificamos si ya existía la relación
         $existing = UserFriend::where('follower_id', $follower_id)
             ->where('followed_id', $followed_id)
             ->first();
 
-        if ($existing && $existing->status !== 'blocked') {
+        // Si ya existe y es 'accepted', no hacemos nada
+        if ($existing && $existing->status === 'accepted') {
             return response()->json(['message' => 'Ya sigues a este usuario.'], 200);
         }
 
-        // Para crear o reactivar la relación y que el status quede en 'accepted' (seguir a usuario)
+        // Crear o Reactivar la relación
         UserFriend::updateOrCreate(
             ['follower_id' => $follower_id, 'followed_id' => $followed_id],
             ['status' => 'accepted']
         );
 
+        // Actualizar contadores
         $this->updateFollowerCounts($follower_id, $followed_id);
 
         return response()->json(['message' => 'Ahora sigues a este usuario.']);
@@ -68,7 +88,7 @@ class UserFriendsController extends Controller
         return response()->json(['message' => 'Has dejado de seguir a este usuario.']);
     }
 
-    //BLOQUEAR a un usuario para evitar interacciones : si el user bloquea a otro, se marca el status como 'blocked' y se elimina de los seguidores del user
+    //BLOQUEAR a un usuario para evitar interacciones : si el user bloquea a otro, se marca el status como blocked y se elimina de los seguidores del user
     
     public function block($blocked_id)
     {
@@ -115,7 +135,7 @@ class UserFriendsController extends Controller
         return response()->json(['message' => 'Has desbloqueado a este usuario']);
     }
 
-    // VER Lista de usuarios que user sigue. FOLLOWERS
+    // VER Lista de usuarios que user sigu-. FOLLOWERS
      
     public function followings($user_id = null)
     {
@@ -162,27 +182,33 @@ class UserFriendsController extends Controller
 
     // ACTUALIZAR los contadores de seguidores/seguido que se actualizará en UserProfile para fronted
      
-    private function updateFollowerCounts($follower_id, $followed_id)
+    private function updateFollowerCounts($userA_id, $userB_id)
     {
-        $followerCount = UserFriend::where('followed_id', $followed_id)
-            ->where('status', 'accepted')
-            ->count();
+        // Actualizamos los perfiles de ambos usuarios 
+        $usersToUpdate = [$userA_id, $userB_id];
 
-        $followingCount = UserFriend::where('follower_id', $follower_id)
-            ->where('status', 'accepted')
-            ->count();
+        foreach ($usersToUpdate as $userId) {
+            //Buscamos el perfil
+            $profile = UserProfile::where('user_id', $userId)->first();
+            
+            if ($profile) {
+                // Contar cuántos siguen a este usuario sus followers
+                $followers = UserFriend::where('followed_id', $userId)
+                    ->where('status', 'accepted')
+                    ->count();
 
-        // Perfil FOLLOWING
-        if ($followedProfile = UserProfile::where('user_id', $followed_id)->first()) {
-            $followedProfile->followers_count = $followerCount;
-            $followedProfile->save();
+                //Contar a cuántos sigue este usuario sus followings
+                $followings = UserFriend::where('follower_id', $userId)
+                    ->where('status', 'accepted')
+                    ->count();
+
+                //Asignar y Guardar
+                $profile->followers_count = $followers;
+                $profile->following_count = $followings; 
+                
+                $profile->save();
+            }
         }
-
-        // Perfil FOLLOWER
-        if ($followerProfile = UserProfile::where('user_id', $follower_id)->first()) {
-            $followerProfile->followings_count = $followingCount;
-            $followerProfile->save();
-        }
-    }
 }
 
+}
