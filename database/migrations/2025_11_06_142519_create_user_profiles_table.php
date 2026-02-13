@@ -15,7 +15,7 @@ return new class extends Migration {
         $table->text('bio')->nullable();
         $table->string('location')->nullable();
         $table->string('website')->nullable();
-        $table->json('top_5_films')->nullable();
+        $table->json('top_films')->nullable();
         $table->unsignedSmallInteger('films_seen')->default(0);
         $table->unsignedSmallInteger('films_rated')->default(0);
         $table->unsignedSmallInteger('films_seen_this_year')->default(0);

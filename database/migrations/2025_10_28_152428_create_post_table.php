@@ -10,7 +10,7 @@ class CreatePostTable extends Migration
     {
         Schema::create('post', function (Blueprint $table) {
             $table->increments('id');
-            $table->unsignedInteger('idUser');
+            $table->unsignedBigInteger('idUser');
             $table->text('title');
             $table->text('subtitle');
             $table->text('content');
