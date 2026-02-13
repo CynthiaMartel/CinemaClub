@@ -8,6 +8,7 @@ import EntryPrincipalView from '@/views/EntryPrincipalView.vue'
 import EntryFormView from '@/views/EntryFormView.vue'
 import EntryFeedView from '@/views/EntryFeedView.vue'
 
+
 const routes = [
   {
     path: '/',
@@ -43,6 +44,19 @@ const routes = [
   component: () => EntryFeedView,
   props: true // Esto permite pasar los parámetros como variables automática
   },
+  {
+  path: '/post-editor/:id?', 
+  name: 'post-editor',
+  // Opción recomendada (Lazy load)
+  component: () => import('@/views/PostEditorView.vue'),
+  props: true // Esto permite pasar los parámetros como variables automática
+  },
+
+  {
+  path: '/post-feed',
+  name: 'post-feed', 
+  component: () => import('@/views/PostsFeedView.vue') 
+},
   
 
 

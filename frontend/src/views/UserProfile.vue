@@ -18,6 +18,8 @@ const isEditProfileModalOpen = ref(false)
 const isFollowing = ref(false) 
 const savingFollow = ref(false)
 
+const profileBlockedMessage = ref(null)
+
 // Variables para contenido
 const userDebates = ref([])
 const userLists = ref([])
@@ -25,6 +27,12 @@ const savedLists = ref([])
 const userReviews = ref([])
 const userDiary = ref([])
 const userWatchlist = ref([])
+
+// --- VARIABLES SOCIALES ---
+const followers = ref([])
+const followings = ref([])
+const isMenuOpen = ref(false) 
+const isBlocking = ref(false) 
 
 // --- PAGINACIÓN de diary --
 const diaryPage = ref(1)
@@ -112,7 +120,7 @@ const loadMoreDiary = () => {
     }
 }
 
-// 4. Cargar WATCHLIST (es lo que el usuario marca para Ver más tarde en la vista de cada film (filmDetailview.vue)
+// 4. Cargar WATCHLIST
 const fetchUserWatchlist = async () => {
   try {
     const userId = route.params.id
@@ -131,8 +139,16 @@ const fetchUserStats = async () => {
 
 const fetchProfile = async () => {
   const userId = route.params.id
+  
+  // Reseteamos el mensaje de bloqueo antes de cargar
+  if (typeof profileBlockedMessage !== 'undefined') {
+      profileBlockedMessage.value = null
+  }
+
   try {
       const { data } = await api.get(`/user_profiles/show/${userId}`)
+      
+      // Si todo va bien, guardamos los datos
       user_profiles.value = data.data
       
       if (data.meta && data.meta.is_following) {
@@ -140,15 +156,84 @@ const fetchProfile = async () => {
       } else {
           isFollowing.value = false
       }
+
   } catch (e) {
-      console.error(e)
+      // AQUÍ DETECTAMOS EL BLOQUEO
+      if (e.response && e.response.status === 403) {
+          console.warn("Acceso denegado por bloqueo")
+                    
+          user_profiles.value = null
+        
+          profileBlockedMessage.value = e.response.data.message || "No puedes ver este perfil."
+          
+      } else {
+          // Errores normales (404, 500, etc.)
+          console.error("Error cargando perfil:", e)
+          error.value = "Error al cargar el perfil." 
+      }
   }
+}
+
+// --Cargar Socials (Followers/Followings) 
+const fetchSocials = async () => {
+  const userId = route.params.id
+  try {
+    const [followersRes, followingsRes] = await Promise.all([
+      api.get(`/user_friends/followers/${userId}`),
+      api.get(`/user_friends/followings/${userId}`)
+    ])
+    followers.value = followersRes.data || []
+    followings.value = followingsRes.data || []
+  } catch (e) {
+    console.error("Error cargando socials:", e)
+  }
+}
+
+// --- Bloquear Usuario 
+const blockUser = async () => {
+  if (!confirm("¿Estás seguro de que quieres bloquear a este usuario? Dejarás de seguirlo automáticamente.")) return
+
+  const profileId = route.params.id
+  isBlocking.value = true // Activar loading
+  
+  try {
+    await api.post(`/user_friends/${profileId}/block`)  
+    
+    isFollowing.value = false
+    isMenuOpen.value = false
+    
+    await Promise.all([
+        fetchSocials(),
+        fetchProfile() 
+    ])
+
+    alert("Usuario bloqueado correctamente.")
+  } catch (e) {
+    console.error("Error bloqueando usuario:", e)
+    alert("Error al bloquear usuario.")
+  } finally {
+    isBlocking.value = false // Desactivar loading
+  }
+}
+
+// --- Helpers ---
+const showBlockedList = () => {
+  isMenuOpen.value = false
+  alert("Aquí se abrirá el modal con la lista de bloqueados")
+}
+
+const goToProfile = (userId) => {
+    router.push({ name: 'user-profile', params: { id: userId } })
+}
+
+// Obtener inicial para el avatar con inicial del nombre del user
+const getInitial = (name) => {
+    return name ? name.charAt(0).toUpperCase() : '?'
 }
 
 const loadAll = async () => {
   isLoading.value = true
   error.value = null
-  
   userDiary.value = []
   diaryPage.value = 1
   
@@ -159,7 +244,8 @@ const loadAll = async () => {
       fetchUserEntries(), 
       fetchSavedLists(),
       fetchUserDiary(1, false),
-      fetchUserWatchlist()
+      fetchUserWatchlist(),
+      fetchSocials() 
     ])
   } catch (err) {
     error.value = "No se pudo cargar el perfil"
@@ -201,43 +287,45 @@ const orderedDiaryKeys = computed(() => {
 
 //////
 const toggleFollow = async () => {
-  // Evitamos que el usuario le de a folow muchas veces (pulsaciones múltiples)
   if (savingFollow.value) return;
-  
-  // Obtenemos el ID del perfil que estamos viendo
   const profileId = route.params.id; 
-  
-  // Verificamos si es nuestro propio perfil (si estamos en nuestro propio perfil no nos vamos a seguir)
   if (auth.user?.id == profileId) return; 
 
   savingFollow.value = true;
+  // Guardamos el estado anterior por si falla la API
+  const previousState = isFollowing.value; 
   
-  // Guardamos el estado anterior 
-  const previousState = isFollowing.value;
+  // Optimismo en la UI: cambiamos el botón inmediatamente antes de que responda la API
+  isFollowing.value = !isFollowing.value;
 
   try {
-    isFollowing.value = !isFollowing.value;
-
     if (previousState === true) {
-        // Si antes era TRUE, ahora dejar de seguir -> UNFOLLOW
+        // Si le seguíamos, hacemos Unfollow
         await api.delete(`/user_friends/${profileId}/unfollow`);
     } else {
-        // Si antes era FALSE ahora seguir -> FOLLOW
+        // Si no le seguíamos, hacemos Follow
         await api.post(`/user_friends/${profileId}/follow`);
     }
 
-  
+    // AQUÍ EL CAMBIO: Recargamos los datos para actualizar contadores y listas
+    await Promise.all([
+        fetchSocials(),
+        fetchProfile()
+    ]);
 
   } catch (e) {
     console.error("Error en Follow/Unfollow", e);
-    isFollowing.value = previousState;
+    // Si falla, revertimos el botón
+    isFollowing.value = previousState; 
     
+    if (e.response && e.response.status === 403) {
+       alert("No puedes realizar esta acción (posible bloqueo).")
+    }
   } finally {
     savingFollow.value = false;
   }
 };
 ///////////
-
 
 watch(() => route.params.id, (newId) => {
   if (newId) loadAll()
@@ -245,6 +333,8 @@ watch(() => route.params.id, (newId) => {
 
 onMounted(loadAll)
 </script>
+
+
 <template>
   <div class="min-h-screen text-slate-100 font-sans bg-[#14181c] overflow-x-hidden pb-20">
     
@@ -253,14 +343,40 @@ onMounted(loadAll)
       <p class="text-slate-400 text-sm uppercase tracking-widest">Cargando perfil...</p>
     </div>
 
+    <div v-else-if="profileBlockedMessage" class="flex flex-col items-center justify-center h-[80vh] gap-6 px-4 text-center">
+      <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mb-2">
+         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-10 h-10 text-slate-400">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+         </svg>
+      </div>
+      <h2 class="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter">
+          Perfil no disponible
+      </h2>
+      <p class="text-slate-400 text-sm md:text-base max-w-md leading-relaxed">
+          {{ profileBlockedMessage }}
+      </p>
+      <button 
+        @click="router.push('/')" 
+        class="mt-4 px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold uppercase tracking-widest rounded transition-colors"
+      >
+        Volver al inicio
+      </button>
+    </div>
+
     <div v-else-if="user_profiles" class="content-wrap mx-auto max-w-[1100px] px-6 md:px-10 lg:px-0 py-10 relative z-10">
       
       <header class="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10 mb-12">
         <div class="flex-shrink-0">
-          <img 
-            :src="user_profiles.avatar ? `/storage/${user_profiles.avatar}` : '/default-avatar.webp'" 
-            class="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-slate-800 shadow-2xl"
-          />
+          <div class="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-slate-800 shadow-2xl overflow-hidden bg-slate-700 flex items-center justify-center shrink-0">
+             <img 
+               v-if="user_profiles.avatar" 
+               :src="`/storage/${user_profiles.avatar}`" 
+               class="w-full h-full object-cover" 
+             />
+             <span v-else class="text-6xl font-black text-slate-400 select-none">
+                {{ getInitial(user_profiles.user.name) }}
+             </span>
+          </div>
         </div>
 
         <div class="flex flex-col flex-grow text-center md:text-left w-full mt-2">
@@ -289,7 +405,7 @@ onMounted(loadAll)
             {{ user_profiles.bio || ' ' }}
           </div>
 
-          <div v-if="auth.user?.id !== user_profiles.user.id" class="mt-6 flex justify-center md:justify-start">
+          <div v-if="auth.user && auth.user.id !== user_profiles.user.id" class="mt-6 flex justify-center md:justify-start">
             <button 
               @click="toggleFollow" 
               :disabled="savingFollow"
@@ -331,22 +447,27 @@ onMounted(loadAll)
              </div>
           </section>
 
-          <section class="mt-2" v-if="userWatchlist.length > 0">
-             <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
-              <h2 class="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-400 italic">Watchlist</h2>
-              <span class="text-[10px] font-bold text-slate-500">{{ userWatchlist.length }} FILMS</span>
+          <section>
+            <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
+              <h2 class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 italic">Mis imprescindibles</h2>
             </div>
-            <div class="brand-scroll flex gap-4 overflow-x-auto pb-4">
-                <div 
-                  v-for="item in userWatchlist" 
-                  :key="item.id" 
-                  class="flex-shrink-0 w-[100px] md:w-[120px] group cursor-pointer"
-                   @click="router.push(`/films/${item.film_id}`)"
-                >
-                  <div class="aspect-[2/3] relative rounded overflow-hidden border border-slate-800 group-hover:border-blue-500 transition-colors">
-                      <img :src="item.film.frame || '/default-poster.webp'" class="w-full h-full object-cover" loading="lazy" />
-                  </div>
-                </div>
+            
+            <div class="grid grid-cols-3 gap-4" v-if="user_profiles">
+              <div 
+                v-for="(film, index) in user_profiles.top_films?.slice(0,3)" 
+                :key="film.idFilm || index"
+                class="aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden border border-slate-700 hover:border-brand/80 hover:scale-[1.02] transition-all shadow-2xl group relative cursor-pointer"
+                 @click="router.push(`/films/${film.id}`)"
+              >
+                <img :src="film.frame || film.poster_url" class="w-full h-full object-cover" loading="lazy" />
+              </div>
+              <div 
+                v-for="i in Math.max(0, 3 - (user_profiles.top_films?.length || 0))" 
+                :key="'empty-' + i"
+                class="aspect-[2/3] border border-dashed border-slate-800 rounded-lg flex items-center justify-center text-slate-700 text-xs"
+              >
+                +
+              </div>
             </div>
           </section>
 
@@ -434,28 +555,106 @@ onMounted(loadAll)
 
         <aside class="lg:col-span-4 flex flex-col gap-10 order-1 lg:order-2">
           
-          <section class="bg-slate-900/20 p-6 rounded-2xl border border-slate-800/50">
-            <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-6 text-center italic">
-              Mis imprescindibles
-            </h2>
-            
-            <div class="grid grid-cols-3 gap-3 md:gap-4" v-if="user_profiles">
-              <div 
-                v-for="(film, index) in user_profiles.top_films" 
-                :key="film.idFilm || index"
-                class="aspect-[2/3] bg-slate-800 rounded-md overflow-hidden border border-slate-700 hover:border-brand/80 hover:scale-[1.02] transition-all shadow-lg group relative cursor-pointer"
-                 @click="router.push(`/films/${film.id}`)"
-              >
-                <img :src="film.frame || film.poster_url" class="w-full h-full object-cover" loading="lazy" />
-              </div>
-              <div 
-                v-for="i in Math.max(0, 6 - (user_profiles.top_films?.length || 0))" 
-                :key="'empty-' + i"
-                class="aspect-[2/3] border border-dashed border-slate-800 rounded-md flex items-center justify-center text-slate-700 text-xs"
-              >
-                +
-              </div>
-            </div>
+          <section class="bg-slate-900/20 p-6 rounded-2xl border border-slate-800/50 relative">
+             <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
+                <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 italic">Comunidad</h2>
+                
+                <div v-if="auth.user && auth.user.id !== user_profiles.user.id" class="relative">
+                   <button @click="isMenuOpen = !isMenuOpen" class="text-slate-500 hover:text-white transition-colors p-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                      </svg>
+                   </button>
+                   
+                   <div v-if="isMenuOpen" class="absolute right-0 top-full mt-2 w-48 bg-[#1a1f26] border border-slate-700 rounded shadow-xl z-50 overflow-hidden">
+                      <button 
+                        @click="blockUser" 
+                        :disabled="isBlocking"
+                        class="w-full text-left px-4 py-3 text-[10px] uppercase font-bold text-red-400 hover:bg-slate-800 transition-colors border-b border-slate-800"
+                      >
+                         {{ isBlocking ? 'Bloqueando...' : 'Bloquear usuario' }}
+                      </button>
+                      <button 
+                        @click="showBlockedList" 
+                        class="w-full text-left px-4 py-3 text-[10px] uppercase font-bold text-slate-400 hover:bg-slate-800 transition-colors"
+                      >
+                         Mostrar lista de bloqueados
+                      </button>
+                   </div>
+                </div>
+             </div>
+
+             <div class="grid grid-cols-2 gap-4 h-auto max-h-[300px]">
+                
+                <div class="flex flex-col h-full bg-slate-900/30 rounded p-2 overflow-hidden">
+                    <div class="text-center mb-3 border-b border-slate-800 pb-2">
+                         <p class="text-xl font-black text-white">{{ followers.length }}</p>
+                         <p class="text-[8px] uppercase tracking-widest text-slate-500 font-bold">Followers</p>
+                    </div>
+                    
+                    <div class="overflow-y-auto brand-scroll pr-1 flex-grow">
+                        <div class="grid grid-cols-3 sm:grid-cols-3 gap-2 justify-items-center">
+                           <div 
+                              v-for="user in followers" 
+                              :key="user.id"
+                              @click="goToProfile(user.id)"
+                              class="flex flex-col items-center gap-1 group cursor-pointer w-full"
+                            >
+                                <div class="w-8 h-8 md:w-9 md:h-9 flex-shrink-0 group-hover:scale-110 transition-transform">
+                                    <img 
+                                      v-if="user.avatar || (user.profile && user.profile.avatar)"
+                                      :src="user.avatar ? `/storage/${user.avatar}` : `/storage/${user.profile.avatar}`" 
+                                      class="w-full h-full rounded-full object-cover border border-slate-700 shadow-sm"
+                                    />
+                                    <div v-else class="w-full h-full rounded-full bg-slate-700 flex items-center justify-center border border-slate-600 shadow-sm">
+                                       <span class="text-[10px] font-bold text-white select-none">{{ getInitial(user.name) }}</span>
+                                    </div>
+                                </div>
+                                <p class="text-[8px] font-bold text-slate-400 group-hover:text-white truncate w-full text-center">{{ user.name }}</p>
+                            </div>
+                        </div>
+
+                        <div v-if="followers.length === 0" class="text-center mt-4">
+                           <p class="text-[8px] text-slate-600 italic">Nadie por aquí.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col h-full bg-slate-900/30 rounded p-2 overflow-hidden">
+                    <div class="text-center mb-3 border-b border-slate-800 pb-2">
+                         <p class="text-xl font-black text-white">{{ followings.length }}</p>
+                         <p class="text-[8px] uppercase tracking-widest text-slate-500 font-bold">Following</p>
+                    </div>
+
+                    <div class="overflow-y-auto brand-scroll pr-1 flex-grow">
+                        <div class="grid grid-cols-3 sm:grid-cols-3 gap-2 justify-items-center">
+                           <div 
+                              v-for="user in followings" 
+                              :key="user.id"
+                              @click="goToProfile(user.id)"
+                              class="flex flex-col items-center gap-1 group cursor-pointer w-full"
+                            >
+                                <div class="w-8 h-8 md:w-9 md:h-9 flex-shrink-0 group-hover:scale-110 transition-transform">
+                                    <img 
+                                      v-if="user.avatar || (user.profile && user.profile.avatar)"
+                                      :src="user.avatar ? `/storage/${user.avatar}` : `/storage/${user.profile.avatar}`" 
+                                      class="w-full h-full rounded-full object-cover border border-slate-700 shadow-sm"
+                                    />
+                                    <div v-else class="w-full h-full rounded-full bg-slate-700 flex items-center justify-center border border-slate-600 shadow-sm">
+                                       <span class="text-[10px] font-bold text-white select-none">{{ getInitial(user.name) }}</span>
+                                    </div>
+                                </div>
+                                <p class="text-[8px] font-bold text-slate-400 group-hover:text-white truncate w-full text-center">{{ user.name }}</p>
+                            </div>
+                        </div>
+
+                        <div v-if="followings.length === 0" class="text-center mt-4">
+                           <p class="text-[8px] text-slate-600 italic">Sin seguidos.</p>
+                        </div>
+                    </div>
+                </div>
+             </div>
+
           </section>
 
           <section class="bg-slate-900/20 p-6 rounded-2xl border border-slate-800/50">
@@ -474,7 +673,7 @@ onMounted(loadAll)
                     v-for="diaryFilm in diaryGrouped[monthKey]" 
                     :key="diaryFilm.id"
                     class="flex items-center group hover:bg-slate-800/40 p-2 rounded transition-colors cursor-pointer"
-                     @click="router.push(`/films/${diaryFilm.film_id}`)"
+                      @click="router.push(`/films/${diaryFilm.film_id}`)"
                   >
                     <div class="w-10 flex-shrink-0 text-right pr-3 border-r border-slate-800">
                       <span class="text-base font-bold text-slate-400 group-hover:text-white block leading-none">
@@ -521,6 +720,31 @@ onMounted(loadAll)
               <p class="text-slate-500 text-[8px] uppercase tracking-widest italic">Sin actividad.</p>
             </div>
           </section>
+
+          <section class="bg-slate-900/20 p-6 rounded-2xl border border-slate-800/50">
+             <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
+              <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-400 italic">Watchlist</h2>
+              <span class="text-[9px] font-bold text-slate-500">{{ userWatchlist.length }} FILMS</span>
+            </div>
+            
+            <div v-if="userWatchlist.length > 0" class="grid grid-cols-4 gap-2">
+                <div 
+                  v-for="item in userWatchlist.slice(0, 16)" 
+                  :key="item.id" 
+                  class="aspect-[2/3] relative rounded overflow-hidden border border-slate-800 hover:border-blue-500 transition-colors cursor-pointer group"
+                   @click="router.push(`/films/${item.film_id}`)"
+                >
+                    <img :src="item.film.frame || '/default-poster.webp'" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy" />
+                </div>
+                <div v-if="userWatchlist.length > 16" class="col-span-4 text-center pt-2">
+                   <p class="text-[8px] text-slate-500 italic">+ {{ userWatchlist.length - 16 }} más...</p>
+                </div>
+            </div>
+            <div v-else class="py-4 text-center">
+               <p class="text-[8px] text-slate-600 italic">Lista vacía.</p>
+            </div>
+          </section>
+
         </aside>
 
       </div>
