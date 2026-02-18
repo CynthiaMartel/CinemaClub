@@ -57,6 +57,11 @@ const routes = [
   name: 'post-feed', 
   component: () => import('@/views/PostsFeedView.vue') 
 },
+
+{path: '/post-reed/:id?',
+  name: 'post-reed', 
+  component: () => import('@/views/PostDetailView.vue') 
+},
   
 
 
