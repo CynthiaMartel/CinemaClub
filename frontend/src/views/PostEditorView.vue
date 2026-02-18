@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue'; 
 import { useRoute, useRouter } from 'vue-router';
 import api from '@/services/api';
 import { Ckeditor } from '@ckeditor/ckeditor5-vue';
@@ -14,7 +14,16 @@ const isLoading = ref(true);
 const isEditMode = computed(() => !!route.params.id);
 const currentUser = ref(null);
 
-// Configuración del Editor
+// --- VARIABLES PARA BÚSQUEDA DE PELÍCULAS ---
+const searchQuery = ref('');
+const searchResults = ref([]);
+const isSearchOpen = ref(false);
+const isSearchingFilm = ref(false);
+const searchWrapRef = ref(null);
+const selectedFilm = ref(null);
+let searchTimer = null;
+
+// Configuración del Editor de Noticias
 const editor = ClassicEditor;
 const editorConfig = ref({
     toolbar: [ 'heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', '|', 'undo', 'redo' ],
@@ -28,13 +37,68 @@ const form = ref({
     editorName: '', 
     img: '',        
     content: '',
-    visible: false  
+    visible: false,
+    film_id: null //** hay que añadirlo a la BD */** */
 });
+
+// --- LÓGICA DE BÚSQUEDA para buscar películas asociadas --- **mirar si ponemos más de una película en algún grid!!*
+const fetchSearch = () => {
+    clearTimeout(searchTimer);
+    const q = searchQuery.value.trim();
+
+    if (q.length < 2) {
+        searchResults.value = [];
+        isSearchOpen.value = false;
+        return;
+    }
+
+    isSearchingFilm.value = true;
+
+    searchTimer = setTimeout(async () => {
+        try {
+            const { data } = await api.get('/films/search', { params: { q } });
+            searchResults.value = data.data || data;
+            isSearchOpen.value = true;
+        } catch (e) {
+            searchResults.value = [];
+        } finally {
+            isSearchingFilm.value = false;
+        }
+    }, 400); 
+};
+
+const selectFilm = (film) => {
+    selectedFilm.value = film;
+    form.value.film_id = film.id; 
+    
+    // **: Si no hay imagen puesta, ponemos la de la película seleccionada
+    if (!form.value.img && (film.poster_url || film.frame)) {
+        form.value.img = film.poster_url || film.frame;
+    }
+    
+    // Limpiamos
+    searchQuery.value = '';
+    isSearchOpen.value = false;
+    searchResults.value = [];
+};
+
+const removeSelectedFilm = () => {
+    selectedFilm.value = null;
+    form.value.film_id = null;
+};
+
+const handleClickOutside = (event) => {
+    if (searchWrapRef.value && !searchWrapRef.value.contains(event.target)) {
+        isSearchOpen.value = false;
+    }
+};
 
 // Lógica de carga inicial
 onMounted(async () => {
+    // Listener para cerrar búsqueda
+    document.addEventListener('mousedown', handleClickOutside);
+
     try {
-        
         const userResponse = await api.get('/user').catch(() => null); 
         
         if (userResponse && userResponse.data) {
@@ -45,14 +109,14 @@ onMounted(async () => {
             const isAdmin = roleId === 1; 
             const isEditor = roleId === 2;
 
-            // Si NO es admin Y TAMPOCO es editor: le redirigimos 
+            // Si NO es admin Y TAMPOCO es editor: le redirigimos a post feed
             if (!isAdmin && !isEditor) {
                 alert("Acceso denegado: No tienes permisos de editor.");
                 router.push({ name: 'post-feed' }); // Redirige al feed
                 return; 
             }
         } else {
-            // Si no hay usuario logueado, también rdirigimos
+            // Si no hay usuario logueado, también redirigimos
             router.push({ name: 'post-feed' });
             return;
         }
@@ -60,7 +124,7 @@ onMounted(async () => {
         // Si estamos editando, cargar el post
         if (isEditMode.value) {
             const response = await api.get(`/post-show/${route.params.id}`);
-            // Soporte por si Laravel devuelve los datos dentro de un objeto dara **+
+            // Soporte por si Laravel devuelve los datos dentro de un objeto dara **+*
             const data = response.data.data || response.data;
             
             form.value = {
@@ -70,8 +134,12 @@ onMounted(async () => {
                 img: data.img || '',
                 content: data.content || '',
                 // Nos aseguramos de que el checkbox entienda si es true/false por eso ponemos tantos or
-                visible: data.visible === true || data.visible === 1 || data.visible === '1'
+                visible: data.visible === true || data.visible === 1 || data.visible === '1',
+                film_id: data.film_id || null
             };
+
+            // Si hay info de pelicula en el post cargado **
+            if (data.film) selectedFilm.value = data.film;
         } else {
             // Si es nuevo, poner el nombre del usuario logueado por defecto
             if(currentUser.value) form.value.editorName = currentUser.value.name;
@@ -84,6 +152,10 @@ onMounted(async () => {
     } finally {
         isLoading.value = false;
     }
+});
+
+onUnmounted(() => {
+    document.removeEventListener('mousedown', handleClickOutside);
 });
 
 // Enviar el formulario
@@ -215,6 +287,57 @@ const cancelEdit = () => {
                     >
                 </div>
 
+                <div class="mb-6" ref="searchWrapRef">
+                    <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Asociar Película</label>
+                    
+                    <div v-if="selectedFilm" class="bg-slate-900/50 rounded-lg p-3 border border-slate-700 flex items-start gap-3 relative group">
+                        <img :src="selectedFilm.frame || selectedFilm.poster_url || '/default-poster.webp'" class="w-10 h-14 object-cover rounded bg-slate-800" />
+                        <div class="flex-1 overflow-hidden">
+                            <p class="text-xs font-bold text-white truncate">{{ selectedFilm.title }}</p>
+                            <p class="text-[9px] text-slate-500 uppercase font-black">{{ selectedFilm.year }}</p>
+                        </div>
+                        <button @click="removeSelectedFilm" class="text-slate-500 hover:text-red-500 transition-colors absolute top-2 right-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div v-else class="relative group">
+                        <input
+                            v-model="searchQuery"
+                            @input="fetchSearch"
+                            @focus="isSearchOpen = true"
+                            type="search"
+                            placeholder="Buscar film..."
+                            class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm text-white focus:border-[#13c090] outline-none transition-colors"
+                        />
+                        <div v-if="isSearchingFilm" class="absolute right-3 top-2.5">
+                             <div class="w-3 h-3 border-2 border-slate-500 border-t-[#13c090] rounded-full animate-spin"></div>
+                        </div>
+
+                        <div
+                          v-if="isSearchOpen && searchResults.length"
+                          class="absolute mt-2 w-full rounded-lg border border-slate-700 bg-[#1e2227] shadow-xl overflow-hidden z-[100] animate-fade-in max-h-60 overflow-y-auto"
+                        >
+                          <button
+                            v-for="film in searchResults"
+                            :key="film.idFilm"
+                            type="button"
+                            class="w-full text-left px-3 py-2 hover:bg-slate-700 flex items-center gap-3 border-b border-slate-700/50 last:border-none transition-colors"
+                            @click="selectFilm(film)"
+                          >
+                            <img :src="film.frame || film.poster_url" class="w-8 h-10 object-cover rounded bg-slate-800" />
+                            <div class="flex-1 overflow-hidden">
+                              <div class="text-xs font-bold text-white truncate">{{ film.title }}</div>
+                              <div class="text-[9px] text-slate-500 uppercase tracking-widest font-black">
+                                {{ film.year || 'S/D' }}
+                              </div>
+                            </div>
+                          </button>
+                        </div>
+                    </div>
+                </div>
                 <div class="mb-8">
                     <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">URL Imagen Portada</label>
                     <input 
@@ -248,14 +371,14 @@ const cancelEdit = () => {
 <style>
 /* --- ESTILOS CRÍTICOS PARA CKEDITOR 5 --- */
 
-/* 1. Reset de colores para el editor (fondo claro, texto oscuro) */
+/* Reset de colores para el editor (fondo claro, texto oscuro) */
 .ck-editor__editable {
     background-color: #e2e8f0 !important; 
     color: #1a202c !important;
     font-size: 1rem;
     padding: 2rem !important;
     
-    /* 2. CONTROL DE SCROLL Y TAMAÑO */
+    /* CONTROL DE SCROLL Y TAMAÑO */
     min-height: 500px;
     max-height: 75vh;
     overflow-y: auto !important; 
@@ -328,5 +451,14 @@ const cancelEdit = () => {
     width: 100%;
     margin-left: auto;
     margin-right: auto;
+}
+
+/* Animación para el dropdown de búsqueda */
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>
