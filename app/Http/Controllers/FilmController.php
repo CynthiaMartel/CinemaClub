@@ -123,6 +123,7 @@ class FilmController extends Controller
 
     // Búsqueda por id de film para película concreta
     public function show(Film $film)
+    
     {
         return response()->json($film->load('cast')); //Para que devuelva la relación cast_crew y podamos ver director y reparto
     }
