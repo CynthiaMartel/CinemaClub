@@ -35,13 +35,12 @@ class UserFeedController extends Controller
             ->latest('created_at');
 
         // Para VER Actividad en user_film_actions (películas vistas, puntuadas, favoritas)
-        $films = UserFilmActions::whereIn('idUser', $followedIds)
-            ->whereIn('visibility', ['public', 'friends',])
-            ->select('id', 'idUser', 'idFilm', 'is_favorite', 'watched', 'watch_later', 'visibility' ,'rating', 'created_at')
-            ->with(['user:id,name,email', 'film:idFilm,title,frame'])
-            ->latest('created_at');
+        $films = UserFilmActions::whereIn('user_id', $followedIds)
+            ->whereIn('visibility', ['public', 'friends'])
+            ->select('id', 'user_id', 'film_id', 'is_favorite', 'watched', 'watch_later', 'visibility' ,'rating', 'updated_at', 'created_at')
+            ->with(['user.profile', 'film:idFilm,title,frame']) // Cargar profile para avatar
+            ->latest('updated_at'); 
 
-        // Para unificar resultados
         $feed = collect();
 
         // Normalizar tipos de actividad en formato uniforme
@@ -60,25 +59,30 @@ class UserFeedController extends Controller
 
         foreach ($films->get() as $action) {
             $filmTitle = $action->film->title ?? 'Película desconocida';
+            
+            // Buscar el avatar (puede estar directo en user o dentro de profile)
+            $avatar = $action->user->avatar ?? $action->user->profile->avatar ?? null;
+
             $feed->push([
-                'type' => 'film_action',
+                'type' => 'film_action', 
                 'source' => 'film',
-                'user' => $action->user->name,
-                'user_id' => $action->idUser,
-                'film_id' => $action->idFilm,
+                'user' => $action->user->name ?? 'Usuario',
+                'user_id' => $action->user_id,
+                'user_avatar' => $avatar, 
+                'film_id' => $action->film_id,
                 'film_title' => $filmTitle,
+                'film_frame' => $action->film->frame ?? null,   
                 'rating' => $action->rating,
                 'watched' => $action->watched,
                 'is_favorite' => $action->is_favorite,
-                'created_at' => $action->created_at,
+                'updated_at' => $action->updated_at,
                 'visibility' => $action->visibility,
             ]);
         }
 
-        // Para ordenar feed por fecha (más reciente primero)
-        $feed = $feed->sortByDesc('created_at')->values();
+        // Ordenar por updated_at descendente
+        $feed = $feed->sortByDesc('updated_at')->values();
 
         return response()->json(['feed' => $feed]);
     }
 }
-

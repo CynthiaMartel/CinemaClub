@@ -24,8 +24,9 @@ const popularDebates = ref([])
 const popularLists = ref([])
 const popularReviews = ref([])
 
-// ESTADO para Noticias Posts
+// ESTADO para Noticias Posts y Actividad
 const journalPosts = ref([])
+const friendsActivity = ref([]) // Nuevo estado para New from friends
 
 // Saludo personalizado con nombre de usuario logueado
 const welcomeMessage = computed(() => {
@@ -55,12 +56,20 @@ const fetchDashboardData = async () => {
   isLoading.value = true
   
   try {
-    const [feedResult, filmsResult, heroResult, postsResult] = await Promise.allSettled([
+    const promises = [
         api.get('/user_entries/feed', { params: { page: 1 } }),
         api.get('/films/trending', { params: { per_page: 15 } }),
         api.get(`/films/${heroFilmId.value}`),
         api.get('/post-index') 
-    ]);
+    ];
+
+    if (auth.isAuthenticated) {
+        promises.push(api.get('/feed').catch(() => null))
+    }
+
+    const results = await Promise.allSettled(promises);
+
+    const [feedResult, filmsResult, heroResult, postsResult, activityResult] = results;
 
     if (feedResult.status === 'fulfilled') {
         const allEntries = feedResult.value.data.data.data;
@@ -79,8 +88,15 @@ const fetchDashboardData = async () => {
 
     if (postsResult.status === 'fulfilled') {
         const posts = postsResult.value.data.data || postsResult.value.data || [];
-    
         journalPosts.value = posts;
+    }
+
+    if (activityResult && activityResult.status === 'fulfilled' && activityResult.value) {
+        const allFeed = activityResult.value.data?.feed || [];
+        
+        // El controlador mezcla entries y film_action
+        // Filtramos para quedarnos solo con lo que va en esta sección (film_action)
+        friendsActivity.value = allFeed.filter(item => item.type === 'film_action');
     }
 
   } catch (error) {
@@ -89,6 +105,14 @@ const fetchDashboardData = async () => {
     isLoading.value = false
   }
 }
+
+const formatShortDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const month = date.toLocaleString('en-US', { month: 'short' });
+    const day = date.getDate();
+    return `${month} ${day}`;
+};
 
 const handleBackdropChange = async (film) => {
     if (!film) return;
@@ -112,6 +136,11 @@ const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('es-ES', { 
         day: '2-digit', month: 'short', year: 'numeric' 
     })
+}
+
+// Función para iniciales de usuario (usado en avatares vacíos)
+const getInitial = (name) => {
+    return name ? name.charAt(0).toUpperCase() : '?'
 }
 
 onMounted(() => {
@@ -202,6 +231,53 @@ onMounted(() => {
           </div>
         </section>
 
+        <section v-if="auth.isAuthenticated && friendsActivity.length > 0">
+          <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
+            <h2 class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">New from friends</h2>
+            <button @click="router.push('/feed')" class="flex items-center gap-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-brand transition-colors">
+               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
+               All activity
+            </button>
+          </div>
+
+          <ul class="brand-scroll flex gap-4 overflow-x-auto pb-6">
+            <li 
+              v-for="(activity, index) in friendsActivity" :key="activity.film_id + '-' + index"
+              class="flex-shrink-0 w-[150px] group cursor-pointer"
+              @click="router.push(`/films/${activity.film_id}`)"
+            >
+              <div class="relative w-[150px] h-[225px] rounded overflow-hidden border border-slate-800 group-hover:border-brand transition-colors shadow-lg">
+                 <img :src="activity.film_frame || '/default-poster.webp'" :alt="activity.film_title" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                 
+                 <div class="absolute bottom-1 left-1 bg-[#14181c]/90 rounded px-1.5 py-1 flex items-center gap-1.5 backdrop-blur-sm border border-slate-700/50">
+                    <img 
+                      v-if="activity.user_avatar"
+                      :src="`/storage/${activity.user_avatar}`" 
+                      class="w-4 h-4 rounded-full object-cover" 
+                    />
+                    <div v-else class="w-4 h-4 rounded-full bg-slate-700 flex items-center justify-center">
+                        <span class="text-[8px] font-bold text-white">{{ getInitial(activity.user) }}</span>
+                    </div>
+                    <span class="text-[9px] font-bold text-slate-200 truncate max-w-[90px]">{{ activity.user }}</span>
+                 </div>
+              </div>
+              
+              <div class="flex items-center justify-between mt-2 px-0.5">
+                  <div class="flex items-center gap-1.5">
+                      <span v-if="activity.rating" class="text-green-500 text-[11px] tracking-widest">
+                         {{ '★'.repeat(Math.floor(activity.rating)) }}<span v-if="activity.rating % 1">½</span>
+                      </span>
+                      <span v-else-if="activity.watched" class="text-green-500 text-[11px] font-black" title="Watched">
+                          👁
+                      </span>
+                      <span v-if="activity.is_favorite" class="text-brand text-[11px] ml-1" title="Liked">❤</span>
+                  </div>
+                  <time class="text-[10px] font-bold text-slate-500 uppercase">{{ formatShortDate(activity.updated_at) }}</time>
+              </div>
+            </li>
+          </ul>
+        </section>
+
         <section>
             <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
               <h2 class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Debates en llamas</h2>
@@ -275,44 +351,88 @@ onMounted(() => {
             </div>
         </section>
 
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-10">
-            <div class="md:col-span-4">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            <div class="lg:col-span-4">
                 <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
                   <h2 class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Listas Populares</h2>
                 </div>
-                <div class="flex flex-col gap-4">
+                <div class="flex flex-col gap-5">
                     <div 
                         v-for="list in popularLists.slice(0, 4)" :key="list.id"
                         @click="goToEntry('user_list', list.id)"
                         class="flex items-center gap-4 group cursor-pointer"
                     >
-                        <div class="relative w-14 h-20 flex-shrink-0">
+                        <div class="relative w-[60px] h-[85px] flex-shrink-0">
                             <div v-if="list.films?.[1]" class="absolute top-1 left-2 w-full h-full bg-slate-700 rounded border border-slate-600 transform rotate-6 opacity-60 z-0"></div>
                             <img :src="list.films?.[0]?.frame || '/default-poster.webp'" class="absolute top-0 left-0 w-full h-full object-cover rounded border border-slate-600 z-10" />
                         </div>
                         <div class="min-w-0">
-                            <h3 class="text-[11px] font-black uppercase text-white truncate group-hover:text-brand transition-colors">{{ list.title }}</h3>
-                            <p class="text-[9px] text-slate-500 uppercase mt-1">{{ list.films?.length }} Films</p>
+                            <h3 class="text-[12px] font-black uppercase text-slate-200 truncate group-hover:text-brand transition-colors">{{ list.title }}</h3>
+                            <div class="flex items-center gap-1.5 mt-1">
+                               <img :src="list.user?.avatar ? `/storage/${list.user.avatar}` : '/default-avatar.webp'" class="w-4 h-4 rounded-full object-cover" />
+                               <p class="text-[10px] text-slate-400 truncate">{{ list.user?.name }}</p>
+                            </div>
+                            <p class="text-[9px] text-slate-500 uppercase mt-2 font-bold">{{ list.films?.length }} Films</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="md:col-span-8">
+            <div class="lg:col-span-8">
                 <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
                   <h2 class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Reviews Populares</h2>
+                  <button @click="router.push('/reviews')" class="text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-brand transition-colors">
+                     Ver más
+                  </button>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-8 mt-4">
                     <div 
                         v-for="review in popularReviews.slice(0, 4)" :key="review.id"
                         @click="goToEntry('user_review', review.id)"
-                        class="flex gap-4 p-3 bg-slate-900/20 rounded-lg hover:bg-slate-800/40 transition-all group cursor-pointer"
+                        class="flex gap-4 group cursor-pointer relative"
                     >
-                        <img :src="review.films?.[0]?.frame" class="w-16 h-24 object-cover rounded border border-slate-800 flex-shrink-0" />
-                        <div class="min-w-0">
-                            <h3 class="text-[10px] font-black uppercase text-white truncate group-hover:text-brand">{{ review.title }}</h3>
-                            <p class="text-[9px] text-slate-400 font-bold uppercase mb-2">Por {{ review.user.name }}</p>
-                            <p class="text-[10px] text-slate-500 italic line-clamp-3">"{{ review.content }}"</p>
+                        <div class="flex-shrink-0 w-[70px]">
+                            <div class="aspect-[2/3] rounded border border-slate-700 group-hover:border-brand transition-colors overflow-hidden shadow-md">
+                                <img :src="review.films?.[0]?.frame" class="w-full h-full object-cover" />
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col flex-grow min-w-0">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <img :src="review.user?.avatar ? `/storage/${review.user.avatar}` : '/default-avatar.webp'" class="w-5 h-5 rounded-full object-cover border border-slate-600" />
+                                <span class="text-[11px] font-bold text-slate-300 truncate hover:text-brand transition-colors">{{ review.user?.name }}</span>
+                            </div>
+
+                            <div class="flex items-baseline gap-1.5 mb-2">
+                                <h3 class="text-[14px] font-black text-white group-hover:text-brand transition-colors truncate">{{ review.films?.[0]?.title }}</h3>
+                                <span v-if="review.films?.[0]?.year" class="text-[10px] text-slate-500 font-bold">{{ review.films?.[0]?.year }}</span>
+                            </div>
+
+                            <div v-if="review.rating" class="flex items-center gap-2 mb-2">
+                                <span class="text-green-500 text-[10px] tracking-widest">
+                                    {{ '★'.repeat(Math.floor(review.rating)) }}<span v-if="review.rating % 1">½</span>
+                                </span>
+                            </div>
+
+                            <div class="text-[12px] text-slate-400 font-light line-clamp-3 mb-3 leading-relaxed">
+                                <p v-html="review.content"></p>
+                            </div>
+
+                            <div class="mt-auto flex items-center gap-4 text-[10px] font-bold text-slate-500">
+                                <div class="flex items-center gap-1.5 hover:text-brand transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" />
+                                    </svg>
+                                    <span>{{ review.likes_count || 0 }} likes</span>
+                                </div>
+                                <div class="flex items-center gap-1.5 hover:text-slate-300 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
+                                    </svg>
+                                    <span>{{ review.comments_count || 0 }}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
