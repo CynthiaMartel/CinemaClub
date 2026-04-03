@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useUserFilmActionsStore } from '@/stores/user_film_actions'
@@ -12,9 +12,9 @@ import LoginModal from '@/components/LoginModal.vue'
 import RatingIt from '@/components/RatingIt.vue'
 import PersonModal from '@/components/CastCrewModal.vue'
 import FilmDetailsModal from '@/components/FilmDetailsModal.vue'
+import AddToListModal from '@/components/AddToListModal.vue'
 
 const route = useRoute()
-const router = useRouter()
 const auth = useAuthStore()
 const userActionsStore = useUserFilmActionsStore()
 const { userVote, isSavingRate } = storeToRefs(userActionsStore)
@@ -28,13 +28,6 @@ const isDetailsModalOpen = ref(false)
 const isCastCrewModalOpen = ref(false)
 const isListModalOpen = ref(false)
 const selectedActorId = ref(null)
-
-// Navegación
-const goCreateEntry = () => {
-  if (auth.user?.id) {
-    router.push({ name: 'create-entry', params: { id: auth.user.id } })
-  }
-}
 
 const openLogin = () => { isLoginOpen.value = true }
 
@@ -267,16 +260,7 @@ onMounted(fetchFilm)
     </div>
   </div>
 
-  <div v-if="isListModalOpen" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-slate-950/90 backdrop-blur-md" @click="isListModalOpen = false"></div>
-    <div class="relative bg-[#1b2228] border border-white/10 w-full max-w-sm rounded-xl p-8 shadow-2xl">
-        <h3 class="text-lg font-black text-white uppercase tracking-tighter mb-6 text-center">Añadir a una lista</h3>
-        <button @click="goCreateEntry" class="w-full py-4 border-2 border-dashed border-white/10 rounded-lg text-slate-500 text-[10px] hover:border-[#BE2B0C] hover:text-[#BE2B0C] transition-all font-black uppercase tracking-widest">
-          + Crear Nueva Lista
-        </button>
-    </div>
-  </div>
-
+  <AddToListModal v-model="isListModalOpen" :filmId="film?.idFilm" />
   <FilmDetailsModal v-model="isDetailsModalOpen" :film="film" @openPerson="openPerson" />
   <LoginModal v-model="isLoginOpen" />
   <PersonModal v-model="isCastCrewModalOpen" :personId="selectedActorId" />

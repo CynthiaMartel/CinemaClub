@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import RegisterModal from '@/components/RegisterModal.vue'
 import HomeBackdropModal from '@/components/HomeBackdropModal.vue'
+import StarDisplay from '@/components/StarDisplay.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -264,13 +265,13 @@ onMounted(() => {
               
               <div class="flex items-center justify-between mt-2 px-0.5">
                   <div class="flex items-center gap-1.5">
-                      <span v-if="activity.rating" class="text-green-500 text-[11px] tracking-widest">
-                         {{ '★'.repeat(Math.floor(activity.rating)) }}<span v-if="activity.rating % 1">½</span>
+                      <StarDisplay v-if="activity.rating" :rating="activity.rating" />
+                      <span v-else-if="activity.watched" class="text-slate-400" title="Watched">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" /><path fill-rule="evenodd" d="M1.323 11.447C2.811 6.976 7.028 3.75 12.001 3.75c4.97 0 9.185 3.223 10.675 7.69.12.362.12.752 0 1.113-1.487 4.471-5.705 7.697-10.677 7.697-4.97 0-9.186-3.223-10.675-7.69a1.762 1.762 0 0 1 0-1.113ZM17.25 12a5.25 5.25 0 1 1-10.5 0 5.25 5.25 0 0 1 10.5 0Z" clip-rule="evenodd" /></svg>
                       </span>
-                      <span v-else-if="activity.watched" class="text-green-500 text-[11px] font-black" title="Watched">
-                          👁
+                      <span v-if="activity.is_favorite" class="text-brand" title="Liked">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5"><path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" /></svg>
                       </span>
-                      <span v-if="activity.is_favorite" class="text-brand text-[11px] ml-1" title="Liked">❤</span>
                   </div>
                   <time class="text-[10px] font-bold text-slate-500 uppercase">{{ formatShortDate(activity.updated_at) }}</time>
               </div>
@@ -410,9 +411,7 @@ onMounted(() => {
                             </div>
 
                             <div v-if="review.rating" class="flex items-center gap-2 mb-2">
-                                <span class="text-green-500 text-[10px] tracking-widest">
-                                    {{ '★'.repeat(Math.floor(review.rating)) }}<span v-if="review.rating % 1">½</span>
-                                </span>
+                                <StarDisplay :rating="review.rating" />
                             </div>
 
                             <div class="text-[12px] text-slate-400 font-light line-clamp-3 mb-3 leading-relaxed">

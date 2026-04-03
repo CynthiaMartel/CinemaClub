@@ -18,7 +18,7 @@
 
     <div
       v-if="isSearchOpen && searchResults.length"
-      class="absolute mt-3 w-full rounded-2xl border border-slate-800 bg-[#1e2227]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[100] animate-fade-in"
+      class="absolute mt-3 w-full rounded-2xl border border-slate-800 bg-[#1e2227]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[100] animate-fade-in max-h-72 overflow-y-auto film-search-scroll"
     >
       <button
         v-for="film in searchResults"
@@ -102,4 +102,8 @@ onUnmounted(() => document.removeEventListener('mousedown', handleClickOutside))
   from { opacity: 0; transform: translateY(-5px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+.film-search-scroll::-webkit-scrollbar { width: 4px; }
+.film-search-scroll::-webkit-scrollbar-track { background: #1e2227; border-radius: 10px; }
+.film-search-scroll::-webkit-scrollbar-thumb { background: #BE2B0C; border-radius: 10px; }
 </style>
