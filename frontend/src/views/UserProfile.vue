@@ -31,8 +31,12 @@ const userWatchlist = ref([])
 // --- VARIABLES SOCIALES ---
 const followers = ref([])
 const followings = ref([])
-const isMenuOpen = ref(false) 
-const isBlocking = ref(false) 
+const isMenuOpen = ref(false)
+const isBlocking = ref(false)
+const isBlockedListOpen = ref(false)
+const blockedUsers = ref([])
+const isLoadingBlocked = ref(false)
+const unblockingId = ref(null)
 
 // --- PAGINACIÓN de diary --
 const diaryPage = ref(1)
@@ -182,8 +186,8 @@ const fetchSocials = async () => {
       api.get(`/user_friends/followers/${userId}`),
       api.get(`/user_friends/followings/${userId}`)
     ])
-    followers.value = followersRes.data || []
-    followings.value = followingsRes.data || []
+    followers.value = followersRes.data.data || []
+    followings.value = followingsRes.data.data || []
   } catch (e) {
     console.error("Error cargando socials:", e)
   }
@@ -217,9 +221,30 @@ const blockUser = async () => {
 }
 
 // --- Helpers ---
-const showBlockedList = () => {
+const showBlockedList = async () => {
   isMenuOpen.value = false
-  alert("Aquí se abrirá el modal con la lista de bloqueados")
+  isBlockedListOpen.value = true
+  isLoadingBlocked.value = true
+  try {
+    const { data } = await api.get('/user_friends/blocked')
+    blockedUsers.value = data.data || []
+  } catch (e) {
+    console.error('Error cargando bloqueados:', e)
+  } finally {
+    isLoadingBlocked.value = false
+  }
+}
+
+const unblockUser = async (userId) => {
+  unblockingId.value = userId
+  try {
+    await api.delete(`/user_friends/${userId}/unblock`)
+    blockedUsers.value = blockedUsers.value.filter(u => u.id !== userId)
+  } catch (e) {
+    console.error('Error desbloqueando:', e)
+  } finally {
+    unblockingId.value = null
+  }
 }
 
 const goToProfile = (userId) => {
@@ -586,27 +611,27 @@ onMounted(loadAll)
 
              <div class="grid grid-cols-2 gap-4 h-auto max-h-[300px]">
                 
-                <div class="flex flex-col h-full bg-slate-900/30 rounded p-2 overflow-hidden">
+                <div class="flex flex-col h-full bg-slate-900/30 rounded p-2">
                     <div class="text-center mb-3 border-b border-slate-800 pb-2">
                          <p class="text-xl font-black text-white">{{ followers.length }}</p>
                          <p class="text-[8px] uppercase tracking-widest text-slate-500 font-bold">Followers</p>
                     </div>
-                    
+
                     <div class="overflow-y-auto brand-scroll pr-1 flex-grow">
-                        <div class="grid grid-cols-3 sm:grid-cols-3 gap-2 justify-items-center">
+                        <div class="grid grid-cols-3 gap-2 justify-items-center px-1 py-1">
                            <div 
                               v-for="user in followers" 
                               :key="user.id"
                               @click="goToProfile(user.id)"
                               class="flex flex-col items-center gap-1 group cursor-pointer w-full"
                             >
-                                <div class="w-8 h-8 md:w-9 md:h-9 flex-shrink-0 group-hover:scale-110 transition-transform">
-                                    <img 
+                                <div class="w-9 h-9 flex-shrink-0 rounded-full overflow-hidden border border-slate-700 shadow-sm group-hover:ring-2 group-hover:ring-brand transition-all">
+                                    <img
                                       v-if="user.avatar || (user.profile && user.profile.avatar)"
-                                      :src="user.avatar ? `/storage/${user.avatar}` : `/storage/${user.profile.avatar}`" 
-                                      class="w-full h-full rounded-full object-cover border border-slate-700 shadow-sm"
+                                      :src="user.avatar ? `/storage/${user.avatar}` : `/storage/${user.profile.avatar}`"
+                                      class="w-full h-full object-cover"
                                     />
-                                    <div v-else class="w-full h-full rounded-full bg-slate-700 flex items-center justify-center border border-slate-600 shadow-sm">
+                                    <div v-else class="w-full h-full bg-slate-700 flex items-center justify-center">
                                        <span class="text-[10px] font-bold text-white select-none">{{ getInitial(user.name) }}</span>
                                     </div>
                                 </div>
@@ -620,27 +645,27 @@ onMounted(loadAll)
                     </div>
                 </div>
 
-                <div class="flex flex-col h-full bg-slate-900/30 rounded p-2 overflow-hidden">
+                <div class="flex flex-col h-full bg-slate-900/30 rounded p-2">
                     <div class="text-center mb-3 border-b border-slate-800 pb-2">
                          <p class="text-xl font-black text-white">{{ followings.length }}</p>
                          <p class="text-[8px] uppercase tracking-widest text-slate-500 font-bold">Following</p>
                     </div>
 
                     <div class="overflow-y-auto brand-scroll pr-1 flex-grow">
-                        <div class="grid grid-cols-3 sm:grid-cols-3 gap-2 justify-items-center">
+                        <div class="grid grid-cols-3 gap-2 justify-items-center px-1 py-1">
                            <div 
                               v-for="user in followings" 
                               :key="user.id"
                               @click="goToProfile(user.id)"
                               class="flex flex-col items-center gap-1 group cursor-pointer w-full"
                             >
-                                <div class="w-8 h-8 md:w-9 md:h-9 flex-shrink-0 group-hover:scale-110 transition-transform">
-                                    <img 
+                                <div class="w-9 h-9 flex-shrink-0 rounded-full overflow-hidden border border-slate-700 shadow-sm group-hover:ring-2 group-hover:ring-brand transition-all">
+                                    <img
                                       v-if="user.avatar || (user.profile && user.profile.avatar)"
-                                      :src="user.avatar ? `/storage/${user.avatar}` : `/storage/${user.profile.avatar}`" 
-                                      class="w-full h-full rounded-full object-cover border border-slate-700 shadow-sm"
+                                      :src="user.avatar ? `/storage/${user.avatar}` : `/storage/${user.profile.avatar}`"
+                                      class="w-full h-full object-cover"
                                     />
-                                    <div v-else class="w-full h-full rounded-full bg-slate-700 flex items-center justify-center border border-slate-600 shadow-sm">
+                                    <div v-else class="w-full h-full bg-slate-700 flex items-center justify-center">
                                        <span class="text-[10px] font-bold text-white select-none">{{ getInitial(user.name) }}</span>
                                     </div>
                                 </div>
@@ -692,13 +717,17 @@ onMounted(loadAll)
                           {{ diaryFilm.film?.title }}
                         </h4>
                         
-                        <div class="flex items-center gap-2 mt-1">
-                          <div v-if="diaryFilm.rating" class="flex items-center gap-0.5">
-                              <span class="text-[8px] text-slate-500 uppercase font-black">Rated</span>
-                              <span class="text-yellow-500 text-[8px]">★</span>
-                          </div>
-                          <span v-else class="text-green-500 text-[8px] font-black uppercase">Watched</span>
-                          <span v-if="diaryFilm.is_favorite" class="text-red-500 text-[8px]">❤</span>
+                        <div class="flex items-center gap-1.5 mt-1">
+                          <svg v-if="diaryFilm.rating" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3 text-[#D08700]" title="Puntuada">
+                            <path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clip-rule="evenodd" />
+                          </svg>
+                          <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3 text-[#00c020]" title="Vista">
+                            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                            <path fill-rule="evenodd" d="M1.323 11.447C2.811 6.976 7.028 3.75 12.001 3.75c4.97 0 9.185 3.223 10.675 7.69.12.362.12.752 0 1.113-1.487 4.471-5.705 7.697-10.677 7.697-4.97 0-9.186-3.223-10.675-7.69a1.762 1.762 0 0 1 0-1.113ZM17.25 12a5.25 5.25 0 1 1-10.5 0 5.25 5.25 0 0 1 10.5 0Z" clip-rule="evenodd" />
+                          </svg>
+                          <svg v-if="diaryFilm.is_favorite" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3 text-brand" title="Favorita">
+                            <path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
+                          </svg>
                         </div>
                       </div>
                     </div>
@@ -750,12 +779,63 @@ onMounted(loadAll)
       </div>
     </div>
 
-    <EditProfileModal 
-      v-model="isEditProfileModalOpen" 
+    <EditProfileModal
+      v-model="isEditProfileModalOpen"
       :userId="route.params.id"
-      :initialData="user_profiles" 
-      @updated="loadAll"  
+      :initialData="user_profiles"
+      @updated="loadAll"
     />
+
+    <!-- Modal: Lista de usuarios bloqueados -->
+    <Teleport to="body">
+      <div v-if="isBlockedListOpen" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-950/90 backdrop-blur-md" @click="isBlockedListOpen = false" />
+        <div class="relative bg-[#1b2228] border border-white/10 w-full max-w-sm rounded-xl shadow-2xl overflow-hidden">
+
+          <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+            <h3 class="text-[11px] font-black text-white uppercase tracking-[0.2em]">Usuarios bloqueados</h3>
+            <button @click="isBlockedListOpen = false" class="text-slate-500 hover:text-white transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <div class="p-4 flex flex-col gap-2 max-h-[60vh] overflow-y-auto brand-scroll">
+
+            <div v-if="isLoadingBlocked" class="flex justify-center py-8">
+              <div class="w-6 h-6 border-2 border-slate-800 border-t-brand rounded-full animate-spin"></div>
+            </div>
+
+            <div v-else-if="blockedUsers.length === 0" class="py-8 text-center">
+              <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold italic">No tienes usuarios bloqueados.</p>
+            </div>
+
+            <div
+              v-else
+              v-for="user in blockedUsers"
+              :key="user.id"
+              class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/[0.02] border border-white/5"
+            >
+              <div class="w-8 h-8 rounded-full bg-slate-700 border border-slate-600 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                <img v-if="user.profile?.avatar" :src="`/storage/${user.profile.avatar}`" class="w-full h-full object-cover" />
+                <span v-else class="text-[10px] font-bold text-white select-none">{{ getInitial(user.name) }}</span>
+              </div>
+              <span class="flex-1 text-[11px] font-bold text-slate-300 truncate">{{ user.name }}</span>
+              <button
+                @click="unblockUser(user.id)"
+                :disabled="unblockingId === user.id"
+                class="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded border border-slate-700 text-slate-400 hover:border-brand hover:text-brand transition-all disabled:opacity-40"
+              >
+                <span v-if="unblockingId === user.id" class="flex items-center gap-1">
+                  <svg class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                </span>
+                <span v-else>Desbloquear</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <LoginModal v-model="isLoginOpen" />
   </div>

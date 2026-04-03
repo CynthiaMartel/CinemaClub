@@ -147,11 +147,11 @@ class UserFriendsController extends Controller
             ->get()
             ->pluck('followed');
 
-        return response()->json($followings);
+        return response()->json(['success' => true, 'data' => $followings]);
     }
 
     // VER lista de FOLLOWINGS
-    
+
     public function followers($user_id = null)
     {
         $user_id = $user_id ?? Auth::id();
@@ -162,11 +162,11 @@ class UserFriendsController extends Controller
             ->get()
             ->pluck('follower');
 
-        return response()->json($followers);
+        return response()->json(['success' => true, 'data' => $followers]);
     }
 
-    // VER Lista de usuarios bloqueados 
-    
+    // VER Lista de usuarios bloqueados
+
     public function blocked()
     {
         $user_id = Auth::id();
@@ -177,7 +177,7 @@ class UserFriendsController extends Controller
             ->get()
             ->pluck('followed');
 
-        return response()->json($blocked);
+        return response()->json(['success' => true, 'data' => $blocked]);
     }
 
     // ACTUALIZAR los contadores de seguidores/seguido que se actualizará en UserProfile para fronted
