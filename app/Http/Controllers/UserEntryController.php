@@ -22,6 +22,15 @@ class UserEntryController extends Controller
         $validated = $request->validated();
         $validated['user_id'] = $user->id;
 
+        // Sanitizar el contenido HTML de CKEditor para prevenir XSS.
+        // Permitimos únicamente etiquetas de formato seguras — cualquier
+        // <script>, evento inline (onerror, onclick…) o iframe queda eliminado.
+        if (!empty($validated['content'])) {
+            $validated['content'] = strip_tags($validated['content'],
+                '<p><br><strong><em><u><s><ul><ol><li><h2><h3><h4><blockquote><a><img><figure><figcaption>'
+            );
+        }
+
         // Crear  entrada lista, debate o reseña
         $entry = UserEntry::create($validated);
 
