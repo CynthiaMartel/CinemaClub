@@ -3,13 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UserFilmActionsRequest;
-use App\Models\User; 
+use App\Models\User;
 use App\Models\UserFilmActions;
 use App\Models\Film;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class UserFilmActionController extends Controller
 {
@@ -31,11 +32,13 @@ class UserFilmActionController extends Controller
         }
         
         $action->fill($validated);
-        $action->save(); 
+        $action->save();
 
         if (isset($validated['rating'])) {
             $this->recalculateFilmRating($filmId);
         }
+
+        $this->invalidateRelatedCache($user->id);
 
         return response()->json([
             'success' => true,
@@ -104,40 +107,39 @@ class UserFilmActionController extends Controller
         ], 200);
     }
 
-  //Mostrar tendencia en homeview para films watched o puntuadas más recientemente
+    // Mostrar tendencia en homeview para films watched o puntuadas más recientemente
     public function getTrendingFilms(Request $request): JsonResponse
     {
         $perPage = $request->query('per_page', 15);
 
-        // obtenemos los IDs de las películas con interacción reciente
-        // Usamos una subconsulta para que el GROUP BY no rompa los campos del SELECT
-        $trendingIdsQuery = UserFilmActions::select('film_id')
-            ->selectRaw('MAX(updated_at) as last_act')
-            ->where(function($q) {
-                $q->where('watched', true)
-                  ->orWhereNotNull('rating');
-            })
-            ->groupBy('film_id');
+        // Cacheamos el resultado 15 minutos — la lista de trending no necesita
+        // ser exacta al segundo, y evita la subconsulta + JOIN en cada visita
+        $cacheKey = "trending_films_{$perPage}";
 
-        // traemos todas las películas haciendo un LEFT JOIN con esa subconsulta
-        // Esto garantiza que si no hay actividad, el orden por release_datese priorice
-        $films = Film::select('films.*', 'sub.last_act')
-            ->leftJoinSub($trendingIdsQuery, 'sub', function ($join) {
-                $join->on('films.idFilm', '=', 'sub.film_id');
-            })
-            // ORDEN 1: Actividad más reciente
-            ->orderByRaw('sub.last_act DESC')
-            // ORDEN 2: Fecha de estreno (desempate)
-            ->orderBy('films.release_date', 'desc')
-            ->paginate($perPage);
+        $result = Cache::remember($cacheKey, now()->addMinutes(15), function () use ($perPage) {
+            $trendingIdsQuery = UserFilmActions::select('film_id')
+                ->selectRaw('MAX(updated_at) as last_act')
+                ->where(function ($q) {
+                    $q->where('watched', true)
+                      ->orWhereNotNull('rating');
+                })
+                ->groupBy('film_id');
 
-        return response()->json([
-            'success' => true,
-            'data' => $films->items(),
-            'pagination' => [
-                'has_more' => $films->hasMorePages()
-            ]
-        ], 200);
+            $films = Film::select('films.*', 'sub.last_act')
+                ->leftJoinSub($trendingIdsQuery, 'sub', function ($join) {
+                    $join->on('films.idFilm', '=', 'sub.film_id');
+                })
+                ->orderByRaw('sub.last_act DESC')
+                ->orderBy('films.release_date', 'desc')
+                ->paginate($perPage);
+
+            return [
+                'data'       => $films->items(),
+                'pagination' => ['has_more' => $films->hasMorePages()],
+            ];
+        });
+
+        return response()->json(['success' => true] + $result, 200);
     }
     // DESMARCAR ACCIÓN
     public function unmarkAction(Request $request, $filmId): JsonResponse
@@ -170,6 +172,8 @@ class UserFilmActionController extends Controller
         if ($field === 'rating') {
             $this->recalculateFilmRating($filmId);
         }
+
+        $this->invalidateRelatedCache($user->id);
 
         return response()->json([
             'success' => true,
@@ -249,6 +253,27 @@ class UserFilmActionController extends Controller
         if ($film) {
             $film->globalRate = round($newAverage ?? 0, 1);
             $film->save();
+        }
+    }
+
+    // Invalida el trending (global) y el feed de cada seguidor del usuario
+    // Se llama tras cualquier acción sobre una película (guardar o desmarcar)
+    private function invalidateRelatedCache(int $userId): void
+    {
+        // Trending es global — borramos todas sus variantes (distintos per_page)
+        Cache::forget('trending_films_15');
+        Cache::forget('trending_films_20');
+
+        // Feed personal del propio usuario
+        Cache::forget("feed_user_{$userId}");
+
+        // Feed de cada seguidor: ellos también verían la actividad de este usuario
+        $followerIds = \App\Models\UserFriend::where('followed_id', $userId)
+            ->where('status', 'accepted')
+            ->pluck('follower_id');
+
+        foreach ($followerIds as $followerId) {
+            Cache::forget("feed_user_{$followerId}");
         }
     }
 }
