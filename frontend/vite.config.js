@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://cinemaclub.test',
+        target: 'http://localhost:8001', // Cambiamos según estemos trabajando con tal o cual puerto
         changeOrigin: true,
         secure: false,
       },
