@@ -188,7 +188,6 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
                     'director_id' => $mainDirectorId,
 
                     'vote_average'       => $details['vote_average'] ?? 0,
-                    'individualRate'     => 0,
                     'globalRate'         => 0,
                 ]
             );

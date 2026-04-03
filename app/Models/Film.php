@@ -13,7 +13,7 @@ class Film extends Model
         'tmdb_id','wikidata_id', 'title','original_title', 'genre','origin_country','original_language','overview',
         'duration','release_date','frame','awards','nominations','festivals',
         'total_awards','total_nominations','total_festivals',
-        'vote_average','individualRate','globalRate','director_id', 'alternative_titles', 'backdrop',
+        'vote_average','globalRate','director_id', 'alternative_titles', 'backdrop',
     ];
 
     protected $casts = [

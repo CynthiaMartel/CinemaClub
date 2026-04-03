@@ -70,7 +70,6 @@ class FilmRequest extends FormRequest
             'cast.*.photo'             => ['nullable', 'url'],
             
             'vote_average'   => ['nullable', 'numeric', 'min:0', 'max:10'], // Nota media calculada a partir de los puntos dados por usuarios registrados
-            'individualRate' => ['nullable', 'numeric', 'min:0', 'max:10'], // Nota del usuario logueado
             'globalRate'     => ['nullable', 'numeric', 'min:0', 'max:10'], // Nota global guardada en la API TMDB
         ];
     }
@@ -118,10 +117,6 @@ class FilmRequest extends FormRequest
             'vote_average.numeric'    => 'La nota media debe ser numérica.',
             'vote_average.min'        => 'La nota media no puede ser menor que 0.',
             'vote_average.max'        => 'La nota media no puede ser mayor que 10.',
-
-            'individualRate.numeric'  => 'La nota individual debe ser numérica.',
-            'individualRate.min'      => 'La nota individual no puede ser menor que 0.',
-            'individualRate.max'      => 'La nota individual no puede ser mayor que 10.',
 
             'globalRate.numeric'      => 'La nota global debe ser numérica.',
             'globalRate.min'          => 'La nota global no puede ser menor que 0.',
