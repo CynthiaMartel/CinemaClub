@@ -12,7 +12,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Lee el token de la cookie HttpOnly y lo pasa a Sanctum como Bearer
+        $middleware->prependToGroup('api', \App\Http\Middleware\ReadTokenFromCookie::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

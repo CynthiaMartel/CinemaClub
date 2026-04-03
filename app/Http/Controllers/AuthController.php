@@ -95,23 +95,27 @@ class AuthController extends Controller
         $user->ipLastAccess       = $request->ip();
         $user->save();
 
-        // Crear token para manejo en Sanctum: se guarda en la tabla personal_access_tokens, para próximas peticiones como votar por ej.
-        $tokenName = 'login_token';
-        $token     = $user->createToken($tokenName)->plainTextToken;
+        // Crear token Sanctum y enviarlo como cookie HttpOnly
+        // (el token nunca llega al JavaScript del frontend)
+        $token = $user->createToken('login_token')->plainTextToken;
 
-        // Respuesta json si no entra en ningún if:
-       return response()->json([
-        'success' => 1,
-        'message' => 'Inicio de sesión exitoso. ¡Bienvenida!',
-        'token'   => $token,
-        'user'    => [
-            'id'    => $user->id,
-            'name'  => $user->name,
-            'email' => $user->email,
-            'idRol' => $user->idRol, // <--- AÑADE ESTA LÍNEA
-            'role'  => optional($user->role)->rolType,
+        $cookieMinutes = 60 * 24 * 7; // 7 días
+        $secure        = app()->environment('production'); // HTTPS solo en producción
+
+        return response()->json([
+            'success' => 1,
+            'message' => 'Inicio de sesión exitoso. ¡Bienvenida!',
+            'user'    => [
+                'id'    => $user->id,
+                'name'  => $user->name,
+                'email' => $user->email,
+                'idRol' => $user->idRol,
+                'role'  => optional($user->role)->rolType,
             ],
-        ], 200);
+        ], 200)->withCookie(
+            cookie('auth_token', $token, $cookieMinutes, '/', null, $secure, true, false, 'lax')
+            //                                                              ↑ httponly  ↑ raw  ↑ samesite
+        );
     }
 
 
@@ -124,7 +128,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => 1,
             'message' => 'Sesión cerrada correctamente'
-        ]);
+        ])->withCookie(cookie()->forget('auth_token'));
     }
 
     // checkSession(): para obtener información del usuario autentificado mediante tokens Sanctum. 

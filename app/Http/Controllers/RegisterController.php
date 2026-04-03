@@ -48,21 +48,25 @@ class RegisterController extends Controller
             \Log::warning("Error enviando correo de bienvenida a {$user->email}: ".$e->getMessage());
         }
 
-        // Crear token Sanctum para autenticar automáticamente tras registro de nuevo usuario
+        // Crear token Sanctum y enviarlo como cookie HttpOnly
         $token = $user->createToken('register_token')->plainTextToken;
 
-        // Devolver respuesta JSON para creación de nuevo usuario
+        $cookieMinutes = 60 * 24 * 7;
+        $secure        = app()->environment('production');
+
         return response()->json([
             'success' => 1,
             'message' => '¡Cuenta creada con éxito! Te damos la bienvenida.',
-            'token' => $token,
             'user' => [
                 'id'    => $user->id,
                 'name'  => $user->name,
                 'email' => $user->email,
+                'idRol' => $user->idRol,
                 'role'  => optional($user->role)->rolType,
             ]
-        ], 201); // 201 : recurso creado correctamente
+        ], 201)->withCookie(
+            cookie('auth_token', $token, $cookieMinutes, '/', null, $secure, true, false, 'lax')
+        );
     }
 }
 
