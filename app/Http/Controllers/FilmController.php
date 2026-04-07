@@ -121,6 +121,35 @@ class FilmController extends Controller
     }
 
 
+    /**
+     * Listado paginado de films ordenados de más reciente a más antiguo
+     * GET /films?page=1&per_page=24
+     */
+    public function index(Request $request)
+    {
+        $perPage = min((int) $request->get('per_page', 24), 60);
+
+        $films = Film::orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        $films->getCollection()->transform(function (Film $film) {
+            return [
+                'idFilm'         => $film->idFilm,
+                'title'          => $film->title,
+                'original_title' => $film->original_title,
+                'year'           => $film->release_date ? substr($film->release_date, 0, 4) : null,
+                'genre'          => $film->genre,
+                'frame'          => $film->frame,
+                'vote_average'   => $film->vote_average,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data'    => $films,
+        ]);
+    }
+
     // Búsqueda por id de film para película concreta
     public function show(Film $film)
     

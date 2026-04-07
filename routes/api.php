@@ -23,6 +23,7 @@ use App\Http\Controllers\UserFilmActionController;
 
 use App\Http\Controllers\UserFeedController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\SearchController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -47,6 +48,10 @@ Route::get('/user', function (Request $request) {
     ->name('api.films.trending');
 
     
+// BÚSQUEDA GLOBAL (films, usuarios, entries, posts)
+Route::get('/search', [SearchController::class, 'global'])
+    ->name('api.search.global');
+
 // BÚSQUEDA barra de búsqueda -> PÚBLICAS
 // Ejemplo: GET http://cinemaclub.test/api/films/search?q=alien
 Route::get('/films/search', [FilmController::class, 'search'])
@@ -54,6 +59,10 @@ Route::get('/films/search', [FilmController::class, 'search'])
 
 // VER película concreta 
 // Ejemplo: GET http://cinemaclub.test/api/films/3 (por id)
+// LISTAR todas las películas paginadas (más recientes primero)
+Route::get('/films', [FilmController::class, 'index'])
+    ->name('api.films.index');
+
 Route::get('/films/{film}', [FilmController::class, 'show'])
     ->name('api.films.show');
 

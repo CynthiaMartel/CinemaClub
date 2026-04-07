@@ -7,6 +7,7 @@ import UserProfile from '@/views/UserProfile.vue'
 import EntryPrincipalView from '@/views/EntryPrincipalView.vue'
 import EntryFormView from '@/views/EntryFormView.vue'
 import EntryFeedView from '@/views/EntryFeedView.vue'
+import FilmsFeedView from '@/views/FilmsFeedView.vue'
 
 
 const routes = [
@@ -39,10 +40,20 @@ const routes = [
   props: true // Esto permite pasar los parámetros como variables automática
   },
   {
-   path: '/entry-feed/', 
-  name: 'entry-feed',
-  component: () => EntryFeedView,
-  props: true // Esto permite pasar los parámetros como variables automática
+    path: '/entry-feed/',
+    name: 'entry-feed',
+    component: () => EntryFeedView,
+    props: true
+  },
+  {
+    path: '/films',
+    name: 'FilmsFeed',
+    component: FilmsFeedView,
+  },
+  {
+    path: '/search',
+    name: 'search',
+    component: () => import('@/views/SearchView.vue'),
   },
   {
   path: '/post-editor/:id?', 
