@@ -4,7 +4,7 @@
     :class="themeClasses.accentSelection"
   >
     
-    <div class="content-wrap relative z-10 mx-auto max-w-[1200px] px-6 sm:px-12 md:px-24 py-10">
+    <div class="content-wrap relative z-10 mx-auto max-w-[1100px] px-6 md:px-10 lg:px-0 py-10">
 
       <EntryHeader 
         :user="entry.user"
@@ -300,3 +300,11 @@ const loadData = async () => {
 
 onMounted(loadData);
 </script>
+
+<style scoped>
+.content-wrap {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>

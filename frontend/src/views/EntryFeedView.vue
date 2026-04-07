@@ -1,7 +1,9 @@
 <template>
-  <div class="min-h-screen text-slate-100 font-sans bg-[#14181c] overflow-x-hidden pb-20">
-    
-    <header class="max-w-7xl mx-auto px-6 pt-12 pb-8">
+  <div class="min-h-screen w-full text-slate-100 font-sans bg-[#14181c] overflow-x-hidden pb-20">
+
+    <div class="content-wrap mx-auto max-w-[1100px] px-6 md:px-10 lg:px-0">
+
+    <header class="pt-12 pb-8">
       <div class="flex flex-col gap-6">
         
         <div class="text-left">
@@ -42,7 +44,7 @@
       </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-6">
+    <main>
       
       <div v-if="loading && entries.length === 0" class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-8">
         <div v-for="i in 3" :key="i" class="h-64 bg-slate-900/50 rounded-3xl animate-pulse"></div>
@@ -159,21 +161,24 @@
         </button>
       </div>
     </main>
+
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import api from '@/services/api';
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
 
 const entries = ref([]);
 const loading = ref(false);
-const activeFilter = ref('all');
+const activeFilter = ref(route.query.tab || 'all');
 const filterUserId = ref(null);
 const page = ref(1);
 const hasMore = ref(true);
@@ -240,6 +245,12 @@ onMounted(() => fetchEntries());
 </script>
 
 <style scoped>
+.content-wrap {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .brand-scroll::-webkit-scrollbar { height: 3px; }
 .brand-scroll::-webkit-scrollbar-thumb { background: #10b981; }
 .rtl-container { direction: rtl; }

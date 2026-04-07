@@ -73,7 +73,7 @@ const submitEntry = async () => {
     <div class="relative w-full h-auto pt-12 md:pt-16 overflow-hidden">
       <div class="absolute inset-0 bg-gradient-to-b from-black/20 via-[#14181c]/90 to-[#14181c]"></div>
       
-      <div class="relative max-w-5xl mx-auto px-4 h-full flex flex-col justify-end pb-6">
+      <div class="relative max-w-[1100px] mx-auto px-6 md:px-10 lg:px-0 h-full flex flex-col justify-end pb-6">
   
 
         <div class="flex flex-wrap gap-5 mb-10">
@@ -100,7 +100,7 @@ const submitEntry = async () => {
       </div>
     </div>
 
-    <main class="max-w-5xl mx-auto px-4 py-8">
+    <main class="max-w-[1100px] mx-auto px-6 md:px-10 lg:px-0 py-8">
       
       <section class="mb-10">
         <label class="block text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">

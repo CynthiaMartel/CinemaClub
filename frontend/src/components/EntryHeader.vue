@@ -11,7 +11,7 @@
 
     <div class="absolute inset-0 bg-gradient-to-b to-transparent opacity-20" :class="bgGradient"></div>
     
-    <div class="relative max-w-6xl mx-auto px-6">
+    <div class="relative max-w-[1100px] mx-auto px-6 md:px-10 lg:px-0">
       <div class="flex flex-wrap items-center gap-6 mb-8">
         <div class="flex items-center gap-2 px-3 py-1 bg-slate-900/80 border border-slate-800 rounded-full shadow-sm backdrop-blur-md">
           <span class="w-1.5 h-1.5 rounded-full animate-pulse" :class="accentColor.replace('text', 'bg')"></span>
