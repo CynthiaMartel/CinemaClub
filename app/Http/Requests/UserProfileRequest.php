@@ -22,8 +22,9 @@ class UserProfileRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'avatar' => 'nullable|image|max:2048',
-            'bio' => 'nullable|string|max:1000',
+            'avatar'     => 'nullable|image|max:2048',
+            'background' => 'nullable|string|max:500',
+            'bio'        => 'nullable|string|max:1000',
             'location' => 'nullable|string|max:255',
             'website' => 'nullable|url|max:255',
             'top_films' => 'nullable|string',
