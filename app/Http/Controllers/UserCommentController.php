@@ -23,7 +23,7 @@ class UserCommentController extends Controller
 
         $comments = UserComment::where('commentable_type', $modelClass)
             ->where('commentable_id', $id)
-            ->with('user:id,name')
+            ->with(['user:id,name', 'user.profile:user_id,avatar'])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -58,7 +58,7 @@ class UserCommentController extends Controller
             'visibility' => $request->visibility ?? 'public',
         ]);
 
-        $comment->load('user:id,name');
+        $comment->load(['user:id,name', 'user.profile:user_id,avatar']);
 
         return response()->json([
             'success' => true,
