@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import HomeBackdropModal from '@/components/HomeBackdropModal.vue'
+import WatchProviders from '@/components/WatchProviders.vue'
 
 const auth  = useAuthStore()
 const isAdmin = computed(() => {
@@ -46,6 +47,33 @@ const error       = ref(null)
 const cachedFilms = ref([])   // películas filtradas guardadas para refinar sin re-filtrar
 const refinement  = ref('')   // texto libre de refinamiento
 const reranking   = ref(false)
+
+// Estado por card: traducción de la sinopsis/explicación
+const cardState = ref({}) // { [filmId]: { translated, translating, showTranslated } }
+
+const getCard = (id) => {
+  if (!cardState.value[id]) {
+    cardState.value[id] = { translated: null, translating: false, showTranslated: false }
+  }
+  return cardState.value[id]
+}
+
+const toggleTranslation = async (id, text) => {
+  const c = getCard(id)
+  if (c.showTranslated) { c.showTranslated = false; return }
+  if (c.translated) { c.showTranslated = true; return }
+  c.translating = true
+  try {
+    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|es`)
+    const json = await res.json()
+    c.translated = json.responseData?.translatedText || null
+    if (c.translated) c.showTranslated = true
+  } catch (e) {
+    console.error('Error traduciendo:', e)
+  } finally {
+    c.translating = false
+  }
+}
 
 // --- OPCIONES DE CADA PASO ---
 // iconPaths: array de paths SVG (heroicons outline 24px)
@@ -212,14 +240,13 @@ const fetchRecommendations = async () => {
     }
 
     cachedFilms.value = filtered
-
-    const { data: rankRes } = await api.post('/recommender/rank', {
-      films:       filtered,
-      preferences: preferencesText.value,
-    })
-
-    results.value = rankRes.data ?? []
-    aiPowered.value = rankRes.ai_powered ?? false
+    // Top 5 por valoración — la sinopsis del film es el resumen por defecto, sin llamar a la IA
+    results.value = filtered.slice(0, 5).map(film => ({
+      film,
+      explanation: film.overview || '',
+    }))
+    aiPowered.value = false
+    cardState.value = {}
     step.value = 6
 
   } catch (e) {
@@ -233,17 +260,16 @@ const refineResults = async () => {
   if (!refinement.value.trim() || reranking.value) return
   reranking.value = true
 
-  const combinedPreferences = refinement.value.trim()
-    ? `${preferencesText.value}. Además: ${refinement.value.trim()}`
-    : preferencesText.value
+  const combinedPreferences = `${preferencesText.value}. Búsqueda específica del usuario: ${refinement.value.trim()}`
 
   try {
     const { data: rankRes } = await api.post('/recommender/rank', {
       films:       cachedFilms.value,
       preferences: combinedPreferences,
     })
-    results.value  = rankRes.data ?? []
+    results.value   = rankRes.data ?? []
     aiPowered.value = rankRes.ai_powered ?? false
+    cardState.value = {} // reset estado de traducción al cambiar resultados
   } catch (e) {
     console.error(e)
   } finally {
@@ -276,7 +302,7 @@ const refineResults = async () => {
 
     <HomeBackdropModal v-model="isBackdropModalOpen" @change-backdrop="handleBackdropChange" />
 
-    <div class="relative z-10 content-wrap mx-auto max-w-[720px] px-6 pt-20 pb-12">
+    <div class="relative z-10 content-wrap mx-auto max-w-[720px] px-4 sm:px-6 pt-14 sm:pt-20 pb-12">
 
       <!-- ── BIENVENIDA ── -->
       <div v-if="step === 0" class="flex flex-col items-center justify-center text-center min-h-[calc(100vh-10rem)] gap-10 animate-fade-in">
@@ -294,11 +320,11 @@ const refineResults = async () => {
         <!-- Texto principal -->
         <div class="flex flex-col items-center gap-3">
           <p class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Recomendador con IA</p>
-          <h1 class="text-5xl md:text-6xl lg:text-7xl font-black uppercase italic tracking-tighter text-white leading-[0.9]">
+          <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black uppercase italic tracking-tighter text-white leading-[0.9]">
             No sé qué<br/>ver esta noche
           </h1>
           <p class="text-slate-400 text-sm md:text-base font-light max-w-xs text-center leading-relaxed mt-2">
-            Responde 4 preguntas rápidas y nuestra IA selecciona las películas perfectas para ti.
+            Responde 4 preguntas y te recomendamos las películas perfectas para ti.
           </p>
         </div>
 
@@ -330,8 +356,8 @@ const refineResults = async () => {
       <div v-else-if="step >= 1 && step <= 4" class="animate-fade-in">
 
         <!-- Cabecera + progreso -->
-        <div class="mb-12">
-          <div class="flex items-center justify-between mb-8">
+        <div class="mb-8 sm:mb-12">
+          <div class="flex items-center justify-between mb-6 sm:mb-8">
             <button @click="back" class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
@@ -459,10 +485,10 @@ const refineResults = async () => {
         </div>
         <div class="text-center">
           <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-2">Analizando tu perfil</p>
-          <p class="text-white font-black uppercase italic text-xl">Consultando a la IA...</p>
+          <p class="text-white font-black uppercase italic text-xl">Buscando películas…</p>
         </div>
         <p class="text-[10px] text-slate-600 uppercase tracking-widest text-center max-w-xs">
-          Filtrando el catálogo y seleccionando las películas perfectas para ti
+          Filtrando el catálogo según tus preferencias
         </p>
       </div>
 
@@ -501,42 +527,74 @@ const refineResults = async () => {
           </div>
 
           <!-- Cards de resultados -->
-          <div class="flex flex-col gap-4">
+          <div class="flex flex-col gap-3">
             <div
               v-for="(item, idx) in results" :key="item.film.id"
-              @click="router.push(`/films/${item.film.id}`)"
-              class="flex gap-4 p-3 rounded-xl border border-slate-800 hover:border-brand/50 hover:bg-slate-900/40 cursor-pointer transition-all group"
+              class="rounded-xl border border-slate-800 hover:border-brand/40 hover:bg-slate-900/40 transition-all group"
             >
-              <!-- Número -->
-              <div class="flex-shrink-0 w-8 flex items-center justify-center">
-                <span class="text-xl font-black text-slate-700 group-hover:text-brand transition-colors">{{ idx + 1 }}</span>
-              </div>
-
-              <!-- Poster -->
-              <div class="flex-shrink-0 w-14 h-20 rounded-lg overflow-hidden bg-slate-800 border border-slate-700">
-                <img v-if="item.film.frame" :src="item.film.frame" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-              </div>
-
-              <!-- Info -->
-              <div class="flex-1 min-w-0 flex flex-col justify-center">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-[8px] font-black uppercase tracking-[2px] text-brand">{{ item.film.genre?.split(',')[0] }}</span>
-                  <span v-if="item.film.year" class="text-[8px] text-slate-600 font-bold">{{ item.film.year }}</span>
-                  <span v-if="item.film.globalRate > 0" class="text-[8px] font-black text-yellow-500">★ {{ item.film.globalRate }}</span>
+              <!-- Fila principal: clickable -->
+              <div
+                class="flex gap-3 sm:gap-4 p-3 sm:p-4 cursor-pointer"
+                @click="router.push(`/films/${item.film.id}`)"
+              >
+                <!-- Número -->
+                <div class="flex-shrink-0 w-5 sm:w-7 flex items-start pt-1 justify-center">
+                  <span class="text-base sm:text-lg font-black text-slate-500 group-hover:text-brand transition-colors leading-none">{{ idx + 1 }}</span>
                 </div>
-                <h3 class="text-sm font-black text-white uppercase tracking-tight truncate group-hover:text-brand transition-colors mb-1.5">
-                  {{ item.film.title }}
-                </h3>
-                <!-- Explicación IA -->
-                <p class="text-[10px] text-slate-400 font-light line-clamp-2 leading-relaxed">
-                  {{ item.explanation }}
-                </p>
+
+                <!-- Poster -->
+                <div class="flex-shrink-0 w-12 h-[68px] sm:w-14 sm:h-20 rounded-lg overflow-hidden bg-slate-800 border border-slate-700/60">
+                  <img v-if="item.film.frame" :src="item.film.frame" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                </div>
+
+                <!-- Info -->
+                <div class="flex-1 min-w-0 flex flex-col justify-center gap-1 sm:gap-1.5">
+                  <!-- Meta: género · año · puntuación -->
+                  <div class="flex items-center flex-wrap gap-x-2 gap-y-1">
+                    <span class="text-[11px] sm:text-xs font-black uppercase tracking-wide text-brand leading-none">{{ item.film.genre?.split(',')[0] }}</span>
+                    <span v-if="item.film.year" class="text-[11px] sm:text-xs text-slate-300 font-semibold leading-none">{{ item.film.year }}</span>
+                    <span v-if="item.film.globalRate > 0" class="text-[11px] sm:text-xs font-bold text-yellow-400 leading-none">★ {{ item.film.globalRate }}</span>
+                  </div>
+                  <!-- Título -->
+                  <h3 class="text-sm sm:text-base font-black text-white uppercase tracking-tight truncate group-hover:text-brand transition-colors">
+                    {{ item.film.title }}
+                  </h3>
+                  <!-- Sinopsis / explicación IA -->
+                  <p v-if="item.explanation" class="text-xs sm:text-[13px] text-slate-200 leading-relaxed line-clamp-3">
+                    {{ getCard(item.film.id).showTranslated && getCard(item.film.id).translated
+                        ? getCard(item.film.id).translated
+                        : item.explanation }}
+                  </p>
+                  <!-- Providers badge -->
+                  <WatchProviders :filmId="item.film.id" compact />
+                </div>
+
+                <!-- Arrow -->
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="flex-shrink-0 w-4 h-4 text-slate-400 group-hover:text-slate-200 transition-colors self-center">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
               </div>
 
-              <!-- Arrow -->
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="flex-shrink-0 w-4 h-4 text-slate-700 group-hover:text-slate-400 transition-colors self-center">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
+              <!-- Fila traducción -->
+              <div v-if="item.explanation" class="flex items-center gap-2 px-3 sm:px-4 pb-3">
+                <button
+                  @click.stop="toggleTranslation(item.film.id, item.explanation)"
+                  :disabled="getCard(item.film.id).translating"
+                  class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 px-2.5 py-1 rounded transition-all disabled:opacity-40"
+                >
+                  <svg v-if="getCard(item.film.id).translating" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                  <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path d="M5 8l6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>
+                  </svg>
+                  {{ getCard(item.film.id).translating ? 'Traduciendo…'
+                     : getCard(item.film.id).showTranslated ? 'Ver original'
+                     : 'Traducir sinopsis' }}
+                </button>
+                <span v-if="getCard(item.film.id).showTranslated" class="text-xs text-slate-500">vía MyMemory</span>
+              </div>
             </div>
           </div>
 
@@ -550,23 +608,23 @@ const refineResults = async () => {
               </div>
               <div>
                 <p class="text-sm font-black uppercase tracking-widest text-white">¿Afinar la búsqueda?</p>
-                <p class="text-[10px] text-slate-500 font-light mt-0.5">Cuéntale a la IA qué tienes en mente y reordenará las {{ cachedFilms.length }} películas filtradas.</p>
+                <p class="text-xs text-slate-400 mt-0.5">Prioriza dentro de las {{ cachedFilms.length }} candidatas ya filtradas. Para géneros distintos, inicia una nueva búsqueda.</p>
               </div>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-col sm:flex-row gap-2">
               <input
                 v-model="refinement"
                 @keydown.enter="refineResults"
                 :disabled="reranking"
                 type="text"
                 maxlength="120"
-                placeholder="Algo como Parasite pero sin violencia, o algo que me haga llorar…"
+                placeholder="Ej: algo más pausado, sin violencia, con buenas actuaciones…"
                 class="flex-1 bg-slate-900/60 border border-slate-800 hover:border-slate-700 focus:border-brand/60 rounded-lg px-4 py-3 text-sm text-white placeholder:text-slate-600 placeholder:font-light focus:outline-none focus:ring-1 focus:ring-brand/30 disabled:opacity-40 transition-all"
               />
               <button
                 @click="refineResults"
                 :disabled="!refinement.trim() || reranking"
-                :class="['flex items-center gap-2 px-5 py-3 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all flex-shrink-0',
+                :class="['flex items-center justify-center gap-2 px-5 py-3 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all sm:flex-shrink-0',
                   refinement.trim() && !reranking
                     ? 'bg-brand hover:bg-[#d4310e] text-white shadow-[0_2px_12px_rgba(190,43,12,0.35)]'
                     : 'bg-slate-800 text-slate-600 cursor-not-allowed']"

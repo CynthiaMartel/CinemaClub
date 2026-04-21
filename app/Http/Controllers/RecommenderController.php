@@ -97,23 +97,31 @@ class RecommenderController extends Controller
             return $this->fallbackRanking($films);
         }
 
-        $filmList = collect($films)->take(30)->map(fn ($f, $i) =>
-            ($i + 1) . ". [ID:{$f['id']}] {$f['title']} ({$f['year']}) | "
-            . "Géneros: {$f['genre']} | "
-            . "Valoración comunidad: {$f['globalRate']}/10 | "
-            . "TMDB: {$f['vote_average']}/10"
-        )->join("\n");
+        $filmList = collect($films)->take(30)->map(function ($f, $i) {
+            $overview     = isset($f['overview']) ? mb_substr(strip_tags($f['overview']), 0, 150) : '';
+            $overviewLine = $overview ? "\n   Sinopsis: {$overview}" : '';
+            return ($i + 1) . ". [ID:{$f['id']}] {$f['title']} ({$f['year']}) | "
+                . "Géneros: {$f['genre']} | "
+                . "Valoración comunidad: {$f['globalRate']}/10 | "
+                . "TMDB: {$f['vote_average']}/10"
+                . $overviewLine;
+        })->join("\n\n");
 
         $systemPrompt = "Eres un experto recomendador de películas para una plataforma cinéfila. "
-            . "Tu tarea es elegir las 5 películas más adecuadas de una lista ya filtrada y explicar "
-            . "brevemente por qué encajan con las preferencias del usuario. "
+            . "Tu tarea es elegir las 5 películas más adecuadas de una lista ya filtrada, "
+            . "basándote en el título, géneros, valoraciones Y la sinopsis de cada película. "
+            . "Usa la sinopsis para inferir el tono emocional, temática y atmósfera, "
+            . "y cruza esa información con lo que pide el usuario. "
+            . "Si el usuario describe un estado de ánimo o temática concreta (ej: 'triste', 'conspiranoico', 'romántico'), "
+            . "prioriza las películas cuya sinopsis encaje con esa descripción aunque los géneros sean amplios. "
             . "Responde SIEMPRE en JSON válido con exactamente este formato: "
             . "[{\"id\": 123, \"explanation\": \"...\"}]. "
             . "Solo devuelves el JSON, sin texto adicional ni bloques de código.";
 
         $userPrompt = "El usuario busca: {$preferences}\n\n"
-            . "Elige las 5 mejores películas de esta lista y explica en 1-2 frases "
-            . "por qué cada una encaja con lo que busca:\n\n{$filmList}";
+            . "Analiza la sinopsis de cada película y elige las 5 que mejor encajen con lo que busca. "
+            . "Explica en 1-2 frases concretas por qué cada una encaja, mencionando algo específico de su trama:\n\n"
+            . $filmList;
 
         try {
             $response = Http::withHeaders([
