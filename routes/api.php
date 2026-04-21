@@ -76,6 +76,9 @@ Route::get('/films/search', [FilmController::class, 'search'])
 Route::get('/films', [FilmController::class, 'index'])
     ->name('api.films.index');
 
+Route::get('/films/{id}/watch-providers', [FilmController::class, 'watchProviders'])
+    ->name('api.films.watch-providers');
+
 Route::get('/films/{film}', [FilmController::class, 'show'])
     ->name('api.films.show');
 
@@ -96,6 +99,10 @@ Route::middleware('auth:sanctum')
     Route::delete('/films/{film}/delete', [FilmController::class, 'destroy'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
         ->name('api.films.destroy');
+
+    // BUSCAR personas en cast_crew para autocompletado (admin)
+    Route::get('/admin/cast-search', [FilmController::class, 'castSearch'])
+        ->name('api.admin.cast-search');
 });
 
 

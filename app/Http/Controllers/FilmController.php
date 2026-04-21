@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Film;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
 use App\Http\Requests\FilmRequest;
 
 class FilmController extends Controller
@@ -160,7 +161,12 @@ class FilmController extends Controller
     // Admin: Crear película manualmente por si se necesita añadir alguna película que no se haya encontrado con API TMDB ni Wikidata (de manera manual desde ADMIN)
     public function store(FilmRequest $request)
     {
-        $validated = $request->validated(); // Validaciones para llenado manual
+        $user = $request->user();
+        if (!$user || !$user->isAdminOrEditor()) {
+            return response()->json(['success' => 0, 'message' => 'No autorizado'], 403);
+        }
+
+        $validated = $request->validated();
 
         // Convertimos arrays a JSON antes de guardar
         $validated['awards']     = json_encode($validated['awards'] ?? []);
@@ -169,12 +175,14 @@ class FilmController extends Controller
 
         $film = Film::create($validated);
 
-        // Guardar director en tabla pivot
-        \DB::table('film_cast_pivot')->insert([
-            'idFilm'   => $film->idFilm,
-            'idPerson' => $validated['director_id'],
-            'role'     => 'Director'
-        ]);
+        // Guardar director en tabla pivot si se proporcionó
+        if (!empty($validated['director_id'])) {
+            \DB::table('film_cast_pivot')->insert([
+                'idFilm'   => $film->idFilm,
+                'idPerson' => $validated['director_id'],
+                'role'     => 'Director',
+            ]);
+        }
 
         // Guardar cast si existe
         if (!empty($validated['cast'])) {
@@ -184,13 +192,18 @@ class FilmController extends Controller
             }
         }
 
-        return response()->json($film, 201);
+        return response()->json(['success' => 1, 'data' => $film->fresh()->load('cast')], 201);
     }
 
 
     // Actualización película desde ADMIN de manera manual
     public function update(FilmRequest $request, Film $film)
     {
+        $user = $request->user();
+        if (!$user || !$user->isAdminOrEditor()) {
+            return response()->json(['success' => 0, 'message' => 'No autorizado'], 403);
+        }
+
         $validated = $request->validated();
 
         $validated['awards']     = json_encode($validated['awards'] ?? []);
@@ -199,30 +212,120 @@ class FilmController extends Controller
 
         $film->update($validated);
 
-        // Actualizar director y cast, limpiamos primero
-        \DB::table('film_cast_pivot')->where('idFilm', $film->idFilm)->delete();
+        // Actualizar pivot: limpiamos director anterior y re-insertamos
+        \DB::table('film_cast_pivot')->where('idFilm', $film->idFilm)->where('role', 'Director')->delete();
 
-        \DB::table('film_cast_pivot')->insert([
-            'idFilm'   => $film->idFilm,
-            'idPerson' => $validated['director_id'],
-            'role'     => 'Director'
-        ]);
+        if (!empty($validated['director_id'])) {
+            \DB::table('film_cast_pivot')->insert([
+                'idFilm'   => $film->idFilm,
+                'idPerson' => $validated['director_id'],
+                'role'     => 'Director',
+            ]);
+        }
 
         if (!empty($validated['cast'])) {
+            \DB::table('film_cast_pivot')->where('idFilm', $film->idFilm)->where('role', '!=', 'Director')->delete();
             foreach ($validated['cast'] as $cast) {
                 $cast['idFilm'] = $film->idFilm;
                 \DB::table('film_cast_pivot')->insert($cast);
             }
         }
 
-        return response()->json($film);
+        return response()->json(['success' => 1, 'data' => $film->fresh()->load('cast')]);
     }
 
-    public function destroy(Film $film)
+    public function destroy(Request $request, Film $film)
     {
+        $user = $request->user();
+        if (!$user || !$user->isAdminOrEditor()) {
+            return response()->json(['success' => 0, 'message' => 'No autorizado'], 403);
+        }
+
         $film->delete();
-        return response()->json(['message' => 'Película eliminada']);
-    }  
+        return response()->json(['success' => 1, 'message' => 'Película eliminada']);
+    }
+
+    /**
+     * Búsqueda de personas en cast_crew para autocompletado del formulario admin.
+     * GET /admin/cast-search?q=Kubrick
+     */
+    public function castSearch(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || !$user->isAdminOrEditor()) {
+            return response()->json(['success' => 0, 'message' => 'No autorizado'], 403);
+        }
+
+        $q = trim($request->get('q', ''));
+        if (strlen($q) < 2) {
+            return response()->json(['success' => 1, 'data' => []]);
+        }
+
+        $people = \DB::table('cast_crew')
+            ->where('name', 'like', "%{$q}%")
+            ->select('idPerson', 'name', 'photo')
+            ->limit(15)
+            ->get();
+
+        return response()->json(['success' => 1, 'data' => $people]);
+    }
+
+    /**
+     * Plataformas de streaming por país (via TMDB Watch Providers)
+     * GET /films/{id}/watch-providers
+     * Resultado cacheado 24h por película.
+     */
+    public function watchProviders($id)
+    {
+        $film = Film::findOrFail($id);
+
+        if (!$film->tmdb_id) {
+            return response()->json(['success' => 0, 'data' => []]);
+        }
+
+        $countries = ['MX', 'AR', 'CO', 'CL', 'PE', 'EC', 'UY', 'VE', 'ES'];
+        $cacheKey  = "watch_providers_{$film->tmdb_id}";
+
+        $data = Cache::remember($cacheKey, now()->addHours(24), function () use ($film, $countries) {
+            $apiKey   = config('services.tmdb.key');
+            $response = Http::timeout(8)->get(
+                "https://api.themoviedb.org/3/movie/{$film->tmdb_id}/watch/providers?api_key={$apiKey}"
+            );
+
+            if (!$response->successful()) {
+                return [];
+            }
+
+            $results = $response->json('results', []);
+            $filtered = [];
+
+            foreach ($countries as $code) {
+                if (!isset($results[$code])) continue;
+
+                $entry = $results[$code];
+                $filtered[$code] = [
+                    'link'     => $entry['link'] ?? null,
+                    'flatrate' => $this->mapProviders($entry['flatrate'] ?? []),
+                    'rent'     => $this->mapProviders($entry['rent']     ?? []),
+                    'buy'      => $this->mapProviders($entry['buy']      ?? []),
+                ];
+            }
+
+            return $filtered;
+        });
+
+        return response()->json(['success' => 1, 'data' => $data]);
+    }
+
+    private function mapProviders(array $providers): array
+    {
+        return array_map(fn($p) => [
+            'id'       => $p['provider_id'],
+            'name'     => $p['provider_name'],
+            'logo'     => 'https://image.tmdb.org/t/p/original' . $p['logo_path'],
+            'priority' => $p['display_priority'],
+        ], $providers);
+    }
 }
 
 

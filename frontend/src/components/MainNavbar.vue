@@ -26,11 +26,18 @@ const goCommunity = () => { isUserMenuOpen.value = false; router.push({ name: 'e
 const goDebates   = () => router.push({ name: 'entry-feed', query: { tab: 'user_debate' } })
 const goNews      = () => router.push({ name: 'post-feed' })
 const goEditorial = () => { isUserMenuOpen.value = false; router.push({ name: 'editorial-inbox' }) }
+const goAdmin     = () => { isUserMenuOpen.value = false; router.push({ name: 'admin-dashboard' }) }
 
 const isEditorOrAdmin = computed(() => {
   if (!auth.isAuthenticated || !auth.user) return false
   return auth.user.idRol === 1 || auth.user.idRol === 2
 })
+
+const isAdmin = computed(() => {
+  if (!auth.isAuthenticated || !auth.user) return false
+  return auth.user.idRol === 1
+})
+
 const openLogin   = () => { isLoginOpen.value = true }
 
 const goProfile = () => {
@@ -187,13 +194,48 @@ onBeforeUnmount(() => {
             >
               <div
                 v-if="isUserMenuOpen"
-                class="absolute right-0 mt-2 w-52 origin-top-right rounded-xl border border-white/10 bg-[#1b2228] shadow-xl overflow-hidden"
+                class="absolute right-0 mt-2 w-56 origin-top-right rounded-xl border border-white/10 bg-[#1b2228] shadow-xl overflow-hidden"
               >
-                <button type="button" class="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-800" @click="goProfile">Mi perfil</button>
-                <button type="button" class="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-800" @click="goCommunity">Comunidad</button>
-                <button v-if="isEditorOrAdmin" type="button" class="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-800" @click="goEditorial">Panel editorial</button>
-                <button type="button" class="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-800" @click="goChangePassword">Cambiar contraseña</button>
-                <button type="button" class="w-full text-left px-4 py-3 text-sm text-red-300 hover:bg-slate-800" @click="logout">Logout</button>
+                <!-- Sección admin — solo para admins -->
+                <template v-if="isAdmin">
+                  <div class="px-4 pt-3 pb-1">
+                    <span class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#00e054]/70">Administración</span>
+                  </div>
+                  <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-[#00e054] hover:bg-[#00e054]/10 flex items-center gap-2.5 transition-colors" @click="goAdmin">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+                    </svg>
+                    Panel de películas
+                  </button>
+                  <button v-if="isEditorOrAdmin" type="button" class="w-full text-left px-4 py-2.5 text-sm text-indigo-400 hover:bg-indigo-500/10 flex items-center gap-2.5 transition-colors" @click="goEditorial">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                    Panel editorial
+                  </button>
+                  <div class="border-t border-white/[0.06] mx-3 my-1"></div>
+                </template>
+
+                <!-- Sección editorial (solo editors, no admins — admins ya lo ven arriba) -->
+                <template v-else-if="isEditorOrAdmin">
+                  <div class="px-4 pt-3 pb-1">
+                    <span class="text-[9px] font-bold uppercase tracking-[0.2em] text-indigo-400/70">Editorial</span>
+                  </div>
+                  <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-indigo-400 hover:bg-indigo-500/10 flex items-center gap-2.5 transition-colors" @click="goEditorial">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                    Panel editorial
+                  </button>
+                  <div class="border-t border-white/[0.06] mx-3 my-1"></div>
+                </template>
+
+                <!-- Opciones de usuario -->
+                <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors" @click="goProfile">Mi perfil</button>
+                <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors" @click="goCommunity">Comunidad</button>
+                <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors" @click="goChangePassword">Cambiar contraseña</button>
+                <div class="border-t border-white/[0.06] mx-3 my-1"></div>
+                <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors" @click="logout">Cerrar sesión</button>
               </div>
             </Transition>
           </div>
@@ -261,6 +303,7 @@ onBeforeUnmount(() => {
           <button type="button" class="mobile-nav-link" @click="goDebates">Debates</button>
           <button type="button" class="mobile-nav-link mobile-nav-link--noticias" @click="goNews">Noticias</button>
           <button v-if="isEditorOrAdmin" type="button" class="mobile-nav-link mobile-nav-link--editorial" @click="goEditorial">Editorial</button>
+          <button v-if="isAdmin" type="button" class="mobile-nav-link mobile-nav-link--admin" @click="goAdmin">Panel de películas</button>
         </nav>
       </div>
     </Transition>
@@ -386,4 +429,6 @@ onBeforeUnmount(() => {
 .mobile-nav-link--noticias:hover { color: #e8471f; }
 .mobile-nav-link--editorial { color: #6366f1; }
 .mobile-nav-link--editorial:hover { color: #a5b4fc; }
+.mobile-nav-link--admin { color: #00e054; }
+.mobile-nav-link--admin:hover { color: #6effa0; }
 </style>

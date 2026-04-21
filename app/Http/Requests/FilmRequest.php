@@ -49,7 +49,8 @@ class FilmRequest extends FormRequest
             'overview'        => ['nullable', 'string'],
             'duration'        => ['nullable', 'integer', 'min:1'],
             'release_date'    => ['nullable', 'date'],
-            'frame'           => ['nullable', 'url'],
+            'frame'           => ['nullable', 'string', 'max:500'],
+            'backdrop'        => ['nullable', 'string', 'max:500'],
 
             'awards'      => ['nullable', 'array'],
             'nominations' => ['nullable', 'array'],
@@ -60,15 +61,15 @@ class FilmRequest extends FormRequest
             'total_festivals'   => ['nullable', 'integer', 'min:0'],
 
             // Tomar los datos del cast de cast_crew
-            'director_id' => ['required', 'exists:cast_crew,idPerson'],
-            
-            'cast'                     => ['nullable', 'array'], 
+            'director_id' => ['nullable', 'integer', 'exists:cast_crew,idPerson'],
+
+            'cast'                     => ['nullable', 'array'],
             'cast.*.idPerson'          => ['required', 'exists:cast_crew,idPerson'],
             'cast.*.role'              => ['required', 'string', 'max:100'],
             'cast.*.character_name'    => ['nullable', 'string', 'max:255'],
             'cast.*.credit_order'      => ['nullable', 'integer', 'min:0'],
             'cast.*.photo'             => ['nullable', 'url'],
-            
+
             'vote_average'   => ['nullable', 'numeric', 'min:0', 'max:10'], // Nota media calculada a partir de los puntos dados por usuarios registrados
             'globalRate'     => ['nullable', 'numeric', 'min:0', 'max:10'], // Nota global guardada en la API TMDB
         ];

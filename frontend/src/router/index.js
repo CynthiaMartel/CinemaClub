@@ -12,6 +12,25 @@ import FilmsFeedView from '@/views/FilmsFeedView.vue'
 
 const routes = [
   {
+    path: '/admin',
+    name: 'admin-dashboard',
+    component: () => import('@/views/AdminDashboardView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/films/new',
+    name: 'admin-film-create',
+    component: () => import('@/views/AdminFilmFormView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/films/:id/edit',
+    name: 'admin-film-edit',
+    component: () => import('@/views/AdminFilmFormView.vue'),
+    props: true,
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
     path: '/',
     name: 'home',
     component: HomeView,
@@ -115,13 +134,18 @@ const router = createRouter({
   },
 })
 
-// Guard : proteger rutas que requieran auth******************
-router.beforeEach((to, from, next) => {
+// Guard : proteger rutas que requieran auth y/o rol admin
+router.beforeEach((to, _from, next) => {
   const auth = useAuthStore()
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return next({ name: 'login' })
+    return next({ name: 'home' })
   }
+
+  if (to.meta.requiresAdmin && auth.user?.idRol != 1) {
+    return next({ name: 'home' })
+  }
+
   return next()
 })
 
