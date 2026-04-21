@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\UserEntry;
 use App\Models\UserEntryFilm;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,11 +14,18 @@ class UserEntryFilmController extends Controller
      */
     public function store(Request $request)
     {
+        $user = Auth::user();
+
         $request->validate([
             'user_entry_id' => 'required|integer|exists:user_entries,id',
             'film_id' => 'required|integer|exists:films,idFilm',
             'order' => 'nullable|integer|min:1',
         ]);
+
+        $entry = UserEntry::findOrFail($request->user_entry_id);
+        if ($entry->user_id !== $user->id) {
+            return response()->json(['error' => 'No tienes permiso para modificar esta entrada.'], 403);
+        }
 
         $relation = UserEntryFilm::create([
             'user_entry_id' => $request->user_entry_id,
@@ -52,7 +60,13 @@ class UserEntryFilmController extends Controller
      
     public function destroy($id)
     {
-        $relation = UserEntryFilm::findOrFail($id);
+        $user = Auth::user();
+        $relation = UserEntryFilm::with('entry')->findOrFail($id);
+
+        if ($relation->entry->user_id !== $user->id && !$user->isAdmin()) {
+            return response()->json(['error' => 'No tienes permiso para eliminar esta relación.'], 403);
+        }
+
         $relation->delete();
 
         return response()->json([
