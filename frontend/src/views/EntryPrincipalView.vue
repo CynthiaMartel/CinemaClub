@@ -4,18 +4,44 @@
     :class="themeClasses.accentSelection"
   >
     
-    <div class="content-wrap relative z-10 mx-auto max-w-[1100px] px-6 md:px-10 lg:px-0 py-10">
+    <EntryHeader
+      :bg-gradient="themeClasses.gradient"
+      :films="entry.films"
+    />
 
-      <EntryHeader 
-        :user="entry.user"
-        :title="entry.title"
-        :type="entry.type"
-        :accent-color="themeClasses.text"
-        :bg-gradient="themeClasses.gradient"
-        :films="entry.films"
-      />
+    <div class="content-wrap mx-auto max-w-[1100px] px-6 md:px-10 lg:px-0 pb-20 relative z-10">
 
-      <main class="mt-8">
+      <!-- Meta del entry — solapado sobre el fondo, igual que UserProfile -->
+      <div class="-mt-20 sm:-mt-28 md:-mt-36 mb-8 md:mb-12 relative z-20">
+        <div class="flex flex-wrap items-center gap-3 sm:gap-6 mb-6 md:mb-8">
+          <div :class="['inline-flex items-center gap-2 px-3 py-1 bg-slate-900/80 border rounded-full text-[10px] font-black uppercase tracking-[2px] shadow-sm backdrop-blur-md', themeClasses.border, themeClasses.text]">
+            <span class="w-1.5 h-1.5 rounded-full animate-pulse bg-current"></span>
+            {{ typeLabel }}
+          </div>
+
+          <span class="text-slate-800 font-thin text-2xl select-none">|</span>
+
+          <div class="flex items-center gap-4 group cursor-pointer">
+            <div class="w-8 h-8 rounded-full border border-slate-700 bg-slate-800 flex items-center justify-center shadow-xl transition-all duration-300 group-hover:border-orange-400/60 flex-shrink-0 overflow-hidden">
+              <span class="text-xs font-black text-slate-400 group-hover:text-orange-400 transition-colors select-none">
+                {{ entry.user?.name?.charAt(0).toUpperCase() || '?' }}
+              </span>
+            </div>
+            <p class="text-[11px] tracking-tight">
+              <span class="text-slate-500 italic font-light lowercase">escrito por</span>
+              <span class="text-white font-black ml-3 uppercase tracking-[2px] transition-colors group-hover:text-orange-400">
+                @{{ entry.user?.name }}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tighter leading-[1.1] max-w-4xl drop-shadow-md">
+          {{ entry.title }}
+        </h1>
+      </div>
+
+      <main>
         
         <div v-if="entry.type === 'user_debate'" class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
           <article class="lg:col-span-8 prose prose-invert max-w-none relative">
@@ -127,8 +153,8 @@
           </div>
         </div>
 
-        <div v-else-if="entry.type === 'user_review'" class="grid grid-cols-1 md:grid-cols-12 gap-10 lg:gap-16 items-start">
-          <aside class="md:col-span-4 lg:col-span-3 sticky top-10">
+        <div v-else-if="entry.type === 'user_review'" class="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-16 items-start">
+          <aside class="md:col-span-4 lg:col-span-3 md:sticky md:top-10">
             <div class="relative group">
               <div class="absolute -inset-1 bg-[#BE2B0C] rounded-xl blur opacity-10 group-hover:opacity-30 transition duration-1000"></div>
               <div class="relative shadow-2xl rounded-xl overflow-hidden border border-slate-700 bg-slate-900">
@@ -236,6 +262,12 @@ const themeClasses = computed(() => {
     button: 'bg-[#BE2B0C] hover:bg-red-700',
     accentSelection: 'selection:bg-[#BE2B0C]/20'
   };
+});
+
+const typeLabel = computed(() => {
+  if (entry.value?.type === 'user_list') return 'Lista';
+  if (entry.value?.type === 'user_debate') return 'Debate';
+  return 'Crítica';
 });
 
 const mappedFilms = computed(() => {
