@@ -35,8 +35,9 @@ class UserFeedController extends Controller
                 ->whereIn('visibility', ['public', 'friends'])
                 ->where('status', 'approved')
                 ->select('id', 'user_id', 'type', 'title', 'visibility', 'likes_count', 'created_at')
-                ->with('user:id,name,email')
+                ->with(['user:id,name', 'films' => fn($q) => $q->select('films.idFilm', 'title', 'frame')->orderByPivot('order')])
                 ->latest('created_at')
+                ->take(30)
                 ->get();
 
             $films = UserFilmActions::whereIn('user_id', $followedIds)
@@ -52,12 +53,19 @@ class UserFeedController extends Controller
                 $feed->push([
                     'type'        => $entry->type,
                     'source'      => 'entry',
+                    'entry_id'    => $entry->id,
                     'user'        => $entry->user->name,
                     'user_id'     => $entry->user_id,
                     'title'       => $entry->title,
                     'likes_count' => $entry->likes_count,
                     'created_at'  => $entry->created_at,
+                    'updated_at'  => $entry->created_at,
                     'visibility'  => $entry->visibility,
+                    'films'       => $entry->films->map(fn($f) => [
+                        'idFilm' => $f->idFilm,
+                        'title'  => $f->title,
+                        'frame'  => $f->frame,
+                    ])->values()->all(),
                 ]);
             }
 

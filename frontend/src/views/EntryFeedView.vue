@@ -16,17 +16,27 @@
         </div>
 
         <div class="flex flex-wrap items-center justify-start gap-3 md:gap-4">
-          <button 
+          <button
             v-for="tab in tabs" :key="tab.id"
             @click="setTab(tab.id)"
             :class="[
               'px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all duration-300',
-              activeFilter === tab.id 
-                ? 'bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.3)]' 
+              activeFilter === tab.id
+                ? 'bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.3)]'
                 : 'bg-transparent text-slate-500 border-slate-800 hover:border-slate-500 hover:text-white'
             ]"
           >
             {{ tab.name }}
+          </button>
+
+          <button
+            @click="handleCreate"
+            class="flex items-center gap-1.5 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-brand/50 text-brand hover:bg-brand hover:text-white transition-all duration-300"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3 h-3">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            {{ createButtonLabel }}
           </button>
 
           <div v-if="activeFilter !== 'all' && auth.isAuthenticated" class="ml-auto relative group">
@@ -164,6 +174,8 @@
 
     </div>
   </div>
+
+  <LoginModal v-model="isLoginModalOpen" />
 </template>
 
 <script setup>
@@ -171,6 +183,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import api from '@/services/api';
+import LoginModal from '@/components/LoginModal.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -182,6 +195,23 @@ const activeFilter = ref(route.query.tab || 'all');
 const filterUserId = ref(null);
 const page = ref(1);
 const hasMore = ref(true);
+const isLoginModalOpen = ref(false);
+
+const createButtonLabel = computed(() => {
+  if (activeFilter.value === 'user_debate') return 'Crear Debate';
+  if (activeFilter.value === 'user_list') return 'Crear Lista';
+  if (activeFilter.value === 'user_review') return 'Crear Reseña';
+  return 'Crear Entrada';
+});
+
+const handleCreate = () => {
+  if (!auth.isAuthenticated) {
+    isLoginModalOpen.value = true;
+    return;
+  }
+  const type = activeFilter.value !== 'all' ? activeFilter.value : 'user_list';
+  router.push({ name: 'create-entry', params: { id: undefined }, query: { type } });
+};
 
 const tabs = [
   { id: 'all', name: 'Comunidad', desc: 'Feed Global' },
