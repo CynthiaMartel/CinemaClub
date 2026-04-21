@@ -44,28 +44,38 @@ const truncatedVote = computed(() => {
   return Number(props.film.vote_average).toFixed(1);
 })
 
-const formattedOtherTitles = computed(() => {
-  const titles = props.film?.alternative_titles;
-  if (!titles) return null;
+const langNames = new Intl.DisplayNames(['es'], { type: 'language' })
+const countryNames = new Intl.DisplayNames(['es'], { type: 'region' })
 
+const parsedAltTitles = computed(() => {
+  const titles = props.film?.alternative_titles
+  if (!titles) return []
   try {
-    const parsed = typeof titles === 'string' && titles.startsWith('{') 
-      ? JSON.parse(titles) 
-      : titles;
-
+    const parsed = typeof titles === 'string' ? JSON.parse(titles) : titles
     if (typeof parsed === 'object' && !Array.isArray(parsed)) {
-      const mapping = { en: 'Inglés', es: 'Español', fr: 'Francés', it: 'Italiano' };
-      return Object.entries(parsed)
-        .map(([lang, title]) => `<span class="text-white/40">${mapping[lang] || lang}:</span> ${title}`)
-        .join(' <br> '); 
+      return Object.entries(parsed).map(([lang, title]) => {
+        let label = lang
+        try { label = langNames.of(lang) || lang } catch {}
+        return { lang: label, title }
+      })
     }
-    
-    if (Array.isArray(parsed)) return parsed.join(' • ');
-    return parsed;
-  } catch (e) {
-    return titles;
-  }
-});
+    if (Array.isArray(parsed)) return parsed.map(t => ({ lang: null, title: t }))
+    return []
+  } catch { return [] }
+})
+
+const formattedOtherTitles = computed(() => parsedAltTitles.value.length > 0)
+
+const originCountriesModal = computed(() => {
+  if (!props.film?.origin_country) return []
+  return props.film.origin_country
+    .split(',')
+    .map(c => c.trim().toUpperCase())
+    .filter(Boolean)
+    .map(code => {
+      try { return countryNames.of(code) || code } catch { return code }
+    })
+})
 
 const awardsProcessed = computed(() => {
   const awardsList = cleanList(props.film.awards);
@@ -107,6 +117,11 @@ const tmdbUrl = computed(() => {
     ? `https://www.themoviedb.org/movie/${props.film.tmdb_id}` 
     : '#';
 });
+
+const originalLanguageName = computed(() => {
+  if (!props.film?.original_language) return null
+  try { return langNames.of(props.film.original_language) || props.film.original_language } catch { return props.film.original_language }
+})
 
 const cleanList = (data) => {
   if (!data) return []
@@ -165,18 +180,51 @@ const cleanList = (data) => {
                 </div>
               </div>
 
-              <div v-if="formattedOtherTitles" class="bg-black/40 backdrop-blur-md p-4 rounded-2xl border border-white/5">
-                <span class="block text-[9px] font-black text-yellow-500/70 mb-2 uppercase tracking-widest">Títulos Alternativos</span>
-                <div class="text-[11px] text-slate-300 leading-relaxed italic font-serif" v-html="formattedOtherTitles"></div>
-              </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 w-full text-left">
+              <!-- Lanzamiento -->
               <div class="bg-slate-900/60 backdrop-blur-md p-5 rounded-2xl border border-white/10 col-span-full shadow-lg">
-                <span class="block text-[9px] text-red-500 font-black uppercase tracking-widest mb-1">Lanzamiento oficial</span>
+                <span class="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Fecha de estreno</span>
                 <div class="flex flex-wrap items-baseline gap-2">
                   <span class="text-3xl text-white font-black leading-none">{{ filmYear }}</span>
-                  <span class="text-[10px] text-slate-500 font-mono tracking-tighter uppercase">{{ formattedReleaseDate }}</span>
+                  <span class="text-sm text-slate-400 font-bold tracking-tight">{{ formattedReleaseDate }}</span>
+                </div>
+              </div>
+
+              <!-- Datos de origen -->
+              <div class="bg-slate-900/60 backdrop-blur-md p-5 rounded-2xl border border-white/10 col-span-full shadow-lg space-y-4">
+                <span class="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">Datos de origen</span>
+
+                <div v-if="film.original_title" class="flex flex-col gap-0.5">
+                  <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Título original</span>
+                  <span class="text-sm text-white font-bold italic">{{ film.original_title }}</span>
+                </div>
+
+                <div v-if="originCountriesModal.length" class="flex flex-col gap-1">
+                  <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">País de origen</span>
+                  <div class="flex flex-wrap gap-1.5">
+                    <span
+                      v-for="country in originCountriesModal"
+                      :key="country"
+                      class="text-[11px] font-bold bg-white/5 border border-white/10 px-2 py-1 rounded text-slate-200"
+                    >{{ country }}</span>
+                  </div>
+                </div>
+
+                <div v-if="originalLanguageName" class="flex flex-col gap-0.5">
+                  <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Idioma original</span>
+                  <span class="text-sm text-white font-bold">{{ originalLanguageName }}</span>
+                </div>
+
+                <div v-if="parsedAltTitles.length" class="flex flex-col gap-2">
+                  <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Otros títulos</span>
+                  <ul class="space-y-1.5">
+                    <li v-for="item in parsedAltTitles" :key="item.title" class="flex items-baseline gap-2">
+                      <span v-if="item.lang" class="text-[9px] font-black uppercase tracking-widest text-slate-500 shrink-0">{{ item.lang }}</span>
+                      <span class="text-[11px] text-slate-300 italic font-serif leading-tight">{{ item.title }}</span>
+                    </li>
+                  </ul>
                 </div>
               </div>
 
