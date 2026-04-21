@@ -136,6 +136,14 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    // Actualiza el avatar en el store sin recargar sesión completa
+    // (se llama desde EditProfileModal tras guardar el perfil con éxito)
+    setAvatar(avatarUrl) {
+      if (this.user) {
+        this.user = { ...this.user, avatar: avatarUrl }
+      }
+    },
+
     _clearSession() {
       this.user = null
       this._loggedIn = false

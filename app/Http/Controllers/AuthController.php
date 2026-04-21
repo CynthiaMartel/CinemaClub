@@ -102,6 +102,8 @@ class AuthController extends Controller
         $cookieMinutes = 60 * 24 * 7; // 7 días
         $secure        = app()->environment('production'); // HTTPS solo en producción
 
+        $user->load('profile:user_id,avatar');
+
         return response()->json([
             'success' => 1,
             'message' => 'Inicio de sesión exitoso. ¡Bienvenida!',
@@ -111,6 +113,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'idRol' => $user->idRol,
                 'role'  => optional($user->role)->rolType,
+                'avatar' => $user->profile?->avatar,
             ],
         ], 200)->withCookie(
             cookie('auth_token', $token, $cookieMinutes, '/', null, $secure, true, false, 'lax')
@@ -141,19 +144,20 @@ class AuthController extends Controller
     public function checkSession (Request $request)
     {
         $user = $request->user();
+        $user->load('profile:user_id,avatar');
 
         return response()->json([
-        'success' => 1,
-        'user' => [
-            'id'            => $user->id,
-            'name'          => $user->name,
-            'email'         => $user->email,
-            'idRol'         => $user->idRol, // <--- AÑADE ESTA LÍNEA
-            'role'          => optional($user->role)->rolType,
-            'blocked'       => (bool) $user->blocked,
-            // ... resto de campos igual
+            'success' => 1,
+            'user' => [
+                'id'      => $user->id,
+                'name'    => $user->name,
+                'email'   => $user->email,
+                'idRol'   => $user->idRol,
+                'role'    => optional($user->role)->rolType,
+                'blocked' => (bool) $user->blocked,
+                'avatar'  => $user->profile?->avatar,
             ],
-        ]); 
+        ]);
     }
 }
 
