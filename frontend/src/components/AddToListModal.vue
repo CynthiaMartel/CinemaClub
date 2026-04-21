@@ -79,8 +79,8 @@ watch(() => props.modelValue, (open) => {
         <!-- Cabecera -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
           <h3 class="text-[11px] font-black text-white uppercase tracking-[0.2em]">Añadir a lista</h3>
-          <button @click="close" class="text-slate-500 hover:text-white transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+          <button @click="close" aria-label="Cerrar" class="text-slate-500 hover:text-white transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
@@ -97,8 +97,8 @@ watch(() => props.modelValue, (open) => {
           </button>
 
           <!-- Loading -->
-          <div v-if="isLoading" class="flex justify-center py-8">
-            <div class="w-6 h-6 border-2 border-slate-800 border-t-brand rounded-full animate-spin"></div>
+          <div v-if="isLoading" class="flex justify-center py-8" role="status" aria-label="Cargando listas...">
+            <div class="w-6 h-6 border-2 border-slate-800 border-t-brand rounded-full animate-spin" aria-hidden="true"></div>
           </div>
 
           <!-- Sin listas -->
@@ -131,11 +131,11 @@ watch(() => props.modelValue, (open) => {
               <span class="flex-1 text-[11px] font-bold text-slate-200 truncate">{{ list.title }}</span>
 
               <!-- Estado -->
-              <span v-if="addingId === list.id" class="flex-shrink-0">
-                <svg class="w-4 h-4 text-slate-400 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              <span v-if="addingId === list.id" class="flex-shrink-0" role="status" aria-label="Añadiendo...">
+                <svg class="w-4 h-4 text-slate-400 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
               </span>
-              <span v-else-if="doneIds.includes(list.id)" class="flex-shrink-0 text-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+              <span v-else-if="doneIds.includes(list.id)" class="flex-shrink-0 text-brand" aria-label="Añadida">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
               </span>
             </button>
           </template>

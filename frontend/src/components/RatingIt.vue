@@ -39,12 +39,18 @@ const handleStarClick = () => {
   <div class="rateit-wrapper">
     <h3 class="rating-title">Tu interacción</h3>
     
-    <div 
-      class="rateit-range" 
-      @mousemove="handleMouseMove" 
+    <div
+      class="rateit-range"
+      @mousemove="handleMouseMove"
       @mouseleave="handleMouseLeave"
       @click="handleStarClick"
       :class="{ 'is-loading': isSavingRate }"
+      role="slider"
+      :aria-valuenow="userVote"
+      aria-valuemin="0"
+      aria-valuemax="10"
+      :aria-label="`Tu puntuación: ${userVote} de 10`"
+      tabindex="0"
     >
       <div class="stars-layer stars-empty"></div>
       
@@ -60,7 +66,7 @@ const handleStarClick = () => {
     </div>
 
     <div class="rating-info">
-      <span v-if="isSavingRate" class="saving-tag">Guardando...</span>
+      <span v-if="isSavingRate" class="saving-tag" role="status" aria-live="polite">Guardando...</span>
       <span v-else class="score-tag ">{{ hoverWidth > 0 ? hoverWidth / 18 : userVote }} </span>
     </div>
   </div>
@@ -79,7 +85,7 @@ const handleStarClick = () => {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #64748b;
+  color: #94a3b8; /* slate-400: ratio 6:1 sobre #17191c, antes #64748b fallaba */
 }
 
 .rateit-range {

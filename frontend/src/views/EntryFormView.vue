@@ -1,12 +1,16 @@
 <script setup>
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import api from '@/services/api';
 import MovieGrid from '@/components/MovieGrid.vue';
 import FilmSearch from '@/components/FilmSearch.vue';
 
 const router = useRouter();
+const route = useRoute();
 const isSubmitting = ref(false);
+
+const validTypes = ['user_list', 'user_debate', 'user_review'];
+const initialType = validTypes.includes(route.query.type) ? route.query.type : 'user_list';
 
 const types = [
   { label: 'Crear Lista', value: 'user_list', activeClass: 'bg-yellow-600 shadow-yellow-900/20', hoverClass: 'hover:text-yellow-500' },
@@ -17,7 +21,7 @@ const types = [
 const form = ref({
   title: '',
   content: '',
-  type: 'user_list',
+  type: initialType,
   visibility: 'public',
   films: []
 });
@@ -95,7 +99,7 @@ const submitEntry = async () => {
           v-model="form.title" 
           type="text" 
           placeholder="Título de la entrada..."
-          class="bg-transparent text-3xl md:text-5xl font-bold text-white outline-none border-b border-gray-700 focus:border-[#13c090] transition-colors w-full pb-2"
+          class="bg-transparent text-3xl md:text-5xl font-bold text-white outline-none border-b border-slate-700 focus:border-brand transition-colors w-full pb-2"
         >
       </div>
     </div>
@@ -103,19 +107,19 @@ const submitEntry = async () => {
     <main class="max-w-[1100px] mx-auto px-6 md:px-10 lg:px-0 py-8">
       
       <section class="mb-10">
-        <label class="block text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">
+        <label class="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">
           Contenido / Descripción
         </label>
         <textarea 
           v-model="form.content"
           placeholder="Escribe aquí los detalles de tu lista, discusión de debate o tu reseña..."
-          class="w-full bg-[#2c3440] border-none rounded-md p-6 text-white text-lg focus:ring-2 focus:ring-[#00c020] min-h-[250px] resize-none shadow-inner"
+          class="w-full bg-[#2c3440] border-none rounded-md p-6 text-white text-lg focus:ring-2 focus:ring-brand/40 min-h-[250px] resize-none shadow-inner"
         ></textarea>
       </section>
 
       <section v-if="form.type" class="mb-12 animate-fade-in">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-gray-800 pb-4">
-          <h2 class="text-xs font-bold uppercase tracking-widest text-gray-500">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-slate-800 pb-4">
+          <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400">
             Películas seleccionadas ({{ form.films.length }})
           </h2>
           
@@ -129,24 +133,24 @@ const submitEntry = async () => {
           @remove="removeMovie"
         />
         
-        <div v-if="form.films.length === 0" class="py-12 border-2 border-dashed border-gray-800 rounded-lg text-center text-gray-600 italic text-sm">
+        <div v-if="form.films.length === 0" class="py-12 border-2 border-dashed border-slate-800 rounded-lg text-center text-slate-500 italic text-sm">
           Usa el buscador superior para añadir películas a tu {{ form.type === 'user_list' ? 'lista' : 'reseña' }}.
         </div>
       </section>
 
-      <div class="flex items-center justify-between border-t border-gray-800 pt-8 mt-12">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-t border-slate-800 pt-8 mt-12">
         <div class="flex flex-col gap-1">
-          <label class="text-[10px] font-bold uppercase text-gray-600 ml-1">Visibilidad</label>
-          <select v-model="form.visibility" class="bg-gray-800 border-none rounded text-xs text-white px-4 py-2 focus:ring-1 focus:ring-[#00c020]">
+          <label class="text-[10px] font-bold uppercase text-slate-400 ml-1">Visibilidad</label>
+          <select v-model="form.visibility" class="bg-slate-800 border-none rounded text-xs text-white px-4 py-2 focus:ring-1 focus:ring-brand/40">
             <option value="public">Público</option>
             <option value="private">Privado</option>
           </select>
         </div>
 
-        <button 
+        <button
           @click="submitEntry"
           :disabled="isSubmitting || !form.title"
-          class="bg-brand hover:bg-slate-800 text-white font-bold py-3 px-12 rounded shadow-lg disabled:opacity-50 transition-all uppercase tracking-widest text-sm"
+          class="w-full sm:w-auto bg-brand hover:bg-slate-800 text-white font-bold py-3 px-8 sm:px-12 rounded shadow-lg disabled:opacity-50 transition-all uppercase tracking-widest text-sm"
         >
           {{ isSubmitting ? 'Publicando...' : 'Publicar Entrada' }}
         </button>

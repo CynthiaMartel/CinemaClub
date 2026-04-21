@@ -25,16 +25,18 @@ defineEmits(['remove']);
         </div>
 
         <button 
-          v-if="isEditable" 
+          v-if="isEditable"
           @click.stop="$emit('remove', index)"
+          :aria-label="`Eliminar ${film.title}`"
           class="absolute top-2 right-2 bg-red-600/90 hover:bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center z-20 shadow-lg"
         >
-          <span class="text-sm font-light">×</span>
+          <span class="text-sm font-light" aria-hidden="true">×</span>
         </button>
       </div>
 
       <div v-if="showNumbers" 
-           class="absolute -top-2 -left-2 bg-slate-900 border border-slate-700 text-indigo-500 text-[10px] font-black w-6 h-6 flex items-center justify-center rounded shadow-2xl z-10">
+           class="absolute -top-2 -left-2 bg-slate-900 border border-slate-700 text-indigo-400 text-[10px] font-black w-6 h-6 flex items-center justify-center rounded shadow-2xl z-10"
+           :aria-label="`Posición ${index + 1}`">
         {{ index + 1 }}
       </div>
     </div>

@@ -8,11 +8,11 @@
         type="search"
         placeholder="Añadir películas..."
         class="w-full bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100
-               placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all backdrop-blur-md"
+               placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all backdrop-blur-md"
       />
       
-      <div v-if="isSearching" class="absolute right-4 top-3.5">
-        <div class="w-4 h-4 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+      <div v-if="isSearching" class="absolute right-4 top-3.5" role="status" aria-label="Buscando...">
+        <div class="w-4 h-4 border-2 border-brand/20 border-t-brand rounded-full animate-spin" aria-hidden="true"></div>
       </div>
     </div>
 
