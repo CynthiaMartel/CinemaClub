@@ -24,6 +24,8 @@ use App\Http\Controllers\UserFilmActionController;
 use App\Http\Controllers\UserFeedController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\RecommenderController;
+use App\Http\Controllers\EditorialController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -51,6 +53,17 @@ Route::get('/user', function (Request $request) {
 // BÚSQUEDA GLOBAL (films, usuarios, entries, posts)
 Route::get('/search', [SearchController::class, 'global'])
     ->name('api.search.global');
+
+/*
+|--------------------------------------------------------------------------
+|  -- RECOMENDADOR --
+|--------------------------------------------------------------------------
+*/
+Route::post('/recommender/filter', [RecommenderController::class, 'filter'])
+    ->name('api.recommender.filter');
+
+Route::post('/recommender/rank', [RecommenderController::class, 'rank'])
+    ->name('api.recommender.rank');
 
 // BÚSQUEDA barra de búsqueda -> PÚBLICAS
 // Ejemplo: GET http://cinemaclub.test/api/films/search?q=alien
@@ -162,7 +175,7 @@ Route::delete('/post-destroy/{id}', [PostController::class, 'destroy'])
 |--------------------------------------------------------------------------
 */
 // MOSTRAR PERFIL POR ID DEL USER -> Si es ADMIN o USER REGULAR LOGEUADO 
-    Route::get('/user_profiles/show/{userId?}', [UserProfileController::class, 'show'])
+    Route::get('/user_profiles/show/{username?}', [UserProfileController::class, 'show'])
         ->name('api.user_profiles.show');
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -196,11 +209,11 @@ Route::middleware('auth:sanctum')->group(function () {
 */
 // Rutas para Crear o actualizar sección de favs, watch later, watched... ; eliminar alguna de estas; mostrar listas de favs, ratings, etc; mostrar estadísticas
 // MOSTRAR ESTADÍSTICAS de actividad del usuario (admin o logueado)
-    Route::get('/user_films/stats/{user_id?}', [UserFilmActionController::class, 'showStats'])
+    Route::get('/user_films/stats/{username?}', [UserFilmActionController::class, 'showStats'])
         ->name('api.user.films.stats');
 
     // MOSTRAR LISTAS de películas según tipo de acción (favorites, watch_later, watched, rating)
-    Route::get('/my_films_diary/{user_id?}', [UserFilmActionController::class, 'showUserFilmDiary'])
+    Route::get('/my_films_diary/{username?}', [UserFilmActionController::class, 'showUserFilmDiary'])
         ->name('api.user.films.my_films_diary');
         
 
@@ -255,10 +268,10 @@ Route::get('{id}/cast-crew', [CastCrewController::class, 'show']);
 
 
 //  MOSTRAR las listas guardadas del usuario USERSAVEDLISTCONTROLLER
-Route::get('/user_profiles/{userId}/saved-lists', [UserSavedListController::class, 'getSavedLists']);
+Route::get('/user_profiles/{username}/saved-lists', [UserSavedListController::class, 'getSavedLists']);
 
 // MOSTRAR COLECCIÓN DE LISTAS, DEBATES, REVIEWS CREADAS por el usuario
-Route::prefix('user_profiles/{userId}')->group(function () {
+Route::prefix('user_profiles/{username}')->group(function () {
 Route::get('/lists', [UserEntryController::class, 'getCreatedLists']);
 Route::get('/debates', [UserEntryController::class, 'getCreatedDebates']);
 Route::get('/reviews', [UserEntryController::class, 'getCreatedReviews']);
@@ -343,11 +356,11 @@ Route::middleware('auth:sanctum')->group(function () {
 // Rutas para relaciones de amigos del user en UserFriendsController (flistas followers, followings, seguir, bloquear...)
 
 // VER lista de followers
-    Route::get('/user_friends/followers/{id?}', [UserFriendsController::class, 'followers'])
+    Route::get('/user_friends/followers/{username?}', [UserFriendsController::class, 'followers'])
         ->name('api.user_friends.followers');
 
     // VER LISTA de followings
-    Route::get('/user_friends/followings/{id?}', [UserFriendsController::class, 'followings'])
+    Route::get('/user_friends/followings/{username?}', [UserFriendsController::class, 'followings'])
         ->name('api.user_friends.followings');
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -435,5 +448,25 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/users/{user}/unblock', [UserController::class, 'unblock'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
         ->name('api.users.unblock');
+});
+
+/*
+|--------------------------------------------------------------------------
+|  -- PANEL EDITORIAL IA (Admin + Editor) --
+|--------------------------------------------------------------------------
+*/
+Route::prefix('editorial')->group(function () {
+    // News Items: listado, detalle, cambio de estado, crear borrador y proceso IA manual
+    Route::get('/news-items',                    [EditorialController::class, 'index']);
+    Route::post('/news-items/process-ai',        [EditorialController::class, 'processAI']);
+    Route::get('/news-items/{id}',               [EditorialController::class, 'show']);
+    Route::patch('/news-items/{id}/status',      [EditorialController::class, 'updateStatus']);
+    Route::post('/news-items/{id}/create-draft', [EditorialController::class, 'createDraft']);
+
+    // Sources: listado, rastreo manual, rastreo global y toggle activa/pausada
+    Route::get('/sources',                     [EditorialController::class, 'sources']);
+    Route::post('/sources/check-all',          [EditorialController::class, 'checkAll']);
+    Route::post('/sources/{id}/check-now',     [EditorialController::class, 'checkNow']);
+    Route::patch('/sources/{id}/toggle',       [EditorialController::class, 'toggleSource']);
 });
 

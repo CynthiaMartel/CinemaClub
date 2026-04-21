@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Models\UserSavedList;
 use App\Models\UserProfile;
 use App\Models\UserEntry;
@@ -52,9 +53,14 @@ class UserSavedListController extends Controller
 
  
 
-    public function getSavedLists($userId): JsonResponse
+    public function getSavedLists($username): JsonResponse
     {
-        
+        $targetUser = User::where('name', $username)->first();
+        if (!$targetUser) {
+            return response()->json(['error' => 'Usuario no encontrado.'], 404);
+        }
+        $userId = $targetUser->id;
+
         $savedEntries = UserSavedList::where('user_id', $userId)
             ->whereHas('entry', function($query) {
                 $query->where('type', 'user_list'); // Solo queremos listas guardadas

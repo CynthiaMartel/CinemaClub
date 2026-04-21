@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
 import EditProfileModal from '@/components/EditProfileModal.vue'
+import { avatarUrl } from '@/composables/useAvatar'
 
 const route = useRoute()
 const router = useRouter()
@@ -56,14 +57,14 @@ const goCreateEntry = () => {
   }
 }
 
-// 1. Cargar lo que el usuario HA CREADO 
+// 1. Cargar lo que el usuario HA CREADO
 const fetchUserEntries = async () => {
-  const id = route.params.id
+  const username = route.params.username
   try{
     const [listsResponse, debatesResponse, reviewsResponse] = await Promise.all([
-    api.get(`/user_profiles/${id}/lists`),
-    api.get(`/user_profiles/${id}/debates`),
-    api.get(`/user_profiles/${id}/reviews`)
+    api.get(`/user_profiles/${username}/lists`),
+    api.get(`/user_profiles/${username}/debates`),
+    api.get(`/user_profiles/${username}/reviews`)
   ])
   
   userLists.value = listsResponse.data.data
@@ -77,8 +78,8 @@ const fetchUserEntries = async () => {
 // 2. Cargar lo que el usuario HA GUARDADO (Su Colección )
 const fetchSavedLists = async () => {
   try {
-    const userId = route.params.id
-    const { data } = await api.get(`/user_profiles/${userId}/saved-lists`)
+    const username = route.params.username
+    const { data } = await api.get(`/user_profiles/${username}/saved-lists`)
     savedLists.value = data.data || []
   } catch (err) {
     console.error("Error cargando guardadas:", err)
@@ -91,9 +92,9 @@ const fetchUserDiary = async (page = 1, append = false) => {
     if (page === 1) isLoading.value = true
     else isLoadingDiary.value = true
 
-    const userId = route.params.id
-    
-    const { data } = await api.get(`/my_films_diary/${userId}`, { 
+    const username = route.params.username
+
+    const { data } = await api.get(`/my_films_diary/${username}`, {
         params: { 
             type: 'diary',
             page: page,
@@ -127,8 +128,8 @@ const loadMoreDiary = () => {
 // 4. Cargar WATCHLIST
 const fetchUserWatchlist = async () => {
   try {
-    const userId = route.params.id
-    const { data } = await api.get(`/my_films_diary/${userId}`, { params: { type: 'watch_later' } })
+    const username = route.params.username
+    const { data } = await api.get(`/my_films_diary/${username}`, { params: { type: 'watch_later' } })
     userWatchlist.value = data.data || []
   } catch (err) {
     console.error("Error cargando watchlist:", err)
@@ -136,21 +137,21 @@ const fetchUserWatchlist = async () => {
 }
 
 const fetchUserStats = async () => {
-  const userId = route.params.id
-  const { data } = await api.get(`/user_films/stats/${userId}`)
+  const username = route.params.username
+  const { data } = await api.get(`/user_films/stats/${username}`)
   userData_fromFilmsActions.value = data.user
 }
 
 const fetchProfile = async () => {
-  const userId = route.params.id
-  
+  const username = route.params.username
+
   // Reseteamos el mensaje de bloqueo antes de cargar
   if (typeof profileBlockedMessage !== 'undefined') {
       profileBlockedMessage.value = null
   }
 
   try {
-      const { data } = await api.get(`/user_profiles/show/${userId}`)
+      const { data } = await api.get(`/user_profiles/show/${username}`)
       
       // Si todo va bien, guardamos los datos
       user_profiles.value = data.data
@@ -178,13 +179,13 @@ const fetchProfile = async () => {
   }
 }
 
-// --Cargar Socials (Followers/Followings) 
+// --Cargar Socials (Followers/Followings)
 const fetchSocials = async () => {
-  const userId = route.params.id
+  const username = route.params.username
   try {
     const [followersRes, followingsRes] = await Promise.all([
-      api.get(`/user_friends/followers/${userId}`),
-      api.get(`/user_friends/followings/${userId}`)
+      api.get(`/user_friends/followers/${username}`),
+      api.get(`/user_friends/followings/${username}`)
     ])
     followers.value = followersRes.data.data || []
     followings.value = followingsRes.data.data || []
@@ -193,11 +194,11 @@ const fetchSocials = async () => {
   }
 }
 
-// --- Bloquear Usuario 
+// --- Bloquear Usuario
 const blockUser = async () => {
   if (!confirm("¿Estás seguro de que quieres bloquear a este usuario? Dejarás de seguirlo automáticamente.")) return
 
-  const profileId = route.params.id
+  const profileId = user_profiles.value?.user_id
   isBlocking.value = true // Activar loading
   
   try {
@@ -247,8 +248,8 @@ const unblockUser = async (userId) => {
   }
 }
 
-const goToProfile = (userId) => {
-    router.push({ name: 'user-profile', params: { id: userId } })
+const goToProfile = (username) => {
+    router.push({ name: 'user-profile', params: { username } })
 }
 
 // Obtener inicial para el avatar con inicial del nombre del user
@@ -313,8 +314,8 @@ const orderedDiaryKeys = computed(() => {
 //////
 const toggleFollow = async () => {
   if (savingFollow.value) return;
-  const profileId = route.params.id; 
-  if (auth.user?.id == profileId) return; 
+  const profileId = user_profiles.value?.user_id;
+  if (auth.user?.id == profileId) return;
 
   savingFollow.value = true;
   // Guardamos el estado anterior por si falla la API
@@ -352,8 +353,8 @@ const toggleFollow = async () => {
 };
 ///////////
 
-watch(() => route.params.id, (newId) => {
-  if (newId) loadAll()
+watch(() => route.params.username, (newUsername) => {
+  if (newUsername) loadAll()
 }, { immediate: true })
 
 onMounted(loadAll)
@@ -388,15 +389,32 @@ onMounted(loadAll)
       </button>
     </div>
 
-    <div v-else-if="user_profiles" class="content-wrap mx-auto max-w-[1100px] px-6 md:px-10 lg:px-0 py-10 relative z-10">
-      
-      <header class="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10 mb-12">
+    <template v-else-if="user_profiles">
+
+      <!-- Hero background — full viewport width -->
+      <div class="relative w-full overflow-hidden mb-0" :class="user_profiles.background ? 'h-52 md:h-64' : 'h-10'">
+        <img
+          v-if="user_profiles.background"
+          :src="user_profiles.background"
+          class="w-full h-full object-cover opacity-40"
+        />
+        <div v-if="user_profiles.background" class="absolute inset-0 bg-gradient-to-t from-[#14181c] via-[#14181c]/30 to-transparent"></div>
+      </div>
+
+      <!-- Constrained content wrapper -->
+      <div class="content-wrap mx-auto max-w-[1100px] px-6 md:px-10 lg:px-0 relative z-10">
+
+      <!-- Header superpuesto al fondo -->
+      <header class="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-6 md:gap-10 mb-8 md:mb-12"
+        :class="user_profiles.background ? '-mt-12 sm:-mt-16 md:-mt-20 relative z-10 px-0' : 'pt-8 sm:pt-10'">
+
         <div class="flex-shrink-0">
-          <div class="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-slate-800 shadow-2xl overflow-hidden bg-slate-700 flex items-center justify-center shrink-0">
-             <img 
-               v-if="user_profiles.avatar" 
-               :src="`/storage/${user_profiles.avatar}`" 
-               class="w-full h-full object-cover" 
+          <div class="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 shadow-2xl overflow-hidden bg-slate-700 flex items-center justify-center shrink-0"
+            :class="user_profiles.background ? 'border-[#14181c]' : 'border-slate-800'">
+             <img
+               v-if="avatarUrl(user_profiles.avatar)"
+               :src="avatarUrl(user_profiles.avatar)"
+               class="w-full h-full object-cover"
              />
              <span v-else class="text-6xl font-black text-slate-400 select-none">
                 {{ getInitial(user_profiles.user.name) }}
@@ -404,22 +422,22 @@ onMounted(loadAll)
           </div>
         </div>
 
-        <div class="flex flex-col flex-grow text-center md:text-left w-full mt-2">
-          <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-            <h1 class="text-3xl md:text-5xl font-black text-white uppercase italic leading-none tracking-tighter">
+        <div class="flex flex-col flex-grow text-center sm:text-left w-full" :class="user_profiles.background ? 'mb-0 pb-2' : 'mt-2'">
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+            <h1 class="text-2xl sm:text-3xl md:text-5xl font-black text-white uppercase italic leading-none tracking-tighter">
                 {{ user_profiles.user.name }}
             </h1>
-            
-            <button 
+
+            <button
               v-if="auth.user?.id === user_profiles.user.id"
-              @click="isEditProfileModalOpen = true" 
+              @click="isEditProfileModalOpen = true"
               class="bg-brand hover:bg-slate-800 text-white font-bold py-1.5 px-4 rounded shadow-lg disabled:opacity-50 transition-all uppercase tracking-widest text-[10px]"
             >
               Editar Perfil
             </button>
           </div>
-          
-          <div class="flex items-center justify-center md:justify-start gap-2 text-brand font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs my-3">
+
+          <div class="flex items-center justify-center sm:justify-start gap-2 text-brand font-bold uppercase tracking-[0.15em] text-[10px] md:text-xs my-2 md:my-3">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
               </svg>
@@ -431,12 +449,12 @@ onMounted(loadAll)
           </div>
 
           <div v-if="auth.user && auth.user.id !== user_profiles.user.id" class="mt-6 flex justify-center md:justify-start">
-            <button 
-              @click="toggleFollow" 
+            <button
+              @click="toggleFollow"
               :disabled="savingFollow"
               class="font-black py-2 px-8 rounded-full shadow-lg transition-all uppercase tracking-[0.15em] text-[10px] flex items-center gap-2 group border border-transparent"
-              :class="isFollowing 
-                ? 'bg-slate-800 text-slate-400 border-slate-700 hover:border-red-900/50 hover:text-red-400' 
+              :class="isFollowing
+                ? 'bg-slate-800 text-slate-400 border-slate-700 hover:border-red-900/50 hover:text-red-400'
                 : 'bg-[#BE2B0C] text-white hover:bg-[#a3240a]'"
             >
               <span v-if="savingFollow" class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
@@ -449,11 +467,11 @@ onMounted(loadAll)
         </div>
       </header>
 
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16">
         
         <div class="lg:col-span-8 flex flex-col gap-10 order-2 lg:order-1">
           
-          <section v-if="userData_fromFilmsActions" class="grid grid-cols-2 md:grid-cols-4 gap-4 border-y border-slate-800 py-6">
+          <section v-if="userData_fromFilmsActions" class="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 border-y border-slate-800 py-4 sm:py-6">
              <div class="text-center border-r border-slate-800/30">
                <p class="text-2xl md:text-3xl font-black text-white">{{ userData_fromFilmsActions.stats.films_seen }}</p>
                <p class="text-[9px] md:text-[10px] uppercase tracking-widest font-bold text-slate-500">Películas</p>
@@ -584,29 +602,35 @@ onMounted(loadAll)
              <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
                 <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 italic">Comunidad</h2>
                 
+                <!-- Menú tres puntos: solo para usuarios autenticados viendo un perfil ajeno -->
                 <div v-if="auth.user && auth.user.id !== user_profiles.user.id" class="relative">
                    <button @click="isMenuOpen = !isMenuOpen" class="text-slate-500 hover:text-white transition-colors p-1">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
                       </svg>
                    </button>
-                   
                    <div v-if="isMenuOpen" class="absolute right-0 top-full mt-2 w-48 bg-[#1a1f26] border border-slate-700 rounded shadow-xl z-50 overflow-hidden">
-                      <button 
-                        @click="blockUser" 
+                      <button
+                        @click="blockUser"
                         :disabled="isBlocking"
-                        class="w-full text-left px-4 py-3 text-[10px] uppercase font-bold text-red-400 hover:bg-slate-800 transition-colors border-b border-slate-800"
+                        class="w-full text-left px-4 py-3 text-[10px] uppercase font-bold text-red-400 hover:bg-slate-800 transition-colors"
                       >
                          {{ isBlocking ? 'Bloqueando...' : 'Bloquear usuario' }}
                       </button>
-                      <button 
-                        @click="showBlockedList" 
-                        class="w-full text-left px-4 py-3 text-[10px] uppercase font-bold text-slate-400 hover:bg-slate-800 transition-colors"
-                      >
-                         Mostrar lista de bloqueados
-                      </button>
                    </div>
                 </div>
+
+                <!-- Botón bloqueados: solo visible en el propio perfil -->
+                <button
+                  v-if="auth.user && auth.user.id === user_profiles.user.id"
+                  @click="showBlockedList"
+                  class="text-slate-500 hover:text-white transition-colors p-1"
+                  title="Lista de bloqueados"
+                >
+                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                     <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                   </svg>
+                </button>
              </div>
 
              <div class="grid grid-cols-2 gap-4 h-auto max-h-[300px]">
@@ -619,16 +643,16 @@ onMounted(loadAll)
 
                     <div class="overflow-y-auto brand-scroll pr-1 flex-grow">
                         <div class="grid grid-cols-3 gap-2 justify-items-center px-1 py-1">
-                           <div 
-                              v-for="user in followers" 
+                           <div
+                              v-for="user in followers"
                               :key="user.id"
-                              @click="goToProfile(user.id)"
+                              @click="goToProfile(user.name)"
                               class="flex flex-col items-center gap-1 group cursor-pointer w-full"
                             >
                                 <div class="w-9 h-9 flex-shrink-0 rounded-full overflow-hidden border border-slate-700 shadow-sm group-hover:ring-2 group-hover:ring-brand transition-all">
                                     <img
-                                      v-if="user.avatar || (user.profile && user.profile.avatar)"
-                                      :src="user.avatar ? `/storage/${user.avatar}` : `/storage/${user.profile.avatar}`"
+                                      v-if="avatarUrl(user.avatar || user.profile?.avatar)"
+                                      :src="avatarUrl(user.avatar || user.profile?.avatar)"
                                       class="w-full h-full object-cover"
                                     />
                                     <div v-else class="w-full h-full bg-slate-700 flex items-center justify-center">
@@ -653,16 +677,16 @@ onMounted(loadAll)
 
                     <div class="overflow-y-auto brand-scroll pr-1 flex-grow">
                         <div class="grid grid-cols-3 gap-2 justify-items-center px-1 py-1">
-                           <div 
-                              v-for="user in followings" 
+                           <div
+                              v-for="user in followings"
                               :key="user.id"
-                              @click="goToProfile(user.id)"
+                              @click="goToProfile(user.name)"
                               class="flex flex-col items-center gap-1 group cursor-pointer w-full"
                             >
                                 <div class="w-9 h-9 flex-shrink-0 rounded-full overflow-hidden border border-slate-700 shadow-sm group-hover:ring-2 group-hover:ring-brand transition-all">
                                     <img
-                                      v-if="user.avatar || (user.profile && user.profile.avatar)"
-                                      :src="user.avatar ? `/storage/${user.avatar}` : `/storage/${user.profile.avatar}`"
+                                      v-if="avatarUrl(user.avatar || user.profile?.avatar)"
+                                      :src="avatarUrl(user.avatar || user.profile?.avatar)"
                                       class="w-full h-full object-cover"
                                     />
                                     <div v-else class="w-full h-full bg-slate-700 flex items-center justify-center">
@@ -684,7 +708,7 @@ onMounted(loadAll)
 
           <section class="bg-slate-900/20 p-6 rounded-2xl border border-slate-800/50">
             <div class="flex items-center justify-between mb-8 border-b border-slate-800 pb-2">
-              <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-green-500 italic w-full text-center">Diary Film</h2>
+              <h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-400/80 italic w-full text-center">Filmoteca Visionada</h2>
             </div>
 
             <div v-if="userDiary.length > 0" class="flex flex-col gap-8">
@@ -717,17 +741,27 @@ onMounted(loadAll)
                           {{ diaryFilm.film?.title }}
                         </h4>
                         
-                        <div class="flex items-center gap-1.5 mt-1">
-                          <svg v-if="diaryFilm.rating" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3 text-[#D08700]" title="Puntuada">
-                            <path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clip-rule="evenodd" />
-                          </svg>
-                          <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3 text-[#00c020]" title="Vista">
-                            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-                            <path fill-rule="evenodd" d="M1.323 11.447C2.811 6.976 7.028 3.75 12.001 3.75c4.97 0 9.185 3.223 10.675 7.69.12.362.12.752 0 1.113-1.487 4.471-5.705 7.697-10.677 7.697-4.97 0-9.186-3.223-10.675-7.69a1.762 1.762 0 0 1 0-1.113ZM17.25 12a5.25 5.25 0 1 1-10.5 0 5.25 5.25 0 0 1 10.5 0Z" clip-rule="evenodd" />
-                          </svg>
-                          <svg v-if="diaryFilm.is_favorite" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3 text-brand" title="Favorita">
-                            <path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
-                          </svg>
+                        <div class="flex items-center gap-1 mt-1.5">
+                          <!-- Visto + puntuado -->
+                          <span v-if="diaryFilm.rating" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-700/40 border border-slate-700/60">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-slate-400" title="Puntuada">
+                              <path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clip-rule="evenodd" />
+                            </svg>
+                            <span class="text-[9px] font-black text-slate-400 leading-none">{{ diaryFilm.rating }}</span>
+                          </span>
+                          <!-- Solo visto -->
+                          <span v-else class="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-700/40 border border-slate-700/60">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-slate-400" title="Vista">
+                              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                              <path fill-rule="evenodd" d="M1.323 11.447C2.811 6.976 7.028 3.75 12.001 3.75c4.97 0 9.185 3.223 10.675 7.69.12.362.12.752 0 1.113-1.487 4.471-5.705 7.697-10.677 7.697-4.97 0-9.186-3.223-10.675-7.69a1.762 1.762 0 0 1 0-1.113ZM17.25 12a5.25 5.25 0 1 1-10.5 0 5.25 5.25 0 0 1 10.5 0Z" clip-rule="evenodd" />
+                            </svg>
+                          </span>
+                          <!-- Favorita -->
+                          <span v-if="diaryFilm.is_favorite" class="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-700/40 border border-slate-700/60">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-slate-400" title="Favorita">
+                              <path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
+                            </svg>
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -756,7 +790,7 @@ onMounted(loadAll)
               <span class="text-[9px] font-bold text-slate-500">{{ userWatchlist.length }} FILMS</span>
             </div>
             
-            <div v-if="userWatchlist.length > 0" class="grid grid-cols-4 gap-2">
+            <div v-if="userWatchlist.length > 0" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                 <div 
                   v-for="item in userWatchlist.slice(0, 16)" 
                   :key="item.id" 
@@ -777,11 +811,13 @@ onMounted(loadAll)
         </aside>
 
       </div>
-    </div>
+
+      </div><!-- /content-wrap -->
+    </template>
 
     <EditProfileModal
       v-model="isEditProfileModalOpen"
-      :userId="route.params.id"
+      :userId="user_profiles?.user_id"
       :initialData="user_profiles"
       @updated="loadAll"
     />
@@ -816,7 +852,7 @@ onMounted(loadAll)
               class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/[0.02] border border-white/5"
             >
               <div class="w-8 h-8 rounded-full bg-slate-700 border border-slate-600 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                <img v-if="user.profile?.avatar" :src="`/storage/${user.profile.avatar}`" class="w-full h-full object-cover" />
+                <img v-if="avatarUrl(user.profile?.avatar)" :src="avatarUrl(user.profile?.avatar)" class="w-full h-full object-cover" />
                 <span v-else class="text-[10px] font-bold text-white select-none">{{ getInitial(user.name) }}</span>
               </div>
               <span class="flex-1 text-[11px] font-bold text-slate-300 truncate">{{ user.name }}</span>
@@ -851,16 +887,19 @@ onMounted(loadAll)
 
 /* Scrollbar */
 .brand-scroll::-webkit-scrollbar {
-    height: 4px;
-    width: 4px;
+    height: 3px;
+    width: 3px;
 }
 .brand-scroll::-webkit-scrollbar-track {
-    background: #1e293b; 
+    background: transparent;
     border-radius: 10px;
 }
 .brand-scroll::-webkit-scrollbar-thumb {
-    background: #de6f25; 
+    background: #334155;
     border-radius: 10px;
+}
+.brand-scroll::-webkit-scrollbar-thumb:hover {
+    background: #475569;
 }
 
 /* RTL para scrolls horizontales */

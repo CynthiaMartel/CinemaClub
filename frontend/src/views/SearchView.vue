@@ -2,6 +2,7 @@
 import { ref, watch, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
+import { avatarUrl } from '@/composables/useAvatar'
 
 const route  = useRoute()
 const router = useRouter()
@@ -17,12 +18,25 @@ const totalLists   = computed(() => results.value.entries.filter(e => e.type ===
 const totalReviews = computed(() => results.value.entries.filter(e => e.type === 'user_review').length)
 const totalPosts   = computed(() => results.value.posts.length)
 
+const activeFilter = ref('todos')
+
 const allResults = computed(() => [
   ...results.value.films,
   ...results.value.users,
   ...results.value.entries,
   ...results.value.posts,
 ])
+
+const filteredResults = computed(() => {
+  if (activeFilter.value === 'todos')    return allResults.value
+  if (activeFilter.value === 'films')    return results.value.films
+  if (activeFilter.value === 'reviews')  return results.value.entries.filter(e => e.type === 'user_review')
+  if (activeFilter.value === 'debates')  return results.value.entries.filter(e => e.type === 'user_debate')
+  if (activeFilter.value === 'listas')   return results.value.entries.filter(e => e.type === 'user_list')
+  if (activeFilter.value === 'noticias') return results.value.posts
+  if (activeFilter.value === 'comunidad') return results.value.users
+  return allResults.value
+})
 
 const fetchResults = async () => {
   const q = query.value.trim()
@@ -39,17 +53,12 @@ const fetchResults = async () => {
 }
 
 const goFilm    = (id) => router.push({ name: 'film-detail', params: { id } })
-const goUser    = (id) => router.push({ name: 'user-profile', params: { id } })
+const goUser    = (name) => router.push({ name: 'user-profile', params: { username: name } })
 const goEntry   = (type, id) => router.push(`/entry/${type}/${id}`)
 const goPost    = (id) => router.push(`/post-reed/${id}`)
 
 const filterByCategory = (cat) => {
-  if (cat === 'films')    router.push({ name: 'FilmsFeed' })
-  if (cat === 'debates')  router.push({ name: 'entry-feed', query: { tab: 'user_debate' } })
-  if (cat === 'listas')   router.push({ name: 'entry-feed', query: { tab: 'user_list' } })
-  if (cat === 'reviews')  router.push({ name: 'entry-feed', query: { tab: 'user_review' } })
-  if (cat === 'noticias') router.push({ name: 'post-feed' })
-  if (cat === 'comunidad') router.push({ name: 'entry-feed' })
+  activeFilter.value = activeFilter.value === cat ? 'todos' : cat
 }
 
 const handleKeydown = (e) => {
@@ -81,13 +90,14 @@ const typeColor = (type) => {
 
 const goToResult = (item) => {
   if (item.type === 'film')        goFilm(item.id)
-  else if (item.type === 'user')   goUser(item.id)
+  else if (item.type === 'user')   goUser(item.name)
   else if (item.type === 'post')   goPost(item.id)
   else                             goEntry(item.type, item.id)
 }
 
 watch(() => route.query.q, (val) => {
   query.value = val || ''
+  activeFilter.value = 'todos'
   fetchResults()
 })
 
@@ -132,10 +142,10 @@ onMounted(fetchResults)
       </div>
 
       <!-- Resultados + categorías -->
-      <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+      <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
 
         <!-- IZQUIERDA: resultados mezclados -->
-        <div class="lg:col-span-8">
+        <div class="lg:col-span-8 order-2 lg:order-1">
 
           <div v-if="loading && allResults.length === 0" class="grid grid-cols-2 sm:grid-cols-3 gap-6">
             <div v-for="i in 6" :key="i" class="h-40 bg-slate-800 rounded-xl animate-pulse"></div>
@@ -147,7 +157,7 @@ onMounted(fetchResults)
 
           <div v-else class="flex flex-col gap-3">
             <div
-              v-for="item in allResults" :key="`${item.type}-${item.id}`"
+              v-for="item in filteredResults" :key="`${item.type}-${item.id}`"
               @click="goToResult(item)"
               class="flex items-center gap-4 p-3 rounded-xl border border-slate-800/50 hover:border-slate-700 hover:bg-slate-900/40 cursor-pointer transition-all group"
             >
@@ -156,8 +166,8 @@ onMounted(fetchResults)
                 <template v-if="item.type === 'user'">
                   <div class="w-full h-full flex items-center justify-center bg-slate-700">
                     <img
-                      v-if="item.avatar"
-                      :src="`/storage/${item.avatar}`"
+                      v-if="avatarUrl(item.avatar)"
+                      :src="avatarUrl(item.avatar)"
                       class="w-full h-full object-cover"
                     />
                     <span v-else class="text-lg font-black text-white">{{ item.title[0]?.toUpperCase() }}</span>
@@ -204,58 +214,127 @@ onMounted(fetchResults)
         </div>
 
         <!-- DERECHA: buscar por categoría -->
-        <aside class="lg:col-span-4">
-          <div class="sticky top-24">
-            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4 border-b border-slate-800 pb-3">
-              Buscar resultados para
+        <aside class="lg:col-span-4 order-1 lg:order-2">
+          <div class="lg:sticky lg:top-24">
+            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 border-b border-slate-800 pb-3">
+              Filtrar por categoría
             </p>
 
-            <div class="flex flex-col gap-2">
+            <!-- Móvil: scroll horizontal -->
+            <div class="flex lg:hidden gap-2 overflow-x-auto pb-2 brand-scroll-h">
+              <button @click="activeFilter = 'todos'"
+                :class="['flex-shrink-0 px-3 py-2 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all',
+                  activeFilter === 'todos' ? 'border-slate-500 bg-slate-800/70 text-white' : 'border-slate-800 text-slate-400']">
+                Todos <span class="ml-1 text-slate-500">{{ allResults.length }}</span>
+              </button>
+              <button v-if="totalFilms > 0" @click="filterByCategory('films')"
+                :class="['flex-shrink-0 px-3 py-2 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all',
+                  activeFilter === 'films' ? 'border-brand/60 bg-slate-900/70 text-white' : 'border-slate-800 text-slate-400']">
+                Films <span class="ml-1 text-brand">{{ totalFilms }}</span>
+              </button>
+              <button v-if="totalReviews > 0" @click="filterByCategory('reviews')"
+                :class="['flex-shrink-0 px-3 py-2 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all',
+                  activeFilter === 'reviews' ? 'border-red-500/50 bg-slate-900/70 text-white' : 'border-slate-800 text-slate-400']">
+                Reviews <span class="ml-1 text-red-400">{{ totalReviews }}</span>
+              </button>
+              <button v-if="totalDebates > 0" @click="filterByCategory('debates')"
+                :class="['flex-shrink-0 px-3 py-2 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all',
+                  activeFilter === 'debates' ? 'border-orange-500/50 bg-slate-900/70 text-white' : 'border-slate-800 text-slate-400']">
+                Debates <span class="ml-1 text-orange-400">{{ totalDebates }}</span>
+              </button>
+              <button v-if="totalLists > 0" @click="filterByCategory('listas')"
+                :class="['flex-shrink-0 px-3 py-2 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all',
+                  activeFilter === 'listas' ? 'border-yellow-500/50 bg-slate-900/70 text-white' : 'border-slate-800 text-slate-400']">
+                Listas <span class="ml-1 text-yellow-500">{{ totalLists }}</span>
+              </button>
+              <button v-if="totalPosts > 0" @click="filterByCategory('noticias')"
+                :class="['flex-shrink-0 px-3 py-2 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all',
+                  activeFilter === 'noticias' ? 'border-slate-500/50 bg-slate-900/70 text-white' : 'border-slate-800 text-slate-400']">
+                Noticias <span class="ml-1 text-slate-400">{{ totalPosts }}</span>
+              </button>
+              <button v-if="totalUsers > 0" @click="filterByCategory('comunidad')"
+                :class="['flex-shrink-0 px-3 py-2 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all',
+                  activeFilter === 'comunidad' ? 'border-emerald-500/50 bg-slate-900/70 text-white' : 'border-slate-800 text-slate-400']">
+                Usuarios <span class="ml-1 text-emerald-400">{{ totalUsers }}</span>
+              </button>
+            </div>
+
+            <!-- Desktop: lista vertical -->
+            <div class="hidden lg:flex flex-col gap-2">
+              <button
+                @click="activeFilter = 'todos'"
+                :class="['flex items-center justify-between px-4 py-3 rounded-lg border transition-all text-left',
+                  activeFilter === 'todos'
+                    ? 'border-slate-500 bg-slate-800/70'
+                    : 'border-slate-800 hover:border-slate-600 hover:bg-slate-900/50']"
+              >
+                <span :class="['text-[11px] font-black uppercase tracking-widest transition-colors', activeFilter === 'todos' ? 'text-white' : 'text-slate-300']">Todos</span>
+                <span class="text-[10px] font-black text-slate-400">{{ allResults.length }}</span>
+              </button>
+
               <button
                 @click="filterByCategory('films')"
-                class="flex items-center justify-between px-4 py-3 rounded-lg border border-slate-800 hover:border-brand/50 hover:bg-slate-900/50 transition-all group text-left"
+                :class="['flex items-center justify-between px-4 py-3 rounded-lg border transition-all text-left',
+                  activeFilter === 'films'
+                    ? 'border-brand/60 bg-slate-900/70'
+                    : 'border-slate-800 hover:border-brand/50 hover:bg-slate-900/50']"
               >
-                <span class="text-[11px] font-black uppercase tracking-widest text-slate-300 group-hover:text-white transition-colors">Films</span>
+                <span :class="['text-[11px] font-black uppercase tracking-widest transition-colors', activeFilter === 'films' ? 'text-white' : 'text-slate-300']">Films</span>
                 <span v-if="totalFilms > 0" class="text-[10px] font-black text-brand">{{ totalFilms }}</span>
               </button>
 
               <button
                 @click="filterByCategory('reviews')"
-                class="flex items-center justify-between px-4 py-3 rounded-lg border border-slate-800 hover:border-red-500/30 hover:bg-slate-900/50 transition-all group text-left"
+                :class="['flex items-center justify-between px-4 py-3 rounded-lg border transition-all text-left',
+                  activeFilter === 'reviews'
+                    ? 'border-red-500/50 bg-slate-900/70'
+                    : 'border-slate-800 hover:border-red-500/30 hover:bg-slate-900/50']"
               >
-                <span class="text-[11px] font-black uppercase tracking-widest text-slate-300 group-hover:text-white transition-colors">Reviews</span>
+                <span :class="['text-[11px] font-black uppercase tracking-widest transition-colors', activeFilter === 'reviews' ? 'text-white' : 'text-slate-300']">Reviews</span>
                 <span v-if="totalReviews > 0" class="text-[10px] font-black text-red-400">{{ totalReviews }}</span>
               </button>
 
               <button
                 @click="filterByCategory('debates')"
-                class="flex items-center justify-between px-4 py-3 rounded-lg border border-slate-800 hover:border-orange-500/30 hover:bg-slate-900/50 transition-all group text-left"
+                :class="['flex items-center justify-between px-4 py-3 rounded-lg border transition-all text-left',
+                  activeFilter === 'debates'
+                    ? 'border-orange-500/50 bg-slate-900/70'
+                    : 'border-slate-800 hover:border-orange-500/30 hover:bg-slate-900/50']"
               >
-                <span class="text-[11px] font-black uppercase tracking-widest text-slate-300 group-hover:text-white transition-colors">Debates</span>
+                <span :class="['text-[11px] font-black uppercase tracking-widest transition-colors', activeFilter === 'debates' ? 'text-white' : 'text-slate-300']">Debates</span>
                 <span v-if="totalDebates > 0" class="text-[10px] font-black text-orange-400">{{ totalDebates }}</span>
               </button>
 
               <button
                 @click="filterByCategory('listas')"
-                class="flex items-center justify-between px-4 py-3 rounded-lg border border-slate-800 hover:border-yellow-500/30 hover:bg-slate-900/50 transition-all group text-left"
+                :class="['flex items-center justify-between px-4 py-3 rounded-lg border transition-all text-left',
+                  activeFilter === 'listas'
+                    ? 'border-yellow-500/50 bg-slate-900/70'
+                    : 'border-slate-800 hover:border-yellow-500/30 hover:bg-slate-900/50']"
               >
-                <span class="text-[11px] font-black uppercase tracking-widest text-slate-300 group-hover:text-white transition-colors">Listas</span>
+                <span :class="['text-[11px] font-black uppercase tracking-widest transition-colors', activeFilter === 'listas' ? 'text-white' : 'text-slate-300']">Listas</span>
                 <span v-if="totalLists > 0" class="text-[10px] font-black text-yellow-500">{{ totalLists }}</span>
               </button>
 
               <button
                 @click="filterByCategory('noticias')"
-                class="flex items-center justify-between px-4 py-3 rounded-lg border border-slate-800 hover:border-slate-500/30 hover:bg-slate-900/50 transition-all group text-left"
+                :class="['flex items-center justify-between px-4 py-3 rounded-lg border transition-all text-left',
+                  activeFilter === 'noticias'
+                    ? 'border-slate-500/50 bg-slate-900/70'
+                    : 'border-slate-800 hover:border-slate-500/30 hover:bg-slate-900/50']"
               >
-                <span class="text-[11px] font-black uppercase tracking-widest text-slate-300 group-hover:text-white transition-colors">Noticias</span>
+                <span :class="['text-[11px] font-black uppercase tracking-widest transition-colors', activeFilter === 'noticias' ? 'text-white' : 'text-slate-300']">Noticias</span>
                 <span v-if="totalPosts > 0" class="text-[10px] font-black text-slate-400">{{ totalPosts }}</span>
               </button>
 
               <button
                 @click="filterByCategory('comunidad')"
-                class="flex items-center justify-between px-4 py-3 rounded-lg border border-slate-800 hover:border-emerald-500/30 hover:bg-slate-900/50 transition-all group text-left"
+                :class="['flex items-center justify-between px-4 py-3 rounded-lg border transition-all text-left',
+                  activeFilter === 'comunidad'
+                    ? 'border-emerald-500/50 bg-slate-900/70'
+                    : 'border-slate-800 hover:border-emerald-500/30 hover:bg-slate-900/50']"
               >
-                <span class="text-[11px] font-black uppercase tracking-widest text-slate-300 group-hover:text-white transition-colors">Usuarios</span>
+                <span :class="['text-[11px] font-black uppercase tracking-widest transition-colors', activeFilter === 'comunidad' ? 'text-white' : 'text-slate-300']">Usuarios</span>
                 <span v-if="totalUsers > 0" class="text-[10px] font-black text-emerald-400">{{ totalUsers }}</span>
               </button>
             </div>
@@ -273,4 +352,6 @@ onMounted(fetchResults)
   margin-left: auto;
   margin-right: auto;
 }
+
+.brand-scroll-h::-webkit-scrollbar { height: 0px; }
 </style>

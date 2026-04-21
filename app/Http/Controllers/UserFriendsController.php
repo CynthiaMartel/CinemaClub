@@ -136,10 +136,18 @@ class UserFriendsController extends Controller
     }
 
     // VER Lista de usuarios que user sigu-. FOLLOWERS
-     
-    public function followings($user_id = null)
+
+    public function followings($username = null)
     {
-        $user_id = $user_id ?? Auth::id();
+        if (!$username) {
+            $user_id = Auth::id();
+        } else {
+            $targetUser = User::where('name', $username)->first();
+            if (!$targetUser) {
+                return response()->json(['error' => 'Usuario no encontrado.'], 404);
+            }
+            $user_id = $targetUser->id;
+        }
 
         $followings = UserFriend::where('follower_id', $user_id)
             ->where('status', 'accepted')
@@ -152,9 +160,17 @@ class UserFriendsController extends Controller
 
     // VER lista de FOLLOWINGS
 
-    public function followers($user_id = null)
+    public function followers($username = null)
     {
-        $user_id = $user_id ?? Auth::id();
+        if (!$username) {
+            $user_id = Auth::id();
+        } else {
+            $targetUser = User::where('name', $username)->first();
+            if (!$targetUser) {
+                return response()->json(['error' => 'Usuario no encontrado.'], 404);
+            }
+            $user_id = $targetUser->id;
+        }
 
         $followers = UserFriend::where('followed_id', $user_id)
             ->where('status', 'accepted')

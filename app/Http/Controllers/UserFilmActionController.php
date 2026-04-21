@@ -48,9 +48,17 @@ class UserFilmActionController extends Controller
     }
     
     // MOSTRAR DIARIO / WATCHLIST / FAVORITOS
-    public function showUserFilmDiary(Request $request, $user_id = null): JsonResponse
+    public function showUserFilmDiary(Request $request, $username = null): JsonResponse
     {
-        $targetId = $user_id ?? Auth::id();
+        if (!$username) {
+            $targetId = Auth::id();
+        } else {
+            $targetUser = User::where('name', $username)->first();
+            if (!$targetUser) {
+                return response()->json(['error' => 'Usuario no encontrado.'], 404);
+            }
+            $targetId = $targetUser->id;
+        }
         $type = $request->query('type');
         $perPage = $request->query('per_page', 20); 
 
@@ -183,12 +191,19 @@ class UserFilmActionController extends Controller
     }
     
     // MOSTRAR ESTADÍSTICAS
-    public function showStats($userId = null) 
+    public function showStats($username = null)
     {
-        $targetId = $userId ?? Auth::id();
-
-        if (!$targetId) {
-            return response()->json(['error' => 'Usuario no encontrado.'], 404);
+        if (!$username) {
+            $targetId = Auth::id();
+            if (!$targetId) {
+                return response()->json(['error' => 'Usuario no encontrado.'], 404);
+            }
+        } else {
+            $targetUser = User::where('name', $username)->first();
+            if (!$targetUser) {
+                return response()->json(['error' => 'Usuario no encontrado.'], 404);
+            }
+            $targetId = $targetUser->id;
         }
 
         $userStats = User::where('id', $targetId)

@@ -22,10 +22,10 @@ const routes = [
     component: FilmDetailView,
   },
   {
-    path: '/profile/:id',
+    path: '/profile/:username',
     name: 'user-profile',
     component: UserProfile,
-    props: true // permite que el id llegue como prop a la vista
+    props: true
   },
   {
   path: '/entry/:type/:id', 
@@ -34,7 +34,7 @@ const routes = [
   props: true // Esto permite pasar los parámetros como variables automática
   },
   {
-  path: '/create-entry/:id', 
+  path: '/create-entry/:id?',
   name: 'create-entry',
   component: EntryFormView,
   props: true // Esto permite pasar los parámetros como variables automática
@@ -76,12 +76,43 @@ const routes = [
   
 
 
+  {
+    path: '/recomendador',
+    name: 'recommender',
+    component: () => import('@/views/RecommenderView.vue'),
+  },
+
+  {
+    path: '/editorial/inbox',
+    name: 'editorial-inbox',
+    component: () => import('@/views/EditorialInboxView.vue'),
+    meta: { requiresAuth: true },
+  },
+
+  {
+    path: '/editorial/sources',
+    name: 'editorial-sources',
+    component: () => import('@/views/EditorialSourcesView.vue'),
+    meta: { requiresAuth: true },
+  },
+
+  {
+    path: '/editorial/write/:id',
+    name: 'editorial-write',
+    component: () => import('@/views/EditorialWriteView.vue'),
+    props: true,
+    meta: { requiresAuth: true },
+  },
+
   // ******aquí van más rutas después: noticias, perfil, etc.
 ]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
+  scrollBehavior() {
+    return { top: 0, behavior: 'instant' }
+  },
 })
 
 // Guard : proteger rutas que requieran auth******************

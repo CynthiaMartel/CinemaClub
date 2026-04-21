@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
 import LoginModal from '@/components/LoginModal.vue'
+import { avatarUrl } from '@/composables/useAvatar'
 
 // --- SETUP ---
 const route = useRoute()
@@ -54,7 +55,7 @@ const formatDate = (dateString) => {
 }
 
 const goBack = () => router.back()
-const goProfile = (userId) => router.push({ name: 'user-profile', params: { id: userId } })
+const goProfile = (username) => router.push({ name: 'user-profile', params: { username } })
 
 // --- MÉTODOS DE COMENTARIOS ---
 const openLogin = () => { isLoginOpen.value = true }
@@ -109,7 +110,7 @@ watch(() => route.params.id, () => {
 <template>
   <div class="min-h-screen w-full bg-[#14181c] text-[#9ab] font-sans overflow-x-hidden selection:bg-[#BE2B0C]/40 pb-20">
     
-    <nav class="sticky top-0 z-50 bg-[#14181c]/90 backdrop-blur-md border-b border-white/5 px-6 py-4">
+    <nav class="sticky top-0 z-50 bg-[#14181c]/90 backdrop-blur-md border-b border-white/5 px-4 sm:px-6 py-4">
         <div class="content-wrap mx-auto max-w-[1100px] flex items-center justify-between">
             <button @click="goBack" class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-white transition-colors flex items-center gap-2">
                 &larr; Volver
@@ -226,16 +227,16 @@ watch(() => route.params.id, () => {
 
                 <div class="space-y-6">
                     <div v-for="comment in comments" :key="comment.id" class="flex gap-5 animate-fade-in group text-left">
-                        <div @click="goProfile(comment.user.id)"
+                        <div @click="goProfile(comment.user.name)"
                             class="w-11 h-11 bg-slate-800 rounded-full flex items-center justify-center text-[#BE2B0C] font-black shrink-0 border border-slate-700 text-lg shadow-md cursor-pointer hover:scale-105 transition-transform overflow-hidden">
-                            <img v-if="comment.user?.avatar" :src="`/storage/${comment.user.avatar}`" class="w-full h-full object-cover">
+                            <img v-if="avatarUrl(comment.user?.avatar)" :src="avatarUrl(comment.user?.avatar)" class="w-full h-full object-cover">
                             <span v-else>{{ comment.user?.name?.charAt(0).toUpperCase() || 'U' }}</span>
                         </div>
                         
                         <div class="flex-1">
                             <div class="bg-slate-800/30 border border-slate-800/60 p-5 rounded-2xl rounded-tl-none group-hover:border-slate-700 transition-colors">
                                 <div class="flex items-center justify-between mb-2">
-                                    <span @click="goProfile(comment.user.id)" class="text-white font-bold text-sm cursor-pointer hover:text-[#BE2B0C] transition-colors">
+                                    <span @click="goProfile(comment.user.name)" class="text-white font-bold text-sm cursor-pointer hover:text-[#BE2B0C] transition-colors">
                                         @{{ comment.user?.name }}
                                     </span>
                                     <span class="text-[9px] text-slate-500 uppercase font-black tracking-tighter">

@@ -49,6 +49,7 @@ class SearchController extends Controller
             ->get()
             ->map(fn($u) => [
                 'id'     => $u->id,
+                'name'   => $u->name,
                 'type'   => 'user',
                 'title'  => $u->name,
                 'avatar' => $u->profile?->avatar,

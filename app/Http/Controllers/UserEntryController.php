@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Models\UserEntry;
 use App\Models\UserEntryLike;
 use App\Models\UserProfile;
@@ -179,48 +180,78 @@ class UserEntryController extends Controller
 
     // MOSTRAR COLECCIÓN DE LISTS, DEBATES Y REVIEWS que el usuario haya creado
 
-    public function getCreatedLists($userId): JsonResponse
+    public function getCreatedLists($username): JsonResponse
     {
-        $lists = UserEntry::where('user_id', $userId)
+        $targetUser = User::where('name', $username)->firstOrFail();
+        $userId = $targetUser->id;
+
+        $authUser = Auth::guard('sanctum')->user();
+        $isOwner = $authUser && $authUser->id === $userId;
+        $isAdmin = $authUser && $authUser->isAdmin();
+
+        $query = UserEntry::where('user_id', $userId)
             ->where('type', 'user_list')
-            ->where('status', 'approved') // Opcional: solo las aprobadas si es para perfil público
-            ->with(['films:idFilm,frame']) 
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ->where('status', 'approved')
+            ->with(['films:idFilm,frame'])
+            ->orderBy('created_at', 'desc');
+
+        if (!$isOwner && !$isAdmin) {
+            $query->where('visibility', 'public');
+        }
 
         return response()->json([
             'success' => true,
-            'data' => $lists
+            'data' => $query->get()
         ], 200);
     }
 
-    public function getCreatedDebates($userId): JsonResponse
+    public function getCreatedDebates($username): JsonResponse
     {
-        $debates = UserEntry::where('user_id', $userId)
+        $targetUser = User::where('name', $username)->firstOrFail();
+        $userId = $targetUser->id;
+
+        $authUser = Auth::guard('sanctum')->user();
+        $isOwner = $authUser && $authUser->id === $userId;
+        $isAdmin = $authUser && $authUser->isAdmin();
+
+        $query = UserEntry::where('user_id', $userId)
             ->where('type', 'user_debate')
             ->where('status', 'approved')
-            ->with(['films:idFilm,frame']) // Por si el debate tiene pelis asociadas
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ->with(['films:idFilm,frame'])
+            ->orderBy('created_at', 'desc');
+
+        if (!$isOwner && !$isAdmin) {
+            $query->where('visibility', 'public');
+        }
 
         return response()->json([
             'success' => true,
-            'data' => $debates
+            'data' => $query->get()
         ], 200);
     }
 
-    public function getCreatedReviews($userId): JsonResponse
+    public function getCreatedReviews($username): JsonResponse
     {
-        $reviews = UserEntry::where('user_id', $userId)
+        $targetUser = User::where('name', $username)->firstOrFail();
+        $userId = $targetUser->id;
+
+        $authUser = Auth::guard('sanctum')->user();
+        $isOwner = $authUser && $authUser->id === $userId;
+        $isAdmin = $authUser && $authUser->isAdmin();
+
+        $query = UserEntry::where('user_id', $userId)
             ->where('type', 'user_review')
             ->where('status', 'approved')
-            ->with(['films:idFilm,frame']) 
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ->with(['films:idFilm,frame'])
+            ->orderBy('created_at', 'desc');
+
+        if (!$isOwner && !$isAdmin) {
+            $query->where('visibility', 'public');
+        }
 
         return response()->json([
             'success' => true,
-            'data' => $reviews
+            'data' => $query->get()
         ], 200);
     }
   
