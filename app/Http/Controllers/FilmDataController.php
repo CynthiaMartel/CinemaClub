@@ -162,8 +162,10 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
 
                 Log::info("Insertando película en BD: {$details['title']}");
 
+                $existingFilm = Film::where('tmdb_id', $movie['id'])->first();
+
                 $film = Film::updateOrCreate(
-                ['tmdb_id' => $movie['id']], 
+                ['tmdb_id' => $movie['id']],
                 [
                     'wikidata_id'        => $wikidataId, 
                     'title'              => $details['title'] ?? 'Sin título',
@@ -175,7 +177,7 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
                     'duration'           => $details['runtime'] ?? 0,
                     'release_date'       => $details['release_date'] ?? now(),
                     'frame'              => !empty($details['poster_path']) ? "https://image.tmdb.org/t/p/w500" . $details['poster_path'] : '',
-                    'backdrop' => !empty($details['backdrop_path']) ? "https://image.tmdb.org/t/p/original" . $details['backdrop_path'] : ($film->backdrop ?? ''), // <--- MANTIENE EL ANTERIOR SI EL NUEVO ESTÁ VACÍO
+                    'backdrop' => !empty($details['backdrop_path']) ? "https://image.tmdb.org/t/p/original" . $details['backdrop_path'] : ($existingFilm?->backdrop ?? ''),
 
                     'awards'             => array_slice($wikidata['awards'], 0, 10),
                     'nominations'        => array_slice($wikidata['nominations'], 0, 10),

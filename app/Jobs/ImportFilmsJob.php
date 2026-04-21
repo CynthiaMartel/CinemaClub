@@ -34,7 +34,8 @@ class ImportFilmsJob implements ShouldQueue
     // Usamos estas propiedades nativas para que Laravel gestione los errores de forma automática
     public $tries = 3;         // Intentos totales si falla antes de marcarlo como "Failed"
     public $backoff = 30;      // Segundos a esperar entre reintentos automáticos
-    public $timeout = 600;     // 10 minutos máximo para evitar que el proceso se corte por tiempo
+    public $timeout = 1800;    // 30 minutos — necesario por las consultas lentas a Wikidata SPARQL
+                               // IMPORTANTE: arrancar el worker con: php artisan queue:work --timeout=1800
 
     public int $yearStart;
     public int $yearEnd;
