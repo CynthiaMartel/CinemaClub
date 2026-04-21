@@ -6,8 +6,8 @@ use App\Http\Requests\UserProfileRequest;
 use App\Models\UserProfile;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use App\Models\UserFriend;
 
 class UserProfileController extends Controller
@@ -50,10 +50,13 @@ class UserProfileController extends Controller
             $validated['top_films'] = json_decode($validated['top_films'], true);
         }
 
-        // Guardar avatar si se sube
+        // Subir avatar a Cloudinary si se adjunta
         if ($request->hasFile('avatar')) {
-            $path = $request->file('avatar')->store('avatars', 'public');
-            $validated['avatar'] = $path;
+            $result = Cloudinary::uploadApi()->upload($request->file('avatar')->getRealPath(), [
+                'folder'         => 'cinemaclub/avatars',
+                'transformation' => [['width' => 400, 'height' => 400, 'crop' => 'fill', 'gravity' => 'face']],
+            ]);
+            $validated['avatar'] = $result['secure_url'];
         }
 
         $profile = UserProfile::create($validated);
@@ -69,24 +72,22 @@ class UserProfileController extends Controller
      // - Si eres admin: puedes ver cualquier perfil pasando user_id
      // - Si eres el propio usuario logueado: puedes ver tu propio perfil
      
-   public function show($userId = null): JsonResponse
+   public function show($username = null): JsonResponse
     {
-        // INTENTAMOS OBTENER EL USUARIO DESDE EL TOKEN
-        // Usamos el guard sanctum
-        $authUser = Auth::guard('sanctum')->user(); 
+        $authUser = Auth::guard('sanctum')->user();
 
-        // Debug para ver en el log quién es quién (opcional, bórralo luego)
-        \Illuminate\Support\Facades\Log::info('Perfil Show Debug:', [
-             'Quien_mira_ID' => $authUser ? $authUser->id : 'INVITADO',
-             'Perfil_que_se_ve_ID' => $userId
-        ]);
-
-        // 2. Resolver el ID del perfil que queremos ver
-        if (!$userId) {
+        // Resolver el userId a partir del username o del token
+        if (!$username) {
             if (!$authUser) {
                 return response()->json(['error' => 'Usuario no especificado.'], 404);
             }
             $userId = $authUser->id;
+        } else {
+            $targetUser = User::where('name', $username)->first();
+            if (!$targetUser) {
+                return response()->json(['error' => 'Usuario no encontrado.'], 404);
+            }
+            $userId = $targetUser->id;
         }
 
         // LÓGICA DE BLOQUEO (Hard Block)
@@ -172,11 +173,16 @@ class UserProfileController extends Controller
         }
 
         if ($request->hasFile('avatar')) {
-            if ($profile->avatar && Storage::disk('public')->exists($profile->avatar)) {
-                Storage::disk('public')->delete($profile->avatar);
+            // Borrar imagen anterior de Cloudinary si existe
+            if ($profile->avatar && str_starts_with($profile->avatar, 'http')) {
+                $publicId = pathinfo(parse_url($profile->avatar, PHP_URL_PATH), PATHINFO_FILENAME);
+                Cloudinary::uploadApi()->destroy("cinemaclub/avatars/{$publicId}");
             }
-            $path = $request->file('avatar')->store('avatars', 'public');
-            $validated['avatar'] = $path;
+            $result = Cloudinary::uploadApi()->upload($request->file('avatar')->getRealPath(), [
+                'folder'         => 'cinemaclub/avatars',
+                'transformation' => [['width' => 400, 'height' => 400, 'crop' => 'fill', 'gravity' => 'face']],
+            ]);
+            $validated['avatar'] = $result['secure_url'];
         }
 
         $profile->update($validated);
@@ -207,9 +213,10 @@ class UserProfileController extends Controller
             return response()->json(['error' => 'No se encontró el perfil de este usuario.'], 404);
         }
 
-        // Si tiene avatar, eliminarlo del almacenamiento
-        if ($profile->avatar && Storage::disk('public')->exists($profile->avatar)) {
-            Storage::disk('public')->delete($profile->avatar);
+        // Si tiene avatar en Cloudinary, eliminarlo
+        if ($profile->avatar && str_starts_with($profile->avatar, 'http')) {
+            $publicId = pathinfo(parse_url($profile->avatar, PHP_URL_PATH), PATHINFO_FILENAME);
+            Cloudinary::uploadApi()->destroy("cinemaclub/avatars/{$publicId}");
         }
 
         $profile->delete();

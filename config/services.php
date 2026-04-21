@@ -35,8 +35,19 @@ return [
         ],
     ],
 
-    'tmdb' => [ // API TMDB 
+    'tmdb' => [ // API TMDB
     'key' => env('TMDB_API_KEY'),
+    ],
+
+    'openai' => [
+        'key' => env('OPENAI_API_KEY'),
+    ],
+
+    'cloudinary' => [
+        'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
+        'api_key'    => env('CLOUDINARY_API_KEY'),
+        'api_secret' => env('CLOUDINARY_API_SECRET'),
+        'url'        => env('CLOUDINARY_URL'),
     ],
 
 ];
