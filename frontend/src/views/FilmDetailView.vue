@@ -13,6 +13,7 @@ import RatingIt from '@/components/RatingIt.vue'
 import PersonModal from '@/components/CastCrewModal.vue'
 import FilmDetailsModal from '@/components/FilmDetailsModal.vue'
 import AddToListModal from '@/components/AddToListModal.vue'
+import WatchProviders from '@/components/WatchProviders.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -250,12 +251,14 @@ onMounted(fetchFilm)
                 </button>
               </div>
 
-              <div v-if="!auth.isAuthenticated" 
-                   @click="openLogin" 
+              <div v-if="!auth.isAuthenticated"
+                   @click="openLogin"
                    class="absolute inset-0 bg-slate-950/90 backdrop-blur-sm opacity-0 group-hover/actions:opacity-100 transition-all duration-300 flex items-center justify-center rounded-lg cursor-pointer p-4 text-center z-20">
                 <p class="text-[9px] font-black text-white uppercase tracking-[0.2em]">Login para interactuar</p>
               </div>
             </div>
+
+            <WatchProviders :filmId="film.idFilm" />
           </aside>
 
           <div class="flex flex-col pt-10 md:pt-20 max-w-full md:max-w-[800px]">
