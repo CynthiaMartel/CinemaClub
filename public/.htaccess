@@ -5,21 +5,27 @@
 
     RewriteEngine On
 
-    # Handle Authorization Header
+    # Pasar cabeceras de auth a PHP (necesario en algunos hostings compartidos)
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Handle X-XSRF-Token Header
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-    # Redirect Trailing Slashes If Not A Folder...
+    # Quitar trailing slash si no es directorio
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
-    # Send Requests To Front Controller...
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteRule ^ index.php [L]
+    # 1. Rutas de API y Sanctum → Laravel (index.php)
+    RewriteRule ^(api|sanctum)(/.*)?$ index.php [L,QSA]
+
+    # 2. Archivos y directorios que existen → servirlos directamente
+    #    (assets JS/CSS, imágenes, sw.js, manifest, etc.)
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # 3. Todo lo demás (rutas de Vue Router) → Vue SPA
+    RewriteRule ^ index.html [L]
 </IfModule>
