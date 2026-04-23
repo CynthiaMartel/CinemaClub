@@ -123,6 +123,19 @@ const routes = [
     meta: { requiresAuth: true },
   },
 
+  {
+    path: '/agenda',
+    name: 'agenda',
+    component: () => import('@/views/AgendaView.vue'),
+  },
+
+  {
+    path: '/events',
+    name: 'event-manager',
+    component: () => import('@/views/EventManagerView.vue'),
+    meta: { requiresAuth: true },
+  },
+
   // ******aquí van más rutas después: noticias, perfil, etc.
 ]
 

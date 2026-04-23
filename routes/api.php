@@ -26,6 +26,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\RecommenderController;
 use App\Http\Controllers\EditorialController;
+use App\Http\Controllers\EventController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -470,10 +471,43 @@ Route::prefix('editorial')->group(function () {
     Route::patch('/news-items/{id}/status',      [EditorialController::class, 'updateStatus']);
     Route::post('/news-items/{id}/create-draft', [EditorialController::class, 'createDraft']);
 
-    // Sources: listado, rastreo manual, rastreo global y toggle activa/pausada
+    // Sources: listado, rastreo manual, rastreo global, edición y toggle activa/pausada
     Route::get('/sources',                     [EditorialController::class, 'sources']);
     Route::post('/sources/check-all',          [EditorialController::class, 'checkAll']);
     Route::post('/sources/{id}/check-now',     [EditorialController::class, 'checkNow']);
     Route::patch('/sources/{id}/toggle',       [EditorialController::class, 'toggleSource']);
+    Route::patch('/sources/{id}',              [EditorialController::class, 'updateSource']);
+});
+
+/*
+|--------------------------------------------------------------------------
+|  -- EVENT MANAGER (Admin + Editor) --
+|--------------------------------------------------------------------------
+*/
+
+// Agenda pública: no requiere auth
+Route::get('/events/public', [EventController::class, 'publicIndex'])
+    ->name('api.events.public');
+
+Route::prefix('events')->group(function () {
+    // Listado con filtros y paginación
+    Route::get('/',                          [EventController::class, 'index']);
+    // Creación manual de evento
+    Route::post('/',                         [EventController::class, 'store']);
+    // Detalle de un evento
+    Route::get('/{id}',                      [EventController::class, 'show']);
+    // Cambiar estado (confirmed / rejected / needs_review / pending)
+    Route::patch('/{id}/status',             [EventController::class, 'updateStatus']);
+    // Editar datos del evento (corrección manual post-IA)
+    Route::patch('/{id}',                    [EventController::class, 'update']);
+    // Eliminar evento
+    Route::delete('/{id}',                   [EventController::class, 'destroy']);
+
+    // Fuentes de eventos
+    Route::get('/sources/list',              [EventController::class, 'sources']);
+    Route::post('/sources/{id}/check-now',   [EventController::class, 'checkNow']);
+    Route::patch('/sources/{id}',            [EventController::class, 'updateSource']);
+    // Procesamiento IA manual (síncrono)
+    Route::post('/process-ai',               [EventController::class, 'processAI']);
 });
 

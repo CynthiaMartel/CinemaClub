@@ -12,6 +12,7 @@ class NewsSource extends Model
         'name',
         'url',
         'type',
+        'purpose',
         'check_interval_hours',
         'last_checked_at',
         'is_active',
