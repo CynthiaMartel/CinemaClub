@@ -9,9 +9,41 @@ class FilmRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // ** Más adelante para limitar a Admin/Editor:
-        // return $this->user() && $this->user()->isAdminOrEditor();
-        return true;
+        return $this->user() && $this->user()->isAdminOrEditor();
+    }
+
+    /**
+     * Normaliza los campos numéricos con DEFAULT en BD (NOT NULL) antes de
+     * que lleguen a las reglas de validación. Así nunca se inserta NULL en
+     * una columna que no lo admite, evitando errores de integridad con MySQL
+     * en modo strict.
+     */
+    protected function prepareForValidation(): void
+    {
+        $intDefaults = [
+            'total_awards'      => 0,
+            'total_nominations' => 0,
+            'total_festivals'   => 0,
+        ];
+        $floatDefaults = [
+            'vote_average' => 0,
+            'globalRate'   => 0,
+        ];
+
+        $merge = [];
+        foreach ($intDefaults as $field => $default) {
+            if ($this->input($field) === null || $this->input($field) === '') {
+                $merge[$field] = $default;
+            }
+        }
+        foreach ($floatDefaults as $field => $default) {
+            if ($this->input($field) === null || $this->input($field) === '') {
+                $merge[$field] = $default;
+            }
+        }
+        if ($merge) {
+            $this->merge($merge);
+        }
     }
 
     public function rules(): array
@@ -47,18 +79,22 @@ class FilmRequest extends FormRequest
             'origin_country'  => ['nullable', 'string', 'max:100'],
             'original_language' => ['nullable', 'string', 'max:100'],
             'overview'        => ['nullable', 'string'],
-            'duration'        => ['nullable', 'integer', 'min:1'],
+            // smallInteger unsigned → max 65 535; min:1 porque 0 no tiene sentido
+            'duration'        => ['nullable', 'integer', 'min:1', 'max:65535'],
             'release_date'    => ['nullable', 'date'],
-            'frame'           => ['nullable', 'string', 'max:500'],
-            'backdrop'        => ['nullable', 'string', 'max:500'],
+            // frame: varchar(225) en BD → máximo 225 chars; url para garantizar formato
+            'frame'           => ['nullable', 'url', 'max:225'],
+            // backdrop: varchar(255) en BD
+            'backdrop'        => ['nullable', 'url', 'max:255'],
 
             'awards'      => ['nullable', 'array'],
             'nominations' => ['nullable', 'array'],
             'festivals'   => ['nullable', 'array'],
 
-            'total_awards'      => ['nullable', 'integer', 'min:0'],
-            'total_nominations' => ['nullable', 'integer', 'min:0'],
-            'total_festivals'   => ['nullable', 'integer', 'min:0'],
+            // NOT NULL DEFAULT 0 en BD → prepareForValidation() garantiza que nunca lleguen como null
+            'total_awards'      => ['required', 'integer', 'min:0', 'max:65535'],
+            'total_nominations' => ['required', 'integer', 'min:0', 'max:65535'],
+            'total_festivals'   => ['required', 'integer', 'min:0', 'max:65535'],
 
             // Tomar los datos del cast de cast_crew
             'director_id' => ['nullable', 'integer', 'exists:cast_crew,idPerson'],
@@ -70,8 +106,9 @@ class FilmRequest extends FormRequest
             'cast.*.credit_order'      => ['nullable', 'integer', 'min:0'],
             'cast.*.photo'             => ['nullable', 'url'],
 
-            'vote_average'   => ['nullable', 'numeric', 'min:0', 'max:10'], // Nota media calculada a partir de los puntos dados por usuarios registrados
-            'globalRate'     => ['nullable', 'numeric', 'min:0', 'max:10'], // Nota global guardada en la API TMDB
+            // NOT NULL DEFAULT 0 en BD → prepareForValidation() garantiza que nunca lleguen como null
+            'vote_average'   => ['required', 'numeric', 'min:0', 'max:10'],
+            'globalRate'     => ['required', 'numeric', 'min:0', 'max:10'],
         ];
     }
 
@@ -90,17 +127,24 @@ class FilmRequest extends FormRequest
 
             'duration.integer'        => 'La duración debe ser un número entero.',
             'duration.min'            => 'La duración debe ser al menos 1 minuto.',
+            'duration.max'            => 'La duración no puede superar 65 535 minutos.',
 
             'release_date.date'       => 'La fecha de estreno debe tener un formato de fecha válido.',
 
-            'frame.url'               => 'La URL del fotograma/cartel no es válida.',
+            'frame.url'               => 'La URL del póster no es válida (debe empezar por https://).',
+            'frame.max'               => 'La URL del póster no puede superar los 225 caracteres.',
+            'backdrop.url'            => 'La URL del backdrop no es válida (debe empezar por https://).',
+            'backdrop.max'            => 'La URL del backdrop no puede superar los 255 caracteres.',
 
             'total_awards.integer'      => 'El total de premios debe ser un número entero.',
             'total_awards.min'          => 'El total de premios no puede ser negativo.',
+            'total_awards.max'          => 'El total de premios no puede superar 65 535.',
             'total_nominations.integer' => 'El total de nominaciones debe ser un número entero.',
             'total_nominations.min'     => 'El total de nominaciones no puede ser negativo.',
+            'total_nominations.max'     => 'El total de nominaciones no puede superar 65 535.',
             'total_festivals.integer'   => 'El total de festivales debe ser un número entero.',
             'total_festivals.min'       => 'El total de festivales no puede ser negativo.',
+            'total_festivals.max'       => 'El total de festivales no puede superar 65 535.',
 
             'director_id.required'    => 'Debes indicar un director.',
             'director_id.exists'      => 'El director seleccionado no existe en la tabla cast_crew.',

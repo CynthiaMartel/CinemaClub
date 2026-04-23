@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use App\Http\Requests\FilmRequest;
+use Illuminate\Database\QueryException;
 
 class FilmController extends Controller
 {
@@ -173,7 +174,18 @@ class FilmController extends Controller
         $validated['nominations']= json_encode($validated['nominations'] ?? []);
         $validated['festivals']  = json_encode($validated['festivals'] ?? []);
 
-        $film = Film::create($validated);
+        try {
+            $film = Film::create($validated);
+        } catch (QueryException $e) {
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'success' => 0,
+                    'message' => 'Ya existe una película con ese título y fecha de estreno.',
+                    'errors'  => ['title' => ['Ya existe una película con ese título y esa fecha de estreno.']],
+                ], 422);
+            }
+            throw $e;
+        }
 
         // Guardar director en tabla pivot si se proporcionó
         if (!empty($validated['director_id'])) {
@@ -210,7 +222,18 @@ class FilmController extends Controller
         $validated['nominations']= json_encode($validated['nominations'] ?? []);
         $validated['festivals']  = json_encode($validated['festivals'] ?? []);
 
-        $film->update($validated);
+        try {
+            $film->update($validated);
+        } catch (QueryException $e) {
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'success' => 0,
+                    'message' => 'Ya existe una película con ese título y fecha de estreno.',
+                    'errors'  => ['title' => ['Ya existe una película con ese título y esa fecha de estreno.']],
+                ], 422);
+            }
+            throw $e;
+        }
 
         // Actualizar pivot: limpiamos director anterior y re-insertamos
         \DB::table('film_cast_pivot')->where('idFilm', $film->idFilm)->where('role', 'Director')->delete();

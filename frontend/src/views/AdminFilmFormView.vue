@@ -250,7 +250,7 @@ onMounted(() => {
             <!-- Duración -->
             <div>
               <label class="field-label">Duración (min)</label>
-              <input v-model="form.duration" type="number" min="1" class="field-input" placeholder="Ej: 120" />
+              <input v-model="form.duration" type="number" min="1" max="65535" class="field-input" placeholder="Ej: 120" />
             </div>
             <!-- Idioma -->
             <div>
@@ -327,7 +327,7 @@ onMounted(() => {
             <!-- Póster -->
             <div>
               <label class="field-label">URL del póster (frame)</label>
-              <input v-model="form.frame" type="url" class="field-input" :class="{ 'border-red-500/70': errors.frame }" placeholder="https://..." />
+              <input v-model="form.frame" type="url" maxlength="225" class="field-input" :class="{ 'border-red-500/70': errors.frame }" placeholder="https://..." />
               <p v-if="errors.frame" class="field-error">{{ errors.frame[0] }}</p>
               <div v-if="form.frame" class="mt-2">
                 <img :src="form.frame" alt="Póster" class="h-32 rounded-lg object-cover border border-slate-700" @error="e => e.target.style.display='none'" />
@@ -336,7 +336,7 @@ onMounted(() => {
             <!-- Backdrop -->
             <div>
               <label class="field-label">URL del backdrop</label>
-              <input v-model="form.backdrop" type="url" class="field-input" :class="{ 'border-red-500/70': errors.backdrop }" placeholder="https://..." />
+              <input v-model="form.backdrop" type="url" maxlength="255" class="field-input" :class="{ 'border-red-500/70': errors.backdrop }" placeholder="https://..." />
               <p v-if="errors.backdrop" class="field-error">{{ errors.backdrop[0] }}</p>
               <div v-if="form.backdrop" class="mt-2">
                 <img :src="form.backdrop" alt="Backdrop" class="h-32 w-full rounded-lg object-cover border border-slate-700" @error="e => e.target.style.display='none'" />
@@ -365,15 +365,18 @@ onMounted(() => {
         <!-- SECCIÓN: IDs externos -->
         <section class="bg-[#1c2128] border border-slate-800 rounded-xl p-4 sm:p-6 space-y-5">
           <h2 class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400 border-b border-slate-800 pb-3">IDs externos</h2>
+          <p class="text-xs text-slate-500">Opcionales. Si no encuentras el ID puedes dejarlo vacío y asignarlo después. Evitan duplicados y habilitan funciones como streaming o datos enriquecidos.</p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label class="field-label">TMDB ID</label>
               <input v-model="form.tmdb_id" type="number" class="field-input" :class="{ 'border-red-500/70': errors.tmdb_id }" placeholder="Ej: 157336" />
+              <p class="text-[11px] text-slate-600 mt-1">El número al final de themoviedb.org/movie/<strong class="text-slate-500">157336</strong></p>
               <p v-if="errors.tmdb_id" class="field-error">{{ errors.tmdb_id[0] }}</p>
             </div>
             <div>
               <label class="field-label">Wikidata ID</label>
               <input v-model="form.wikidata_id" type="number" class="field-input" :class="{ 'border-red-500/70': errors.wikidata_id }" placeholder="Ej: 11252" />
+              <p class="text-[11px] text-slate-600 mt-1">Solo el número de wikidata.org/wiki/Q<strong class="text-slate-500">11252</strong> (sin la Q)</p>
               <p v-if="errors.wikidata_id" class="field-error">{{ errors.wikidata_id[0] }}</p>
             </div>
           </div>
@@ -385,15 +388,15 @@ onMounted(() => {
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <div>
               <label class="field-label">Total premios</label>
-              <input v-model="form.total_awards" type="number" min="0" class="field-input" placeholder="0" />
+              <input v-model="form.total_awards" type="number" min="0" max="65535" class="field-input" placeholder="0" />
             </div>
             <div>
               <label class="field-label">Total nominaciones</label>
-              <input v-model="form.total_nominations" type="number" min="0" class="field-input" placeholder="0" />
+              <input v-model="form.total_nominations" type="number" min="0" max="65535" class="field-input" placeholder="0" />
             </div>
             <div>
               <label class="field-label">Total festivales</label>
-              <input v-model="form.total_festivals" type="number" min="0" class="field-input" placeholder="0" />
+              <input v-model="form.total_festivals" type="number" min="0" max="65535" class="field-input" placeholder="0" />
             </div>
           </div>
         </section>
