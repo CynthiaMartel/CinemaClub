@@ -192,7 +192,7 @@ onMounted(fetchFilm)
 
     <div v-if="isLoading" class="flex flex-col items-center justify-center h-screen gap-6">
       <div class="w-14 h-14 border-4 border-slate-800 border-t-[#BE2B0C] rounded-full animate-spin"></div>
-      <p class="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px]">CinemaClub is loading...</p>
+      <p class="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px]">FilmoClub is loading...</p>
     </div>
 
     <div v-else-if="error" class="flex items-center justify-center h-screen px-4">
@@ -355,12 +355,12 @@ onMounted(fetchFilm)
               </div>
             </div>
 
-            <!-- Aparece en CinemaClub -->
+            <!-- Aparece en FilmoClub -->
             <div v-if="hasAnyEntries || isLoadingEntries" class="mb-14 pt-16">
 
               <!-- Header accent -->
               <div class="flex items-center justify-between border-l-4 border-[#BE2B0C] pl-4">
-                <h3 class="text-lg font-black uppercase italic tracking-tighter text-white leading-none">Aparece en CinemaClub</h3>
+                <h3 class="text-lg font-black uppercase italic tracking-tighter text-white leading-none">Aparece en FilmoClub</h3>
               </div>
 
               <!-- Tabs -->

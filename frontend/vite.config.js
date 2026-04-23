@@ -5,15 +5,21 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // En producción el build va directo a Laravel's public/
+  // emptyOutDir: false para no borrar index.php ni .htaccess
+  build: {
+    outDir: '../public',
+    emptyOutDir: false,
+  },
   plugins: [
     vue(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'mask-icon.svg'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png'],
       manifest: {
-        name: 'CinemaClub',
-        short_name: 'CinemaClub',
+        name: 'FilmoClub',
+        short_name: 'FilmoClub',
         description: 'Tu club de cine social',
         theme_color: '#17191c',
         background_color: '#17191c',
@@ -22,11 +28,14 @@ export default defineConfig({
         start_url: '/',
         orientation: 'portrait',
         icons: [
+          // Logo principal de FilmoClub — mismo que aparece en el navbar
           {
-            src: 'pwa-64x64.png',
-            sizes: '64x64',
+            src: 'logoCineClub7.png',
+            sizes: 'any',
             type: 'image/png',
+            purpose: 'any',
           },
+          // Iconos de tamaño fijo como fallback para navegadores más estrictos
           {
             src: 'pwa-192x192.png',
             sizes: '192x192',
@@ -96,9 +105,11 @@ export default defineConfig({
         ],
       },
       devOptions: {
-        // Activa el SW en dev para poder testear offline y el install prompt
+        // Activa el SW en dev. 'classic' es más estable que 'module' en localhost
+        // y evita que el SW quede en estado "waiting" entre recargas, lo que
+        // bloquea que Chrome vuelva a emitir beforeinstallprompt.
         enabled: true,
-        type: 'module',
+        type: 'classic',
       },
     }),
   ],

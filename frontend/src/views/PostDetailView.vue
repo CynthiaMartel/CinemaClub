@@ -116,7 +116,7 @@ watch(() => route.params.id, () => {
                 &larr; Volver
             </button>
             <span class="text-[10px] font-bold text-[#BE2B0C] uppercase tracking-widest">
-                CinemaClub News
+                FilmoClub News
             </span>
         </div>
     </nav>

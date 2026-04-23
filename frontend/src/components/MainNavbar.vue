@@ -12,7 +12,21 @@ const router = useRouter()
 const route  = useRoute()
 const auth   = useAuthStore()
 
-const { canInstall, install } = useInstallPrompt()
+const { showInstallButton, install, browserType } = useInstallPrompt()
+
+const installPanel = ref(null) // null | 'safari-mac' | 'safari-ios' | 'firefox'
+
+const closeInstallPanel = () => { installPanel.value = null }
+
+const handleInstall = async () => {
+  isUserMenuOpen.value  = false
+  isMobileMenuOpen.value = false
+  if (browserType === 'safari-mac' || browserType === 'safari-ios' || browserType === 'firefox') {
+    installPanel.value = browserType
+  } else {
+    await install()
+  }
+}
 
 const isLoginOpen          = ref(false)
 const isUserMenuOpen       = ref(false)
@@ -26,6 +40,8 @@ const goCommunity = () => { isUserMenuOpen.value = false; router.push({ name: 'e
 const goDebates   = () => router.push({ name: 'entry-feed', query: { tab: 'user_debate' } })
 const goNews      = () => router.push({ name: 'post-feed' })
 const goEditorial = () => { isUserMenuOpen.value = false; router.push({ name: 'editorial-inbox' }) }
+const goAgenda    = () => router.push({ name: 'agenda' })
+const goEvents    = () => { isUserMenuOpen.value = false; router.push({ name: 'event-manager' }) }
 const goAdmin     = () => { isUserMenuOpen.value = false; router.push({ name: 'admin-dashboard' }) }
 
 const isEditorOrAdmin = computed(() => {
@@ -57,17 +73,32 @@ const logout = async () => {
 }
 
 // Search
-const searchQuery = ref('')
+const searchQuery   = ref('')
+const isSearchOpen  = ref(false)
+const searchInputRef = ref(null)
+
+const openSearch = async () => {
+  isSearchOpen.value = true
+  await nextTick()
+  searchInputRef.value?.focus()
+}
+
+const closeSearch = () => {
+  isSearchOpen.value = false
+  searchQuery.value  = ''
+}
 
 const goToSearch = () => {
   const q = searchQuery.value.trim()
   if (!q) return
   router.push({ name: 'search', query: { q } })
   searchQuery.value = ''
+  isSearchOpen.value = false
 }
 
 const handleSearchKey = (e) => {
   if (e.key === 'Enter') goToSearch()
+  if (e.key === 'Escape') closeSearch()
 }
 
 const isScrolled = ref(false)
@@ -84,14 +115,16 @@ const onGlobalClick = (ev) => {
 
 const onGlobalKeydown = (ev) => {
   if (ev.key === 'Escape') {
-    isUserMenuOpen.value = false
+    isUserMenuOpen.value  = false
     isMobileMenuOpen.value = false
+    installPanel.value    = null
   }
 }
 
 watch(() => route.fullPath, () => {
-  isUserMenuOpen.value = false
+  isUserMenuOpen.value  = false
   isMobileMenuOpen.value = false
+  installPanel.value    = null
   isScrolled.value = false
   nextTick(updateScroll)
 })
@@ -124,40 +157,55 @@ onBeforeUnmount(() => {
       <div class="flex items-center h-16 gap-4 md:gap-8">
 
         <!-- Logo -->
-        <button type="button" class="flex-shrink-0 flex items-center" @click="goHome">
-          <img :src="logoUrl" alt="CinemaClub 7" class="h-8 md:h-9 w-auto object-contain" />
+        <button type="button" class="logo-btn flex-shrink-0 flex items-center gap-2.5" @click="goHome">
+          <img :src="logoUrl" alt="FilmoClub" class="h-6 md:h-7 w-auto object-contain" />
+          <span class="logo-wordmark" aria-label="FilmoClub">
+            <span class="logo-filmo">Filmo</span><span class="logo-club">Club</span>
+          </span>
         </button>
 
-        <!-- Nav links — desktop -->
-        <div class="hidden md:flex items-center gap-6">
-          <button type="button" class="nav-link" @click="goCommunity">Comunidad</button>
-          <button type="button" class="nav-link" @click="goFilmsFeed">Films</button>
-          <button type="button" class="nav-link" @click="goDebates">Debates</button>
-          <button type="button" class="nav-link nav-link--noticias" @click="goNews">Noticias</button>
-          <button v-if="isEditorOrAdmin" type="button" class="nav-link nav-link--editorial" @click="goEditorial">Editorial</button>
-        </div>
+        <!-- Nav links + Search — agrupados a la derecha, pegados entre sí -->
+        <div class="flex-1 flex items-center justify-end gap-5 md:gap-7">
 
-        <!-- Search — sin marco, icono integrado -->
-        <div class="flex-1 flex justify-center">
-          <div class="relative w-full max-w-[220px] sm:max-w-[300px]">
-            <input
-              v-model="searchQuery"
-              @keydown="handleSearchKey"
-              type="search"
-              placeholder="Buscar…"
-              class="search-input w-full bg-transparent pl-8 pr-3 py-1.5 text-sm text-slate-300
-                     placeholder:text-slate-600 focus:outline-none"
-            />
+          <!-- Nav links — solo desktop -->
+          <div class="hidden md:flex items-center gap-6">
+            <button type="button" class="nav-link" @click="goCommunity">Comunidad</button>
+            <button type="button" class="nav-link" @click="goFilmsFeed">Films</button>
+            <button type="button" class="nav-link" @click="goDebates">Debates</button>
+            <button type="button" class="nav-link nav-link--noticias" @click="goNews">Noticias</button>
+            <button type="button" class="nav-link nav-link--agenda" @click="goAgenda">Agenda</button>
+          </div>
+
+          <!-- Search expandible -->
+          <div class="search-wrap">
+            <!-- Lupa -->
             <button
               type="button"
-              class="absolute left-0 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400 transition-colors"
-              @click="goToSearch"
+              class="search-icon-btn"
+              :class="{ 'is-open': isSearchOpen }"
+              :aria-label="isSearchOpen ? 'Buscar' : 'Abrir búsqueda'"
+              @click="isSearchOpen ? goToSearch() : openSearch()"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
               </svg>
             </button>
+
+            <!-- Input con transición de anchura -->
+            <Transition name="search-expand">
+              <input
+                v-if="isSearchOpen"
+                ref="searchInputRef"
+                v-model="searchQuery"
+                @keydown="handleSearchKey"
+                @blur="!searchQuery && closeSearch()"
+                type="search"
+                placeholder="Buscar…"
+                class="search-input"
+              />
+            </Transition>
           </div>
+
         </div>
 
         <!-- Derecha: usuario o login + hamburguesa -->
@@ -213,6 +261,12 @@ onBeforeUnmount(() => {
                     </svg>
                     Panel editorial
                   </button>
+                  <button v-if="isEditorOrAdmin" type="button" class="w-full text-left px-4 py-2.5 text-sm text-amber-400 hover:bg-amber-500/10 flex items-center gap-2.5 transition-colors" @click="goEvents">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    Event Manager
+                  </button>
                   <div class="border-t border-white/[0.06] mx-3 my-1"></div>
                 </template>
 
@@ -227,6 +281,12 @@ onBeforeUnmount(() => {
                     </svg>
                     Panel editorial
                   </button>
+                  <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-amber-400 hover:bg-amber-500/10 flex items-center gap-2.5 transition-colors" @click="goEvents">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    Event Manager
+                  </button>
                   <div class="border-t border-white/[0.06] mx-3 my-1"></div>
                 </template>
 
@@ -234,6 +294,22 @@ onBeforeUnmount(() => {
                 <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors" @click="goProfile">Mi perfil</button>
                 <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors" @click="goCommunity">Comunidad</button>
                 <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors" @click="goChangePassword">Cambiar contraseña</button>
+
+                <!-- Instalar PWA — visible en todos los navegadores mientras no esté instalada -->
+                <template v-if="showInstallButton">
+                  <div class="border-t border-white/[0.06] mx-3 my-1"></div>
+                  <button
+                    type="button"
+                    class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 flex items-center gap-2.5 transition-colors"
+                    @click="handleInstall"
+                  >
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Instalar app
+                  </button>
+                </template>
+
                 <div class="border-t border-white/[0.06] mx-3 my-1"></div>
                 <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors" @click="logout">Cerrar sesión</button>
               </div>
@@ -249,15 +325,16 @@ onBeforeUnmount(() => {
             Entrar
           </button>
 
-          <!-- Botón instalar PWA — solo aparece cuando el browser lo soporta y no está instalada -->
+          <!-- Botón instalar PWA — solo para usuarios NO logueados (los logueados lo ven en el dropdown) -->
+          <!-- Botón instalar — desktop (sm+), oculto en móvil (ahí va en el menú hamburguesa) -->
           <button
-            v-if="canInstall"
+            v-if="showInstallButton && !auth.isAuthenticated"
             type="button"
             class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/10
                    text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-white
                    hover:border-white/20 transition-colors"
-            @click="install"
-            aria-label="Instalar CinemaClub"
+            @click="handleInstall"
+            aria-label="Instalar FilmoClub"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -302,8 +379,20 @@ onBeforeUnmount(() => {
           <button type="button" class="mobile-nav-link" @click="goFilmsFeed">Films</button>
           <button type="button" class="mobile-nav-link" @click="goDebates">Debates</button>
           <button type="button" class="mobile-nav-link mobile-nav-link--noticias" @click="goNews">Noticias</button>
-          <button v-if="isEditorOrAdmin" type="button" class="mobile-nav-link mobile-nav-link--editorial" @click="goEditorial">Editorial</button>
+          <button type="button" class="mobile-nav-link mobile-nav-link--agenda" @click="goAgenda">Agenda</button>
           <button v-if="isAdmin" type="button" class="mobile-nav-link mobile-nav-link--admin" @click="goAdmin">Panel de películas</button>
+          <!-- Instalar app — móvil, solo usuarios no logueados -->
+          <button
+            v-if="showInstallButton && !auth.isAuthenticated"
+            type="button"
+            class="mobile-nav-link flex items-center gap-2"
+            @click="handleInstall; isMobileMenuOpen = false"
+          >
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Instalar app
+          </button>
         </nav>
       </div>
     </Transition>
@@ -311,6 +400,94 @@ onBeforeUnmount(() => {
 
   <LoginModal v-model="isLoginOpen" />
   <ChangePasswordModal v-model="isChangePasswordOpen" />
+
+  <!-- Panel de instrucciones de instalación (Safari / Firefox) -->
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="installPanel"
+        class="fixed inset-0 z-[999] flex items-end sm:items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+      >
+        <!-- Backdrop -->
+        <div
+          class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          @click="closeInstallPanel"
+        />
+
+        <!-- Tarjeta -->
+        <Transition
+          enter-active-class="transition duration-200 ease-out"
+          enter-from-class="opacity-0 translate-y-4 scale-95"
+          enter-to-class="opacity-100 translate-y-0 scale-100"
+          appear
+        >
+          <div class="relative w-full max-w-sm rounded-2xl bg-[#1b2228] border border-white/10 shadow-2xl p-6">
+
+            <!-- Botón cerrar -->
+            <button
+              type="button"
+              class="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition-colors"
+              @click="closeInstallPanel"
+              aria-label="Cerrar"
+            >
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+
+            <!-- Safari macOS -->
+            <template v-if="installPanel === 'safari-mac'">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="text-2xl">🧭</span>
+                <h2 class="text-base font-bold text-white">Instalar en Mac</h2>
+              </div>
+              <ol class="space-y-2 text-sm text-slate-300">
+                <li class="flex gap-2"><span class="text-slate-500 font-mono">1.</span>En el menú superior, ve a <strong class="text-white">Archivo</strong></li>
+                <li class="flex gap-2"><span class="text-slate-500 font-mono">2.</span>Pulsa <strong class="text-white">Añadir al Dock…</strong></li>
+                <li class="flex gap-2"><span class="text-slate-500 font-mono">3.</span>Confirma con <strong class="text-white">Añadir</strong></li>
+              </ol>
+            </template>
+
+            <!-- Safari iOS -->
+            <template v-else-if="installPanel === 'safari-ios'">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="text-2xl">📱</span>
+                <h2 class="text-base font-bold text-white">Instalar en iPhone / iPad</h2>
+              </div>
+              <ol class="space-y-2 text-sm text-slate-300">
+                <li class="flex gap-2"><span class="text-slate-500 font-mono">1.</span>Pulsa el botón <strong class="text-white">Compartir</strong> <span class="inline-block border border-slate-600 rounded px-1 text-xs">⬆</span> de Safari</li>
+                <li class="flex gap-2"><span class="text-slate-500 font-mono">2.</span>Selecciona <strong class="text-white">Añadir a pantalla de inicio</strong></li>
+                <li class="flex gap-2"><span class="text-slate-500 font-mono">3.</span>Confirma con <strong class="text-white">Añadir</strong></li>
+              </ol>
+            </template>
+
+            <!-- Firefox -->
+            <template v-else-if="installPanel === 'firefox'">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="text-2xl">🦊</span>
+                <h2 class="text-base font-bold text-white">Firefox no admite instalación</h2>
+              </div>
+              <p class="text-sm text-slate-300">
+                Para instalar FilmoClub como app, ábrela en
+                <strong class="text-white">Chrome</strong> o <strong class="text-white">Brave</strong>
+                y pulsa de nuevo el botón Instalar.
+              </p>
+            </template>
+
+          </div>
+        </Transition>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -349,26 +526,21 @@ onBeforeUnmount(() => {
   transform: translateZ(0);
 }
 
-/* Al scrollear: tinte perceptible sobre contenido oscuro + blur */
+/* Al scrollear: fondo sólido semi-transparente con blur */
 .nav-backdrop.is-scrolled {
-  background: linear-gradient(
-    to bottom,
-    rgba(20, 24, 28, 0.82) 0%,
-    rgba(20, 24, 28, 0.45) 70%,
-    rgba(20, 24, 28, 0.00) 100%
-  );
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(20, 24, 28, 0.65);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 
 /* Links — coherentes con la tipografía del logo: sans, no italic, bold */
 .nav-link {
-  font-size: 0.75rem;       /* 12px — compact como el logo */
+  font-size: 0.875rem;      /* 14px — más legible y vistoso */
   font-weight: 700;
   text-transform: uppercase;
   font-style: normal;        /* no italic — logo es recto */
-  letter-spacing: 0.06em;    /* ligero tracking como el logo */
+  letter-spacing: 0.07em;    /* ligero tracking como el logo */
   color: #64748b;            /* slate-500 */
   padding: 0.25rem 0;
   transition: color 150ms;
@@ -379,15 +551,55 @@ onBeforeUnmount(() => {
   color: #e2e8f0; /* slate-200 */
 }
 
-/* Búsqueda sin marco, con línea inferior sutil solo al hacer foco */
-.search-input {
-  border: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color 150ms;
+/* ── Search expandible ─────────────────────────────────────────── */
+.search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
-.search-input:focus {
-  border-bottom-color: #475569; /* slate-600 */
+.search-icon-btn {
+  flex-shrink: 0;
+  color: #64748b;
+  transition: color 150ms;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+}
+
+.search-icon-btn:hover,
+.search-icon-btn.is-open {
+  color: #e2e8f0;
+}
+
+.search-input {
+  width: 140px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #475569;
+  color: #e2e8f0;
+  font-size: 0.875rem;
+  padding: 0.15rem 0.25rem;
+  outline: none;
+}
+
+.search-input::placeholder { color: #475569; }
+.search-input::-webkit-search-cancel-button,
+.search-input::-webkit-search-decoration { display: none; }
+
+@media (min-width: 640px)  { .search-input { width: 180px; } }
+@media (min-width: 768px)  { .search-input { width: 220px; } }
+
+/* Transición Vue: search-expand */
+.search-expand-enter-active,
+.search-expand-leave-active {
+  transition: width 200ms ease, opacity 150ms ease;
+  overflow: hidden;
+}
+.search-expand-enter-from,
+.search-expand-leave-to {
+  width: 0 !important;
+  opacity: 0;
 }
 
 /* Noticias — brand rojo, contenido curado/editorial */
@@ -406,16 +618,32 @@ onBeforeUnmount(() => {
   color: #a5b4fc; /* indigo-300 */
 }
 
+/* Agenda — naranja marca (mismo que logo-club), calendario de eventos */
+.nav-link--agenda {
+  color: #f97316; /* orange-500, coherente con logo-club */
+}
+.nav-link--agenda:hover {
+  color: #fdba74; /* orange-300 */
+}
+
+/* Events (menú admin) — amber */
+.nav-link--events {
+  color: #f59e0b; /* amber-400 */
+}
+.nav-link--events:hover {
+  color: #fcd34d; /* amber-300 */
+}
+
 /* Quitar el X nativo del input[type=search] */
 .search-input::-webkit-search-cancel-button { display: none; }
 .search-input::-webkit-search-decoration    { display: none; }
 
 /* Links móvil */
 .mobile-nav-link {
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   color: #94a3b8; /* slate-400 */
   padding: 0.75rem 0;
   text-align: left;
@@ -429,6 +657,51 @@ onBeforeUnmount(() => {
 .mobile-nav-link--noticias:hover { color: #e8471f; }
 .mobile-nav-link--editorial { color: #6366f1; }
 .mobile-nav-link--editorial:hover { color: #a5b4fc; }
+.mobile-nav-link--events { color: #f59e0b; }
+.mobile-nav-link--events:hover { color: #fcd34d; }
+.mobile-nav-link--agenda { color: #f97316; }
+.mobile-nav-link--agenda:hover { color: #fdba74; }
 .mobile-nav-link--admin { color: #00e054; }
 .mobile-nav-link--admin:hover { color: #6effa0; }
+
+/* ── Logo wordmark ─────────────────────────────────────────────── */
+.logo-btn {
+  cursor: pointer;
+}
+
+.logo-wordmark {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  display: inline-block;
+  transform: scaleX(1.15);
+  transform-origin: left center;
+  transition: opacity 150ms ease;
+  user-select: none;
+}
+
+/* responsive wordmark */
+@media (min-width: 640px) {
+  .logo-wordmark { font-size: 1.3rem; transform: scaleX(1.15); }
+}
+@media (min-width: 768px) {
+  .logo-wordmark { font-size: 1.5rem; transform: scaleX(1.15); }
+}
+@media (min-width: 1024px) {
+  .logo-wordmark { font-size: 1.65rem; transform: scaleX(1.15); }
+}
+
+.logo-btn:hover .logo-wordmark {
+  opacity: 0.82;
+}
+
+.logo-filmo {
+  color: #BE2B0C; /* brand */
+}
+
+.logo-club {
+  color: #f97316; /* orange-500 */
+}
 </style>

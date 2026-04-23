@@ -158,7 +158,7 @@ onMounted(() => {
                                  {{ getInitials(post.editorName) }}
                             </div>
                             <span class="text-[10px] font-bold text-[#899] uppercase hover:text-white transition-colors cursor-default tracking-wide">
-                                {{ post.editorName || 'CinemaClub' }}
+                                {{ post.editorName || 'FilmoClub' }}
                             </span>
                         </div>
 
