@@ -16,6 +16,9 @@ const toastMsg   = ref('')
 const toastType  = ref('success')
 const checkingId = ref(null)
 const togglingId = ref(null)
+const editingId  = ref(null)
+const editForm   = ref({ name: '', url: '' })
+const isSaving   = ref(false)
 
 const fmtDate = (d) => d
   ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -63,6 +66,31 @@ const checkNow = async (source) => {
     showToast('Error al rastrear la fuente.', 'error')
   } finally {
     checkingId.value = null
+  }
+}
+
+const startEdit = (source) => {
+  editingId.value = source.id
+  editForm.value  = { name: source.name, url: source.url }
+}
+
+const cancelEdit = () => {
+  editingId.value = null
+  editForm.value  = { name: '', url: '' }
+}
+
+const saveEdit = async (source) => {
+  isSaving.value = true
+  try {
+    const { data } = await api.patch(`/editorial/sources/${source.id}`, editForm.value)
+    source.name = data.data.name
+    source.url  = data.data.url
+    showToast('Fuente actualizada.')
+    cancelEdit()
+  } catch {
+    showToast('Error al guardar los cambios.', 'error')
+  } finally {
+    isSaving.value = false
   }
 }
 
@@ -153,27 +181,45 @@ onMounted(() => {
           >
             <!-- Nombre + fallos + URL -->
             <td class="py-3 pr-4">
-              <div class="flex items-center gap-2 flex-wrap">
-                <p class="font-semibold text-xs leading-snug" :class="source.needs_review ? 'text-amber-400' : 'text-slate-200'">
-                  {{ source.name }}
-                </p>
-                <span
-                  v-if="source.needs_review"
-                  class="pill-error"
-                  :title="source.last_error
-                    ? `Último error: ${source.last_error}`
-                    : 'Falló 3 veces seguidas. La fuente se pausó automáticamente. Comprueba la URL o actívala manualmente para reintentar.'"
-                >
-                  {{ source.failed_attempts }}✕ fallo
-                </span>
-              </div>
-              <a
-                :href="source.url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="text-[10px] text-slate-600 hover:text-slate-400 transition-colors truncate block max-w-[220px]"
-                :title="source.url"
-              >{{ source.url }}</a>
+              <!-- Modo edición inline -->
+              <template v-if="editingId === source.id">
+                <input
+                  v-model="editForm.name"
+                  class="edit-inline-input mb-1"
+                  placeholder="Nombre"
+                />
+                <input
+                  v-model="editForm.url"
+                  class="edit-inline-input"
+                  placeholder="https://…"
+                  @keydown.enter="saveEdit(source)"
+                  @keydown.escape="cancelEdit"
+                />
+              </template>
+              <!-- Modo lectura -->
+              <template v-else>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <p class="font-semibold text-xs leading-snug" :class="source.needs_review ? 'text-amber-400' : 'text-slate-200'">
+                    {{ source.name }}
+                  </p>
+                  <span
+                    v-if="source.needs_review"
+                    class="pill-error"
+                    :title="source.last_error
+                      ? `Último error: ${source.last_error}`
+                      : 'Falló 3 veces seguidas. La fuente se pausó automáticamente. Comprueba la URL o actívala manualmente para reintentar.'"
+                  >
+                    {{ source.failed_attempts }}✕ fallo
+                  </span>
+                </div>
+                <a
+                  :href="source.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-[10px] text-slate-600 hover:text-slate-400 transition-colors truncate block max-w-[220px]"
+                  :title="source.url"
+                >{{ source.url }}</a>
+              </template>
             </td>
 
             <!-- Tipo -->
@@ -231,20 +277,42 @@ onMounted(() => {
 
             <!-- Acciones -->
             <td class="py-3 text-right">
-              <button
-                class="action-check inline-flex items-center gap-1.5"
-                :disabled="checkingId === source.id"
-                :title="source.needs_review
-                  ? 'Forzar un rastreo ahora para comprobar si la fuente ha vuelto a funcionar'
-                  : 'Rastrear esta fuente ahora mismo, sin esperar al ciclo automático'"
-                @click="checkNow(source)"
-              >
-                <svg v-if="checkingId === source.id" class="spinner" viewBox="0 0 24 24" fill="none">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                </svg>
-                {{ checkingId === source.id ? 'Rastreando…' : 'Rastrear ahora' }}
-              </button>
+              <div class="flex items-center justify-end gap-1.5">
+                <!-- Guardar / Cancelar cuando está en modo edición -->
+                <template v-if="editingId === source.id">
+                  <button class="action-save" :disabled="isSaving" @click="saveEdit(source)">
+                    {{ isSaving ? '…' : 'Guardar' }}
+                  </button>
+                  <button class="action-cancel" @click="cancelEdit">Cancelar</button>
+                </template>
+                <!-- Acciones normales -->
+                <template v-else>
+                  <button
+                    class="action-edit"
+                    title="Editar nombre y URL de esta fuente"
+                    @click="startEdit(source)"
+                  >
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z"/>
+                    </svg>
+                    Editar
+                  </button>
+                  <button
+                    class="action-check inline-flex items-center gap-1.5"
+                    :disabled="checkingId === source.id"
+                    :title="source.needs_review
+                      ? 'Forzar un rastreo ahora para comprobar si la fuente ha vuelto a funcionar'
+                      : 'Rastrear esta fuente ahora mismo, sin esperar al ciclo automático'"
+                    @click="checkNow(source)"
+                  >
+                    <svg v-if="checkingId === source.id" class="spinner" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                    </svg>
+                    {{ checkingId === source.id ? 'Rastreando…' : 'Rastrear' }}
+                  </button>
+                </template>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -381,6 +449,41 @@ button.status-badge.paused:hover { background: rgb(71 85 105 / 0.5); color: #94a
 }
 .action-check:hover:not(:disabled) { color: #e2e8f0; border-color: #475569; background: #1e293b; }
 .action-check:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Edición inline ──────────────────────────────────────────── */
+.edit-inline-input {
+  display: block; width: 100%;
+  background: rgb(30 41 59 / 0.8); border: 1px solid rgb(99 102 241 / 0.4);
+  border-radius: 5px; color: #e2e8f0; font-size: 11px;
+  padding: 4px 8px; outline: none; transition: border-color 150ms;
+}
+.edit-inline-input:focus { border-color: #6366f1; }
+
+.action-edit {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: #475569; padding: 3px 8px; border-radius: 5px;
+  border: 1px solid rgb(51 65 85 / 0.4); transition: all 150ms; cursor: pointer;
+  white-space: nowrap;
+}
+.action-edit:hover { color: #94a3b8; border-color: #475569; background: #1e293b; }
+
+.action-save {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: #6ee7b7; padding: 3px 10px; border-radius: 5px;
+  background: rgb(6 78 59 / 0.3); border: 1px solid rgb(6 78 59 / 0.4);
+  transition: all 150ms; cursor: pointer; white-space: nowrap;
+}
+.action-save:hover:not(:disabled) { background: rgb(6 78 59 / 0.5); }
+.action-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.action-cancel {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: #64748b; padding: 3px 8px; border-radius: 5px;
+  border: 1px solid rgb(51 65 85 / 0.4); transition: all 150ms; cursor: pointer;
+  white-space: nowrap;
+}
+.action-cancel:hover { color: #94a3b8; background: #1e293b; }
 
 /* ── Toast ──────────────────────────────────────────────────── */
 .toast-enter-active, .toast-leave-active { transition: all 250ms ease; }

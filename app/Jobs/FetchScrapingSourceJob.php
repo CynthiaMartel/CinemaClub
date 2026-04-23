@@ -129,6 +129,21 @@ class FetchScrapingSourceJob implements ShouldQueue
                 }
             }
 
+            // Fallback: si no hay descripción, intentar atributos alt de imágenes del item
+            if (empty($desc)) {
+                $imgNodes = $xpath->query('.//img[@alt]', $item);
+                $alts = [];
+                foreach ($imgNodes as $img) {
+                    $alt = trim($img->getAttribute('alt'));
+                    if (strlen($alt) > 10) { // ignorar alts decorativos cortos
+                        $alts[] = $alt;
+                    }
+                }
+                if (! empty($alts)) {
+                    $desc = implode(' | ', $alts);
+                }
+            }
+
             if (NewsItem::where('original_url', $link)->exists()) {
                 continue;
             }
@@ -159,10 +174,41 @@ class FetchScrapingSourceJob implements ShouldQueue
     }
 
     /**
+     * Extrae metadatos OpenGraph del <head> de un documento HTML.
+     * Devuelve array con keys: og_title, og_description, og_image (todos nullable).
+     * Útil como fallback cuando el scraper no encuentra items por CSS selector.
+     */
+    protected function extractOpenGraph(string $html): array
+    {
+        $og = ['og_title' => null, 'og_description' => null, 'og_image' => null];
+
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument();
+        @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+        $xpath = new \DOMXPath($dom);
+
+        $metaTags = $xpath->query('//head/meta[@property]');
+        if ($metaTags) {
+            foreach ($metaTags as $meta) {
+                $prop    = strtolower($meta->getAttribute('property'));
+                $content = trim($meta->getAttribute('content'));
+                match ($prop) {
+                    'og:title'       => $og['og_title']       = $content,
+                    'og:description' => $og['og_description'] = $content,
+                    'og:image'       => $og['og_image']       = $content,
+                    default          => null,
+                };
+            }
+        }
+
+        return $og;
+    }
+
+    /**
      * Comprueba robots.txt del dominio.
      * Solo comprueba reglas globales (User-agent: *) por simplicidad.
      */
-    private function isAllowedByRobots(string $url): bool
+    protected function isAllowedByRobots(string $url): bool
     {
         $base  = $this->baseUrl($url);
         $path  = parse_url($url, PHP_URL_PATH) ?: '/';
@@ -203,7 +249,7 @@ class FetchScrapingSourceJob implements ShouldQueue
      * Convierte un selector CSS simple a XPath.
      * Soporta: tag, .class, tag.class, #id, descendant (espacio), > hijo directo.
      */
-    private function cssToXpath(string $selector): string
+    protected function cssToXpath(string $selector): string
     {
         $selector = trim($selector);
 
@@ -221,7 +267,7 @@ class FetchScrapingSourceJob implements ShouldQueue
         return './/' . $joined;
     }
 
-    private function singleCssToXpath(string $part): string
+    protected function singleCssToXpath(string $part): string
     {
         $part = trim($part);
         $tag  = '*';
@@ -254,13 +300,13 @@ class FetchScrapingSourceJob implements ShouldQueue
         return $xpath;
     }
 
-    private function baseUrl(string $url): string
+    protected function baseUrl(string $url): string
     {
         $parts = parse_url($url);
         return ($parts['scheme'] ?? 'https') . '://' . ($parts['host'] ?? '');
     }
 
-    private function absoluteUrl(string $href, string $base): string
+    protected function absoluteUrl(string $href, string $base): string
     {
         if (str_starts_with($href, 'http')) {
             return $href;

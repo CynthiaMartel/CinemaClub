@@ -163,6 +163,24 @@ const goToWrite = (item) => {
   router.push({ name: 'editorial-write', params: { id: item.id } })
 }
 
+// Reenviar a Event Manager con datos pre-rellenos para crear evento manual
+const goToAgenda = (item) => {
+  router.push({
+    name: 'event-manager',
+    query: {
+      prefill_title: item.ai_suggested_title || item.title,
+      prefill_desc:  item.ai_summary || '',
+      prefill_url:   item.original_url,
+    },
+  })
+}
+
+// Una noticia es candidata a evento si su categoría es festival/convocatoria
+// o si la IA la puntuó con relevancia alta (≥7)
+const isEventCandidate = (item) =>
+  ['festival', 'convocatoria'].includes(item.ai_category) ||
+  (item.ai_relevance_score != null && item.ai_relevance_score >= 7)
+
 const openDetail = (item) => {
   selectedItem.value = item
   showDetail.value   = true
@@ -382,6 +400,14 @@ const goToPage = (page) => {
           >Rechazar</button>
 
           <div class="flex-1"></div>
+
+          <!-- Botón → Agenda: visible solo en noticias candidatas a evento -->
+          <button
+            v-if="isEventCandidate(item)"
+            class="action-btn agenda"
+            title="Añadir a la agenda de eventos de Canarias"
+            @click="goToAgenda(item)"
+          >→ Agenda</button>
 
           <a
             :href="item.original_url"
@@ -699,6 +725,8 @@ const goToPage = (page) => {
 .action-btn.preview:hover { background: rgb(71 85 105 / 0.5); color: #cbd5e1; }
 .action-btn:disabled      { opacity: 0.4; cursor: not-allowed; }
 
+.action-btn.agenda        { background: rgb(120 53 15/0.3); color: #fcd34d; border: 1px solid rgb(180 83 9/0.3); }
+.action-btn.agenda:hover  { background: rgb(120 53 15/0.5); }
 .action-btn.edit-primary {
   background: #13c090;
   color: #fff;

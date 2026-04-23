@@ -312,6 +312,29 @@ class EditorialController extends Controller
     }
 
     /**
+     * PATCH /api/editorial/sources/{id}
+     * Actualiza nombre y/o URL de una fuente editorial.
+     */
+    public function updateSource(Request $request, int $id): JsonResponse
+    {
+        if ($err = $this->authorizeEditor()) return $err;
+
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'url'  => 'sometimes|url|max:500',
+        ]);
+
+        $source = NewsSource::findOrFail($id);
+        $source->update($validated);
+
+        return response()->json([
+            'success' => 1,
+            'message' => 'Fuente actualizada.',
+            'data'    => $source,
+        ]);
+    }
+
+    /**
      * PATCH /api/editorial/sources/{id}/toggle
      * Activa/pausa una fuente.
      */
