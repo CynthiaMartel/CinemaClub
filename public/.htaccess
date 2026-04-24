@@ -4,24 +4,22 @@
     </IfModule>
 
     RewriteEngine On
+    RewriteBase /
 
-    # Pasar cabeceras de auth a PHP (necesario en algunos hostings compartidos)
+    # Pasar cabeceras de auth a PHP (necesario en Hostinger shared hosting)
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-    # Quitar trailing slash si no es directorio
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteCond %{REQUEST_URI} (.+)/$
-    RewriteRule ^ %1 [L,R=301]
+    # Bloquear acceso directo a la carpeta backend-api/ salvo a través de las reglas de abajo
+    RewriteRule ^backend-api/$ - [F,L]
 
-    # 1. Rutas de API y Sanctum → Laravel (index.php)
-    RewriteRule ^(api|sanctum)(/.*)?$ index.php [L,QSA]
+    # 1. Rutas de API y Sanctum → Laravel (backend-api/index.php)
+    RewriteRule ^(api|sanctum)(/.*)? backend-api/index.php [L,QSA]
 
     # 2. Archivos y directorios que existen → servirlos directamente
-    #    (assets JS/CSS, imágenes, sw.js, manifest, etc.)
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
