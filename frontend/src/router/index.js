@@ -49,7 +49,7 @@ const routes = [
   {
   path: '/entry/:type/:id', 
   name: 'entry-detail',
-  component: () => EntryPrincipalView,
+  component: EntryPrincipalView,
   props: true // Esto permite pasar los parámetros como variables automática
   },
   {
@@ -61,7 +61,7 @@ const routes = [
   {
     path: '/entry-feed/',
     name: 'entry-feed',
-    component: () => EntryFeedView,
+    component: EntryFeedView,
     props: true
   },
   {
