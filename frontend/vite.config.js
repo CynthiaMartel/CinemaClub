@@ -60,16 +60,21 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         runtimeCaching: [
           {
-            // Llamadas a la API — NetworkFirst: datos frescos si hay red, caché como fallback
+            // Búsqueda, auth y feed — siempre red, nunca caché (datos en tiempo real)
+            urlPattern: /^\/api\/(search|login|logout|register|check-session|user_entries\/feed|films\/trending).*/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            // Resto de llamadas a la API — NetworkFirst con caché corto de fallback
             urlPattern: /^\/api\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24, // 24 horas
+                maxAgeSeconds: 60 * 5, // 5 minutos
               },
-              networkTimeoutSeconds: 10,
+              networkTimeoutSeconds: 20,
               cacheableResponse: {
                 statuses: [0, 200],
               },
