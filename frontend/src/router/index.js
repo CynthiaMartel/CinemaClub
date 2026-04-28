@@ -1,14 +1,5 @@
-// Para las views
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '@/views/HomeView.vue'
-import FilmDetailView from '@/views/FilmDetailView.vue'
 import { useAuthStore } from '@/stores/auth'
-import UserProfile from '@/views/UserProfile.vue'
-import EntryPrincipalView from '@/views/EntryPrincipalView.vue'
-import EntryFormView from '@/views/EntryFormView.vue'
-import EntryFeedView from '@/views/EntryFeedView.vue'
-import FilmsFeedView from '@/views/FilmsFeedView.vue'
-
 
 const routes = [
   {
@@ -33,41 +24,41 @@ const routes = [
   {
     path: '/',
     name: 'home',
-    component: HomeView,
+    component: () => import('@/views/HomeView.vue'),
   },
   {
     path: '/films/:id',
     name: 'film-detail',
-    component: FilmDetailView,
+    component: () => import('@/views/FilmDetailView.vue'),
   },
   {
     path: '/profile/:username',
     name: 'user-profile',
-    component: UserProfile,
-    props: true
+    component: () => import('@/views/UserProfile.vue'),
+    props: true,
   },
   {
-  path: '/entry/:type/:id', 
-  name: 'entry-detail',
-  component: EntryPrincipalView,
-  props: true // Esto permite pasar los parámetros como variables automática
+    path: '/entry/:type/:id',
+    name: 'entry-detail',
+    component: () => import('@/views/EntryPrincipalView.vue'),
+    props: true,
   },
   {
-  path: '/create-entry/:id?',
-  name: 'create-entry',
-  component: EntryFormView,
-  props: true // Esto permite pasar los parámetros como variables automática
+    path: '/create-entry/:id?',
+    name: 'create-entry',
+    component: () => import('@/views/EntryFormView.vue'),
+    props: true,
   },
   {
     path: '/entry-feed/',
     name: 'entry-feed',
-    component: EntryFeedView,
-    props: true
+    component: () => import('@/views/EntryFeedView.vue'),
+    props: true,
   },
   {
     path: '/films',
     name: 'FilmsFeed',
-    component: FilmsFeedView,
+    component: () => import('@/views/FilmsFeedView.vue'),
   },
   {
     path: '/search',
