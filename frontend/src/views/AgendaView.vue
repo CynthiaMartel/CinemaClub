@@ -9,7 +9,7 @@ const isLoading  = ref(false)
 const error      = ref(null)
 
 const filters = ref({
-  period:     'upcoming', // upcoming | week | month | all
+  period:     'ongoing', // ongoing | upcoming | week | month | all
   island:     '',
   event_type: '',
   page:       1,
@@ -68,6 +68,9 @@ const dateParams = computed(() => {
   const pad   = (n) => String(n).padStart(2, '0')
   const fmt   = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
 
+  if (filters.value.period === 'ongoing') {
+    return { ongoing: 1 }
+  }
   if (filters.value.period === 'week') {
     const end = new Date(today); end.setDate(today.getDate() + 7)
     return { date_from: fmt(today), date_to: fmt(end) }
@@ -79,7 +82,6 @@ const dateParams = computed(() => {
   if (filters.value.period === 'all') {
     return {}
   }
-  // upcoming (default)
   return { upcoming: 1 }
 })
 
@@ -149,6 +151,7 @@ const clearType   = () => { filters.value.event_type = '' }
       <div class="flex gap-1.5 flex-wrap mb-3">
         <button
           v-for="p in [
+            { key: 'ongoing',  label: 'En curso' },
             { key: 'upcoming', label: 'Próximos' },
             { key: 'week',     label: 'Esta semana' },
             { key: 'month',    label: 'Este mes' },

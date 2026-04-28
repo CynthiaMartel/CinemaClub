@@ -50,6 +50,17 @@ class CinemaEvent extends Model
                      });
     }
 
+    /** Eventos que han comenzado y aún no han terminado */
+    public function scopeOngoing($query)
+    {
+        $today = Carbon::today();
+        return $query->where('start_date', '<=', $today)
+                     ->where(function ($q) use ($today) {
+                         $q->whereNull('end_date')
+                           ->orWhere('end_date', '>=', $today);
+                     });
+    }
+
     /** Eventos por isla */
     public function scopeByIsland($query, string $island)
     {

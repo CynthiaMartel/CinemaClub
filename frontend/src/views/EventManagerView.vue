@@ -256,8 +256,10 @@ const saveEdit = async () => {
     if (idx !== -1) events.value[idx] = { ...events.value[idx], ...data.data }
     showToast('Evento actualizado.')
     closeModal()
-  } catch {
-    showToast('Error al guardar los cambios.', 'error')
+  } catch (e) {
+    const errors = e?.response?.data?.errors
+    const first  = errors ? Object.values(errors).flat()[0] : null
+    showToast(first ?? 'Error al guardar los cambios.', 'error')
   } finally {
     isSaving.value = false
   }

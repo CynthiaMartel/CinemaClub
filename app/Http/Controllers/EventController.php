@@ -64,6 +64,9 @@ class EventController extends Controller
         if ($request->boolean('upcoming')) {
             $query->upcoming();
         }
+        if ($request->boolean('ongoing')) {
+            $query->ongoing();
+        }
 
         $events = $query->paginate(20);
 
@@ -86,14 +89,14 @@ class EventController extends Controller
         if ($request->filled('event_type')) {
             $query->where('event_type', $request->event_type);
         }
-        if ($request->filled('date_from') && $request->filled('date_to')) {
+        if ($request->boolean('ongoing')) {
+            $query->ongoing();
+        } elseif ($request->boolean('upcoming')) {
+            $query->upcoming();
+        } elseif ($request->filled('date_from') && $request->filled('date_to')) {
             $query->inRange($request->date_from, $request->date_to);
         } else {
-            // Por defecto: desde hoy en adelante
-            $query->where(function ($q) {
-                $q->whereNull('end_date')
-                  ->orWhere('end_date', '>=', now()->toDateString());
-            })->where('start_date', '>=', now()->subDays(1)->toDateString());
+            $query->upcoming();
         }
 
         $events = $query->paginate(20);
@@ -202,13 +205,13 @@ class EventController extends Controller
             'title'       => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'start_date'  => 'nullable|date',
-            'end_date'    => 'nullable|date|after_or_equal:start_date',
+            'end_date'    => 'nullable|date',
             'event_type'  => 'nullable|in:festival,projection,cycle,workshop,other',
             'venue'       => 'nullable|string|max:255',
             'island'      => 'nullable|in:GC,TF,LZ,FV,LP,EH,GO,ALL',
-            'ticket_url'  => 'nullable|url|max:500',
-            'image_url'   => 'nullable|url|max:500',
-            'source_url'  => 'nullable|url|max:500',
+            'ticket_url'  => 'nullable|string|max:500',
+            'image_url'   => 'nullable|string|max:500',
+            'source_url'  => 'nullable|string|max:500',
         ]);
 
         $event = CinemaEvent::findOrFail($id);
