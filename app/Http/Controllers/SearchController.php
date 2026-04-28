@@ -28,19 +28,24 @@ class SearchController extends Controller
         }
 
         // Films
-        $films = Film::where('title', 'like', "%{$q}%")
-            ->orWhere('original_title', 'like', "%{$q}%")
-            ->orderBy('release_date', 'desc')
-            ->limit(8)
-            ->get()
-            ->map(fn($f) => [
-                'id'    => $f->idFilm,
-                'type'  => 'film',
-                'title' => $f->title,
-                'year'  => $f->release_date ? substr($f->release_date, 0, 4) : null,
-                'frame' => $f->frame,
-                'genre' => $f->genre,
-            ]);
+        try {
+            $films = Film::where('title', 'like', "%{$q}%")
+                ->orWhere('original_title', 'like', "%{$q}%")
+                ->orWhere('alternative_titles', 'like', "%{$q}%")
+                ->orderBy('release_date', 'desc')
+                ->limit(8)
+                ->get()
+                ->map(fn($f) => [
+                    'id'    => $f->idFilm,
+                    'type'  => 'film',
+                    'title' => $f->title,
+                    'year'  => $f->release_date ? substr($f->release_date, 0, 4) : null,
+                    'frame' => $f->frame,
+                    'genre' => $f->genre,
+                ]);
+        } catch (\Exception $e) {
+            $films = collect();
+        }
 
         // Usuarios
         $users = User::where('name', 'like', "%{$q}%")
@@ -56,35 +61,43 @@ class SearchController extends Controller
             ]);
 
         // Entradas (listas, debates, reviews)
-        $entries = UserEntry::where('title', 'like', "%{$q}%")
-            ->with([
-                'user:id,name',
-                'films' => fn($q) => $q->select('films.idFilm', 'films.frame')->limit(1),
-            ])
-            ->orderBy('created_at', 'desc')
-            ->limit(8)
-            ->get()
-            ->map(fn($e) => [
-                'id'    => $e->id,
-                'type'  => $e->type,
-                'title' => $e->title,
-                'frame' => $e->films->first()?->frame,
-                'user'  => $e->user?->name,
-            ]);
+        try {
+            $entries = UserEntry::where('title', 'like', "%{$q}%")
+                ->with([
+                    'user:id,name',
+                    'films' => fn($q) => $q->select('films.idFilm', 'films.frame')->limit(1),
+                ])
+                ->orderBy('created_at', 'desc')
+                ->limit(8)
+                ->get()
+                ->map(fn($e) => [
+                    'id'    => $e->id,
+                    'type'  => $e->type,
+                    'title' => $e->title,
+                    'frame' => $e->films->first()?->frame,
+                    'user'  => $e->user?->name,
+                ]);
+        } catch (\Exception $e) {
+            $entries = collect();
+        }
 
         // Posts / Noticias
-        $posts = Post::where('title', 'like', "%{$q}%")
-            ->where('visible', 1)
-            ->orderBy('created_at', 'desc')
-            ->limit(6)
-            ->get()
-            ->map(fn($p) => [
-                'id'    => $p->id,
-                'type'  => 'post',
-                'title' => $p->title,
-                'frame' => $p->img,
-                'user'  => $p->editorName,
-            ]);
+        try {
+            $posts = Post::where('title', 'like', "%{$q}%")
+                ->where('visible', 1)
+                ->orderBy('created_at', 'desc')
+                ->limit(6)
+                ->get()
+                ->map(fn($p) => [
+                    'id'    => $p->id,
+                    'type'  => 'post',
+                    'title' => $p->title,
+                    'frame' => $p->img,
+                    'user'  => $p->editorName,
+                ]);
+        } catch (\Exception $e) {
+            $posts = collect();
+        }
 
         return response()->json([
             'success' => true,
