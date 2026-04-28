@@ -28,7 +28,7 @@ class WelcomeUserMail extends Mailable
     {
         return $this
             ->subject('¡Te damos la bienvenida a CinemaClub!')
-            ->view('emails.welcome_user');
+            ->markdown('emails.welcome_user');
     }
 }
 
