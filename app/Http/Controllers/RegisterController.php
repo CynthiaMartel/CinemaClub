@@ -33,13 +33,13 @@ class RegisterController extends Controller
         $user->save();
 
         // Creación automática de perfil de usuario pero VACÍA
-        UserProfile::create([
-        'user_id'     => $user->id,
-        'bio'         => null,
-        'location'    => null,
-        'website'     => null,
-        'top_films' => [], 
-    ]);
+        $profile = UserProfile::create([
+            'user_id'   => $user->id,
+            'bio'       => null,
+            'location'  => null,
+            'website'   => null,
+            'top_films' => [],
+        ]);
 
         // Para enviar correo de bienvenida 
         try {
@@ -58,11 +58,13 @@ class RegisterController extends Controller
             'success' => 1,
             'message' => '¡Cuenta creada con éxito! Te damos la bienvenida.',
             'user' => [
-                'id'    => $user->id,
-                'name'  => $user->name,
-                'email' => $user->email,
-                'idRol' => $user->idRol,
-                'role'  => optional($user->role)->rolType,
+                'id'      => $user->id,
+                'name'    => $user->name,
+                'email'   => $user->email,
+                'idRol'   => $user->idRol,
+                'role'    => optional($user->role)->rolType,
+                'blocked' => false,
+                'avatar'  => $profile->avatar ?? null,
             ]
         ], 201)->withCookie(
             cookie('auth_token', $token, $cookieMinutes, '/', null, $secure, true, false, 'lax')
