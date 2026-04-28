@@ -285,12 +285,141 @@ class FilmController extends Controller
         }
 
         $people = \DB::table('cast_crew')
-            ->where('name', 'like', "%{$q}%")
+            ->where(function ($query) use ($q) {
+                $query->where('name', 'like', "%{$q}%");
+                if (is_numeric($q)) {
+                    $query->orWhere('idPerson', (int) $q);
+                }
+            })
             ->select('idPerson', 'name', 'photo')
             ->limit(15)
             ->get();
 
         return response()->json(['success' => 1, 'data' => $people]);
+    }
+
+    /**
+     * Crea una nueva persona en cast_crew desde el panel admin.
+     * POST /api/admin/cast-crew/store
+     */
+    public function castPersonStore(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || !$user->isAdminOrEditor()) {
+            return response()->json(['success' => 0, 'message' => 'No autorizado'], 403);
+        }
+
+        $validated = $request->validate([
+            'name'    => ['required', 'string', 'max:255'],
+            'photo'   => ['nullable', 'url', 'max:225'],
+            'tmdb_id' => ['nullable', 'integer', 'unique:cast_crew,tmdb_id'],
+        ]);
+
+        $id = \DB::table('cast_crew')->insertGetId([
+            'name'       => $validated['name'],
+            'photo'      => $validated['photo'] ?? null,
+            'tmdb_id'    => $validated['tmdb_id'] ?? null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $person = \DB::table('cast_crew')->where('idPerson', $id)->first();
+
+        return response()->json(['success' => 1, 'data' => $person], 201);
+    }
+
+    /**
+     * Obtiene datos de una película desde la API de TMDB y los mapea a nuestro modelo.
+     * GET /api/admin/tmdb-fetch?tmdb_id=12345
+     */
+    public function tmdbFetch(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || !$user->isAdminOrEditor()) {
+            return response()->json(['success' => 0, 'message' => 'No autorizado'], 403);
+        }
+
+        $tmdbId = (int) $request->get('tmdb_id');
+        if (!$tmdbId) {
+            return response()->json(['success' => 0, 'message' => 'tmdb_id requerido'], 422);
+        }
+
+        $apiKey  = config('services.tmdb.key');
+        $base    = 'https://api.themoviedb.org/3';
+        $imgBase = 'https://image.tmdb.org/t/p/w500';
+        $imgBd   = 'https://image.tmdb.org/t/p/w1280';
+        $imgPerson = 'https://image.tmdb.org/t/p/w185';
+
+        $movieRes = Http::timeout(10)->get("{$base}/movie/{$tmdbId}", [
+            'api_key'  => $apiKey,
+            'language' => 'es-ES',
+        ]);
+
+        if ($movieRes->status() === 404) {
+            return response()->json(['success' => 0, 'message' => 'Película no encontrada en TMDB'], 404);
+        }
+        if (!$movieRes->successful()) {
+            return response()->json(['success' => 0, 'message' => 'Error al contactar TMDB'], 502);
+        }
+
+        $movie = $movieRes->json();
+
+        $creditsRes = Http::timeout(10)->get("{$base}/movie/{$tmdbId}/credits", ['api_key' => $apiKey]);
+        $credits = $creditsRes->successful() ? $creditsRes->json() : [];
+
+        $genres    = implode(', ', array_column($movie['genres'] ?? [], 'name'));
+        $countries = implode(', ', array_column($movie['production_countries'] ?? [], 'iso_3166_1'));
+
+        $filmData = [
+            'tmdb_id'           => $tmdbId,
+            'title'             => $movie['title'] ?? $movie['original_title'] ?? '',
+            'original_title'    => $movie['original_title'] ?? '',
+            'overview'          => $movie['overview'] ?? '',
+            'duration'          => $movie['runtime'] ?: null,
+            'release_date'      => $movie['release_date'] ?: null,
+            'vote_average'      => round((float)($movie['vote_average'] ?? 0), 1),
+            'genre'             => $genres,
+            'origin_country'    => $countries,
+            'original_language' => $movie['original_language'] ?? '',
+            'frame'             => isset($movie['poster_path'])   ? $imgBase . $movie['poster_path']   : null,
+            'backdrop'          => isset($movie['backdrop_path']) ? $imgBd   . $movie['backdrop_path'] : null,
+        ];
+
+        // Director: buscar en cast_crew por tmdb_id
+        $tmdbDirector = collect($credits['crew'] ?? [])->firstWhere('job', 'Director');
+        $directorData = null;
+        if ($tmdbDirector) {
+            $dbPerson = \DB::table('cast_crew')->where('tmdb_id', $tmdbDirector['id'])->first();
+            $directorData = [
+                'tmdb_id'  => $tmdbDirector['id'],
+                'name'     => $tmdbDirector['name'],
+                'photo'    => $tmdbDirector['profile_path'] ? $imgPerson . $tmdbDirector['profile_path'] : null,
+                'idPerson' => $dbPerson?->idPerson ?? null,
+            ];
+        }
+
+        // Cast (top 10): buscar en cast_crew por tmdb_id
+        $castData = [];
+        foreach (array_slice($credits['cast'] ?? [], 0, 10) as $member) {
+            $dbPerson = \DB::table('cast_crew')->where('tmdb_id', $member['id'])->first();
+            $castData[] = [
+                'tmdb_id'   => $member['id'],
+                'name'      => $member['name'],
+                'photo'     => $member['profile_path'] ? $imgPerson . $member['profile_path'] : null,
+                'character' => $member['character'] ?? '',
+                'order'     => $member['order'] ?? 0,
+                'idPerson'  => $dbPerson?->idPerson ?? null,
+            ];
+        }
+
+        return response()->json([
+            'success' => 1,
+            'data' => [
+                'film'     => $filmData,
+                'director' => $directorData,
+                'cast'     => $castData,
+            ],
+        ]);
     }
 
     /**

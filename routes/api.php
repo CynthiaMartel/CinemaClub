@@ -104,6 +104,14 @@ Route::middleware('auth:sanctum')
     // BUSCAR personas en cast_crew para autocompletado (admin)
     Route::get('/admin/cast-search', [FilmController::class, 'castSearch'])
         ->name('api.admin.cast-search');
+
+    // IMPORTAR datos de película desde TMDB
+    Route::get('/admin/tmdb-fetch', [FilmController::class, 'tmdbFetch'])
+        ->name('api.admin.tmdb-fetch');
+
+    // CREAR nueva persona en cast_crew
+    Route::post('/admin/cast-crew/store', [FilmController::class, 'castPersonStore'])
+        ->name('api.admin.cast-crew.store');
 });
 
 
@@ -292,6 +300,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/user_entries/create', [UserEntryController::class, 'store'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
         ->name('api.user_entries.create');
+
+    //  ACTUALIZAR una entrada (solo para el dueño o admin)
+    Route::put('/user_entries/{id}', [UserEntryController::class, 'update'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.user_entries.update');
 
     //  ELIMINAR una entrada (solo para user o admin)
     Route::delete('/user_entries/{id}', [UserEntryController::class, 'destroy'])
