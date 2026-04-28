@@ -6,9 +6,11 @@ import api from '@/services/api'
 import RegisterModal from '@/components/RegisterModal.vue'
 import HomeBackdropModal from '@/components/HomeBackdropModal.vue'
 import StarDisplay from '@/components/StarDisplay.vue'
+import { useNavState } from '@/composables/useNavState'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { isUserMenuOpen } = useNavState()
 
 // --- ESTADO ---
 const isRegisterOpen = ref(false)
@@ -185,7 +187,7 @@ watch(() => auth.isAuthenticated, (isAuth) => {
       </div>
 
       <div>  
-        <div v-if="isAdmin" class="absolute top-4 left-4 sm:top-10 sm:left-10 z-50">
+        <div v-if="isAdmin" class="absolute top-4 left-4 sm:top-10 sm:left-10 z-50 transition-opacity duration-150" :class="{ 'opacity-0 pointer-events-none sm:opacity-100 sm:pointer-events-auto': isUserMenuOpen }">
               <button @click="openBackdropModal" class="flex items-center gap-2 bg-brand/20 hover:bg-brand text-white border border-brand/50 px-3 sm:px-4 py-2 rounded text-[10px] font-black uppercase tracking-widest transition-all">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" /></svg>
                   <span class="hidden sm:inline">Cambiar Backdrop</span>
@@ -237,7 +239,7 @@ watch(() => auth.isAuthenticated, (isAuth) => {
           <!-- Films: rated, watched, liked -->
           <section v-if="friendsActivity.length > 0">
             <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
-              <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-200">Actividad de mi comunidad</h2>
+              <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-200">Visionados de mi comunidad</h2>
               <button @click="router.push('/feed')" class="flex items-center gap-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-brand transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
                 Ver todo
@@ -263,15 +265,18 @@ watch(() => auth.isAuthenticated, (isAuth) => {
                 </div>
 
                 <!-- Iconos + estrellas debajo del poster -->
-                <div class="flex items-center gap-1.5 mt-2 px-0.5">
-                  <StarDisplay v-if="activity.rating" :rating="activity.rating" />
-                  <svg v-if="activity.is_favorite" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-brand flex-shrink-0" title="Favorita">
-                    <path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
-                  </svg>
-                  <svg v-if="activity.watched" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" title="Vista">
-                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" /><path fill-rule="evenodd" d="M1.323 11.447C2.811 6.976 7.028 3.75 12.001 3.75c4.97 0 9.185 3.223 10.675 7.69.12.362.12.752 0 1.113-1.487 4.471-5.705 7.697-10.677 7.697-4.97 0-9.186-3.223-10.675-7.69a1.762 1.762 0 0 1 0-1.113ZM17.25 12a5.25 5.25 0 1 1-10.5 0 5.25 5.25 0 0 1 10.5 0Z" clip-rule="evenodd" />
-                  </svg>
-                  <time class="text-[9px] font-bold text-slate-400 uppercase ml-auto">{{ formatShortDate(activity.updated_at) }}</time>
+                <div class="flex flex-col items-center gap-1 mt-2">
+                  <div class="flex items-center justify-center gap-1.5">
+                    <StarDisplay v-if="activity.rating" :rating="activity.rating" :lg="true" />
+                    <span v-if="activity.rating" class="text-[11px] font-black text-slate-200 leading-none tabular-nums">{{ activity.rating }}</span>
+                    <svg v-if="activity.is_favorite" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 text-brand flex-shrink-0" title="Favorita">
+                      <path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
+                    </svg>
+                    <svg v-if="activity.watched" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 text-emerald-400 flex-shrink-0" title="Vista">
+                      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" /><path fill-rule="evenodd" d="M1.323 11.447C2.811 6.976 7.028 3.75 12.001 3.75c4.97 0 9.185 3.223 10.675 7.69.12.362.12.752 0 1.113-1.487 4.471-5.705 7.697-10.677 7.697-4.97 0-9.186-3.223-10.675-7.69a1.762 1.762 0 0 1 0-1.113ZM17.25 12a5.25 5.25 0 1 1-10.5 0 5.25 5.25 0 0 1 10.5 0Z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <time class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">{{ formatShortDate(activity.updated_at) }}</time>
                 </div>
               </li>
             </ul>
@@ -280,7 +285,7 @@ watch(() => auth.isAuthenticated, (isAuth) => {
           <!-- Entradas: debates, reviews, listas -->
           <section v-if="friendsEntries.length > 0">
             <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
-              <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-200">Entradas de mi comunidad</h2>
+              <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-200">Debates, reviews, listas de mi comunidad</h2>
               <button @click="router.push('/feed')" class="text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-brand transition-colors">Ver todo</button>
             </div>
 
@@ -303,6 +308,7 @@ watch(() => auth.isAuthenticated, (isAuth) => {
                           :key="film.idFilm"
                           class="mini-poster-item"
                           :style="{ zIndex: fi * 10 }"
+                          @click.stop="router.push(`/films/${film.idFilm}`)"
                         >
                           <img :src="film.frame || '/default-poster.webp'" :alt="film.title" class="mini-poster-img" loading="lazy" />
                         </li>
@@ -315,7 +321,8 @@ watch(() => auth.isAuthenticated, (isAuth) => {
 
                   <!-- DEBATE: poster portrait + bocadillo naranja -->
                   <template v-else-if="entry.type === 'user_debate'">
-                    <div class="relative w-[90px] h-[135px] sm:w-[100px] sm:h-[150px] rounded overflow-hidden border border-white/10 group-hover:border-orange-500/40 transition-colors shadow-md">
+                    <div class="relative w-[90px] h-[135px] sm:w-[100px] sm:h-[150px] rounded overflow-hidden border border-white/10 group-hover:border-orange-500/40 transition-colors shadow-md"
+                      @click.stop="entry.films?.[0]?.idFilm && router.push(`/films/${entry.films[0].idFilm}`)">
                       <img :src="entry.films?.[0]?.frame || '/default-poster.webp'" :alt="entry.title"
                         class="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" loading="lazy" />
                       <div class="absolute top-1 left-1 w-4 h-4 rounded-full bg-slate-900/90 border border-slate-700 flex items-center justify-center text-orange-400">
@@ -326,7 +333,8 @@ watch(() => auth.isAuthenticated, (isAuth) => {
 
                   <!-- REVIEW: poster portrait sepia + icono globo blanco -->
                   <template v-else>
-                    <div class="relative w-[90px] h-[135px] sm:w-[100px] sm:h-[150px] rounded overflow-hidden border border-white/10 group-hover:border-slate-400/50 transition-colors shadow-md">
+                    <div class="relative w-[90px] h-[135px] sm:w-[100px] sm:h-[150px] rounded overflow-hidden border border-white/10 group-hover:border-slate-400/50 transition-colors shadow-md"
+                      @click.stop="entry.films?.[0]?.idFilm && router.push(`/films/${entry.films[0].idFilm}`)">
                       <img :src="entry.films?.[0]?.frame || '/default-poster.webp'" :alt="entry.title"
                         class="w-full h-full object-cover opacity-75 sepia-[0.5] group-hover:sepia-0 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" loading="lazy" />
                       <div class="absolute top-1 left-1 w-4 h-4 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white">
@@ -433,9 +441,8 @@ watch(() => auth.isAuthenticated, (isAuth) => {
                   </svg>
                 </div>
                 <div class="text-left">
-                  <p class="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 mb-1">Recomendador con IA</p>
                   <p class="text-lg md:text-xl font-black uppercase italic tracking-tighter text-white leading-tight group-hover:text-amber-500 transition-colors">
-                    No sé qué ver esta noche
+                    No sé qué ver
                   </p>
                 </div>
               </div>
@@ -536,26 +543,35 @@ watch(() => auth.isAuthenticated, (isAuth) => {
                     Ver más
                   </button>
                 </div>
-                <div class="flex flex-col gap-5">
+                <div class="flex flex-col gap-6">
                     <div
                         v-for="list in popularLists.slice(0, 4)" :key="list.id"
                         @click="goToEntry('user_list', list.id)"
-                        class="flex items-center gap-4 group cursor-pointer"
+                        class="group cursor-pointer"
                     >
-                        <div class="relative w-[75px] h-[110px] flex-shrink-0 overflow-hidden rounded">
-                            <div v-if="list.films?.[1]" class="absolute top-1 left-2 w-full h-full bg-slate-700 rounded border border-slate-600 transform rotate-6 opacity-60 z-0 group-hover:opacity-80 transition-opacity duration-200"></div>
-                            <img :src="list.films?.[0]?.frame || '/default-poster.webp'" class="absolute top-0 left-0 w-full h-full object-cover rounded border border-slate-600 z-10 group-hover:scale-105 transition-transform duration-300" />
+                        <div v-if="list.films?.length" class="mini-poster-stack mb-2.5">
+                            <ul class="mini-poster-list">
+                                <li
+                                    v-for="(film, idx) in list.films.slice(0, 5)"
+                                    :key="film.idFilm || idx"
+                                    class="mini-poster-item"
+                                    :style="{ zIndex: idx * 10 }"
+                                >
+                                    <img :src="film.frame || '/default-poster.webp'" :alt="film.title" class="mini-poster-img" loading="lazy" />
+                                </li>
+                            </ul>
                         </div>
-                        <div class="min-w-0">
-                            <h3 class="text-[12px] font-black uppercase text-slate-200 truncate group-hover:text-brand transition-colors">{{ list.title }}</h3>
-                            <div class="flex items-center gap-1.5 mt-1">
-                               <div class="w-4 h-4 rounded-full bg-slate-700 border border-slate-500 flex items-center justify-center flex-shrink-0">
-                                   <span class="text-[7px] font-black text-white">{{ getInitial(list.user?.name) }}</span>
-                               </div>
-                               <p class="text-[10px] font-bold text-slate-200 truncate">{{ list.user?.name }}</p>
+                        <div v-else class="w-[90px] h-[135px] bg-slate-800/60 rounded border border-slate-700/50 flex items-center justify-center mb-2.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-slate-600"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" /></svg>
+                        </div>
+                        <h3 class="text-[12px] font-black uppercase text-slate-200 line-clamp-1 group-hover:text-brand transition-colors">{{ list.title }}</h3>
+                        <div class="flex items-center gap-1.5 mt-1">
+                            <div class="w-4 h-4 rounded-full bg-slate-700 border border-slate-500 flex items-center justify-center flex-shrink-0">
+                                <span class="text-[7px] font-black text-white">{{ getInitial(list.user?.name) }}</span>
                             </div>
-                            <p class="text-[9px] text-slate-400 uppercase mt-2 font-bold">{{ list.films?.length }} Films</p>
+                            <p class="text-[10px] font-bold text-slate-200 truncate">{{ list.user?.name }}</p>
                         </div>
+                        <p class="text-[9px] text-slate-400 uppercase mt-1 font-bold">{{ list.films?.length }} Films</p>
                     </div>
                 </div>
             </div>
@@ -597,9 +613,7 @@ watch(() => auth.isAuthenticated, (isAuth) => {
                                 <StarDisplay :rating="review.rating" />
                             </div>
 
-                            <div class="text-[12px] text-slate-400 font-light line-clamp-3 mb-3 leading-relaxed">
-                                <p v-html="review.content"></p>
-                            </div>
+                            <div class="ck-content text-[12px] text-slate-400 font-light line-clamp-3 mb-3 leading-relaxed" v-html="review.content"></div>
 
                             <div class="mt-auto flex items-center gap-4 text-[10px] font-bold">
                                 <div class="flex items-center gap-1.5 text-slate-300 hover:text-brand transition-colors">
@@ -673,12 +687,13 @@ watch(() => auth.isAuthenticated, (isAuth) => {
   animation: fade-in-up 1.2s ease-out forwards;
 }
 
-/* Mini poster stack (Entradas de mi comunidad — listas) */
+/* Mini poster stack (Entradas de mi comunidad — listas / Listas Populares) */
 .mini-poster-stack { overflow: hidden; }
 .mini-poster-list { display: flex; height: 135px; position: relative; list-style: none; padding: 0; margin: 0; }
-.mini-poster-item { position: relative; width: 90px; height: 135px; margin-left: -63px; flex-shrink: 0; transition: transform 0.3s ease; }
+.mini-poster-item { position: relative; width: 90px; height: 135px; margin-left: -63px; flex-shrink: 0; transition: transform 0.4s ease; }
 .mini-poster-item:first-child { margin-left: 0; }
 .mini-poster-img { width: 90px; height: 135px; object-fit: cover; border: 1.5px solid #14181c; border-radius: 5px; box-shadow: 8px 0 18px rgba(0,0,0,0.6); }
+.group:hover .mini-poster-item { transform: translateY(-6px) rotate(-1deg); }
 
 /* Scrollbars personalizadas */
 .brand-scroll::-webkit-scrollbar { width: 4px; height: 4px; }

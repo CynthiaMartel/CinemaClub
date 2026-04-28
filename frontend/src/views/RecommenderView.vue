@@ -319,9 +319,8 @@ const refineResults = async () => {
 
         <!-- Texto principal -->
         <div class="flex flex-col items-center gap-3">
-          <p class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Recomendador con IA</p>
           <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black uppercase italic tracking-tighter text-white leading-[0.9]">
-            No sé qué<br/>ver esta noche
+            No sé qué ver
           </h1>
           <p class="text-slate-400 text-sm md:text-base font-light max-w-xs text-center leading-relaxed mt-2">
             Responde 4 preguntas y te recomendamos las películas perfectas para ti.
@@ -608,7 +607,7 @@ const refineResults = async () => {
               </div>
               <div>
                 <p class="text-sm font-black uppercase tracking-widest text-white">¿Afinar la búsqueda?</p>
-                <p class="text-xs text-slate-400 mt-0.5">Prioriza dentro de las {{ cachedFilms.length }} candidatas ya filtradas. Para géneros distintos, inicia una nueva búsqueda.</p>
+                <p class="text-xs text-slate-400 mt-0.5">Prioriza dentro de las candidatas ya filtradas. Para géneros distintos, inicia una nueva búsqueda.</p>
               </div>
             </div>
             <div class="flex flex-col sm:flex-row gap-2">

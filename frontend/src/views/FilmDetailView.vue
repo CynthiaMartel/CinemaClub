@@ -45,6 +45,14 @@ const hasAnyEntries = computed(() =>
 
 const activeEntries = computed(() => filmEntries.value[activeEntriesTab.value])
 
+const ENTRY_LIMIT = 6
+const showAllEntries = ref(false)
+watch(activeEntriesTab, () => { showAllEntries.value = false })
+const visibleEntries = computed(() =>
+  showAllEntries.value ? activeEntries.value : activeEntries.value.slice(0, ENTRY_LIMIT)
+)
+const hasMoreEntries = computed(() => activeEntries.value.length > ENTRY_LIMIT)
+
 const entryTabs = [
   { key: 'lists',   label: 'Listas',   type: 'user_list' },
   { key: 'debates', label: 'Debates',  type: 'user_debate' },
@@ -159,6 +167,11 @@ const fetchFilm = async () => {
   }
 }
 
+const stripHtml = (html) => {
+  if (!html) return ''
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)
+}
+
 const fetchUserFilmActions = async () => {
   if (!film.value || !auth.isAuthenticated) return
   try {
@@ -237,17 +250,21 @@ onMounted(fetchFilm)
               <RatingIt :filmId="film.idFilm" :filmRef="film" />
 
               <div class="grid grid-cols-4 gap-2 mt-5 pt-5 border-t border-white/5 text-[#9ab]">
-                <button @click="userActionsStore.toggleFavorite(film.idFilm, film)" :class="film.user_action?.is_favorite ? 'text-[#BE2B0C] bg-[#BE2B0C]/10' : 'hover:text-white'" class="aspect-square flex items-center justify-center rounded transition-all">
+                <button @click="userActionsStore.toggleFavorite(film.idFilm, film)" :class="film.user_action?.is_favorite ? 'text-[#BE2B0C] bg-[#BE2B0C]/10' : 'hover:text-white'" class="action-btn aspect-square flex items-center justify-center rounded transition-all relative">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
+                  <span class="action-tooltip">Favorito</span>
                 </button>
-                <button @click="userActionsStore.toggleWatched(film.idFilm, film)" :class="film.user_action?.watched ? 'text-[#00c020] bg-[#00c020]/10' : 'hover:text-white'" class="aspect-square flex items-center justify-center rounded transition-all">
+                <button @click="userActionsStore.toggleWatched(film.idFilm, film)" :class="film.user_action?.watched ? 'text-[#00c020] bg-[#00c020]/10' : 'hover:text-white'" class="action-btn aspect-square flex items-center justify-center rounded transition-all relative">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                  <span class="action-tooltip">Vista</span>
                 </button>
-                <button @click="userActionsStore.toggleWatchLater(film.idFilm, film)" :class="film.user_action?.watch_later ? 'text-[#34a8c4] bg-[#34a8c4]/10' : 'hover:text-white'" class="aspect-square flex items-center justify-center rounded transition-all">
+                <button @click="userActionsStore.toggleWatchLater(film.idFilm, film)" :class="film.user_action?.watch_later ? 'text-[#34a8c4] bg-[#34a8c4]/10' : 'hover:text-white'" class="action-btn aspect-square flex items-center justify-center rounded transition-all relative">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                  <span class="action-tooltip">Ver más tarde</span>
                 </button>
-                <button @click="isListModalOpen = true" class="aspect-square flex items-center justify-center rounded hover:text-white transition-all">
+                <button @click="isListModalOpen = true" class="action-btn aspect-square flex items-center justify-center rounded hover:text-white transition-all relative">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  <span class="action-tooltip">Añadir a lista</span>
                 </button>
               </div>
 
@@ -356,14 +373,38 @@ onMounted(fetchFilm)
             </div>
 
             <!-- Aparece en FilmoClub -->
-            <div v-if="hasAnyEntries || isLoadingEntries" class="mb-14 pt-16">
+            <div class="mb-14 pt-16">
 
-              <!-- Header accent -->
-              <div class="flex items-center justify-between border-l-4 border-[#BE2B0C] pl-4">
-                <h3 class="text-lg font-black uppercase italic tracking-tighter text-white leading-none">Aparece en FilmoClub</h3>
+              <!-- Header accent + CTA -->
+              <div class="flex flex-wrap items-start justify-between gap-6 border-l-4 border-[#BE2B0C] pl-4 mb-8">
+                <h3 class="text-lg font-black uppercase italic tracking-tighter text-white leading-none pt-0.5">Aparece en FilmoClub</h3>
+
+                <div v-if="auth.isAuthenticated" class="flex flex-col items-end gap-2">
+                  <p class="text-[9px] text-[#678] font-black uppercase tracking-wider">Crea un debate, review o lista:</p>
+                  <router-link
+                    :to="{ name: 'create-entry' }"
+                    class="flex items-center gap-1.5 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-[#BE2B0C]/50 text-[#BE2B0C] hover:bg-[#BE2B0C] hover:text-white transition-all duration-300"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3 h-3">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    Crear Entrada
+                  </router-link>
+                </div>
+
+                <div v-else class="flex flex-col items-end gap-1.5 text-right">
+                  <p class="text-[9px] text-[#678] font-black uppercase tracking-wider">Crea un debate, review o lista:</p>
+                  <p class="text-[10px] text-[#9ab] leading-relaxed">
+                    <button @click="openLogin" class="text-[#BE2B0C] font-black hover:underline">Regístrate</button>
+                    <span class="text-[#678]"> o </span>
+                    <button @click="openLogin" class="font-bold hover:text-white hover:underline">inicia sesión</button>
+                    <span class="text-[#678]"> si ya tienes cuenta para acceder</span>
+                  </p>
+                </div>
               </div>
 
-              <!-- Tabs -->
+              <!-- Tabs y entries (solo si hay contenido) -->
+              <template v-if="hasAnyEntries || isLoadingEntries">
               <div class="entries-tabs-row">
                 <button
                   v-for="tab in entryTabs"
@@ -390,14 +431,14 @@ onMounted(fetchFilm)
 
               <!-- Cards horizontales -->
               <template v-else>
-                <div v-if="activeEntries.length" class="entries-scroll entries-grid">
+                <div v-if="activeEntries.length" class="entries-scroll" :class="activeEntriesTab === 'lists' ? 'entries-grid' : 'entries-list'">
 
                   <router-link
-                    v-for="entry in activeEntries"
+                    v-for="entry in visibleEntries"
                     :key="entry.id"
                     :to="{ name: 'entry-detail', params: { type: entry.type, id: entry.id } }"
-                    class="flex-shrink-0 group cursor-pointer"
-                    :class="activeEntriesTab === 'lists' ? 'w-[200px]' : 'w-[120px]'"
+                    class="group cursor-pointer"
+                    :class="activeEntriesTab === 'lists' ? 'flex-shrink-0 w-[200px]' : 'block'"
                   >
                     <!-- LISTA: posters solapados -->
                     <template v-if="activeEntriesTab === 'lists'">
@@ -418,50 +459,72 @@ onMounted(fetchFilm)
                           </li>
                         </ul>
                       </div>
+                      <h4 class="text-[11px] font-black uppercase text-white group-hover:text-[#BE2B0C] transition-colors leading-tight truncate px-0.5">{{ entry.title }}</h4>
+                      <p class="text-[9px] text-[#678] font-bold uppercase mt-1 px-0.5 truncate tracking-wider">{{ entry.user?.name }}</p>
                     </template>
 
-                    <!-- RESEÑA: portada + icono estrella -->
+                    <!-- RESEÑA: tarjeta horizontal tipo Letterboxd -->
                     <template v-else-if="activeEntriesTab === 'reviews'">
-                      <div class="aspect-[2/3] rounded-xl overflow-hidden mb-3 relative shadow-lg border border-slate-800 group-hover:border-[#BE2B0C] transition-colors duration-300">
-                        <img
-                          v-if="entry.films?.[0]?.frame"
-                          :src="entry.films[0].frame"
-                          class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                        <div v-else class="w-full h-full bg-[#1b2228] flex items-center justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-[#445]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                      <div class="flex gap-4 bg-[#1b2228]/50 hover:bg-[#1b2228] border border-white/5 hover:border-white/15 rounded-lg p-3 transition-all duration-200">
+                        <div class="flex-shrink-0">
+                          <div class="w-[52px] h-[78px] rounded overflow-hidden border border-white/10 bg-[#0d1117]">
+                            <img v-if="entry.films?.[0]?.frame" :src="entry.films[0].frame" class="w-full h-full object-cover" />
+                            <div v-else class="w-full h-full flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-[#334]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            </div>
+                          </div>
                         </div>
-                        <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent"></div>
-                        <div class="absolute top-2 right-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-yellow-400" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        <div class="flex flex-col gap-1 min-w-0 flex-1 py-0.5">
+                          <div class="flex items-center gap-2">
+                            <div class="w-5 h-5 rounded-full bg-[#BE2B0C]/20 flex items-center justify-center text-[9px] font-black text-[#BE2B0C] flex-shrink-0 uppercase">{{ entry.user?.name?.[0] }}</div>
+                            <span class="text-[10px] font-black text-[#9ab] uppercase tracking-wider truncate">{{ entry.user?.name }}</span>
+                            <span v-if="entry.likes_count" class="text-[9px] text-[#445] flex-shrink-0 ml-auto">{{ entry.likes_count }} ♥</span>
+                          </div>
+                          <h4 class="text-[12px] font-black text-white group-hover:text-[#BE2B0C] transition-colors leading-snug line-clamp-1 mt-0.5">{{ entry.title }}</h4>
+                          <p v-if="entry.content" class="text-[11px] text-[#567] leading-relaxed line-clamp-2">{{ stripHtml(entry.content) }}</p>
                         </div>
                       </div>
                     </template>
 
-                    <!-- DEBATE: portada desaturada + icono chat -->
+                    <!-- DEBATE: tarjeta editorial con acento naranja -->
                     <template v-else-if="activeEntriesTab === 'debates'">
-                      <div class="aspect-[2/3] rounded-lg bg-[#0a0a0a] border border-slate-800 overflow-hidden mb-3 relative shadow-md group-hover:border-orange-400 transition-colors duration-300">
-                        <img
-                          v-if="entry.films?.[0]?.frame"
-                          :src="entry.films[0].frame"
-                          class="w-full h-full object-cover opacity-55 grayscale-[30%] group-hover:opacity-90 group-hover:grayscale-0 transition-all duration-500"
-                        />
-                        <div v-else class="w-full h-full bg-[#1b2228] flex items-center justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-[#445]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      <div class="flex gap-4 bg-[#171c20] hover:bg-[#1c2228] border border-white/5 hover:border-orange-400/20 rounded-lg p-4 transition-all duration-200 relative overflow-hidden">
+                        <div v-if="entry.films?.[0]?.frame" class="absolute inset-0 opacity-[0.05] bg-cover bg-center pointer-events-none" :style="{ backgroundImage: `url(${entry.films[0].frame})` }"></div>
+                        <div class="flex-shrink-0 relative z-10">
+                          <div class="w-[40px] h-[60px] rounded overflow-hidden border border-orange-400/15 bg-[#0d1117]">
+                            <img v-if="entry.films?.[0]?.frame" :src="entry.films[0].frame" class="w-full h-full object-cover opacity-60 grayscale" />
+                            <div v-else class="w-full h-full flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-orange-400/40" fill="currentColor" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            </div>
+                          </div>
                         </div>
-                        <div class="absolute top-2 left-2 bg-black/70 p-1 rounded-full border border-white/10">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-orange-400" fill="currentColor" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <div class="flex flex-col gap-1.5 min-w-0 flex-1 relative z-10">
+                          <div class="flex items-center gap-1.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-orange-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            <span class="text-[8px] font-black uppercase tracking-[0.2em] text-orange-400">Debate</span>
+                            <span v-if="entry.likes_count" class="text-[9px] text-[#445] ml-auto">{{ entry.likes_count }} ♥</span>
+                          </div>
+                          <h4 class="text-[13px] font-black text-white group-hover:text-orange-300 transition-colors leading-snug line-clamp-2">{{ entry.title }}</h4>
+                          <p v-if="entry.content" class="text-[11px] text-[#567] line-clamp-2 leading-relaxed">{{ stripHtml(entry.content) }}</p>
+                          <span class="text-[9px] text-[#9ab] font-bold pt-0.5">{{ entry.user?.name }}</span>
                         </div>
                       </div>
                     </template>
-
-                    <!-- Texto -->
-                    <h4 class="text-[11px] font-black uppercase text-white group-hover:text-[#BE2B0C] transition-colors leading-tight truncate px-0.5">{{ entry.title }}</h4>
-                    <p class="text-[9px] text-[#678] font-bold uppercase mt-1 px-0.5 truncate tracking-wider">{{ entry.user?.name }}</p>
                   </router-link>
 
                 </div>
-                <p v-else class="text-[10px] text-[#678] font-black uppercase tracking-widest py-4">Sin resultados aún</p>
+
+                <div v-if="hasMoreEntries && !showAllEntries" class="mt-4 text-center">
+                  <button
+                    @click="showAllEntries = true"
+                    class="text-[9px] font-black uppercase tracking-widest text-[#678] hover:text-white border border-[#2a3240] hover:border-[#445] px-5 py-2 rounded transition-all"
+                  >
+                    Ver los {{ activeEntries.length - ENTRY_LIMIT }} restantes
+                  </button>
+                </div>
+
+                <p v-else-if="!activeEntries.length" class="text-[10px] text-[#678] font-black uppercase tracking-widest py-4">Sin resultados aún</p>
+              </template>
               </template>
             </div>
 
@@ -504,13 +567,57 @@ onMounted(fetchFilm)
 /* Tabs de entries */
 .entries-tabs-row { display: flex; gap: 16px; margin-top: 40px; margin-bottom: 24px; }
 
-/* Grid horizontal entries */
+/* Grid horizontal entries (listas) */
 .entries-grid { display: flex; gap: 32px; overflow-x: auto; padding-bottom: 16px; }
+
+/* Grid 2 columnas para reviews y debates */
+.entries-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .entries-list { grid-template-columns: 1fr; }
+}
 
 /* Scroll horizontal entries */
 .entries-scroll { scrollbar-width: thin; scrollbar-color: #2a3240 transparent; }
 .entries-scroll::-webkit-scrollbar { height: 3px; }
 .entries-scroll::-webkit-scrollbar-thumb { background: #2a3240; border-radius: 4px; }
+
+/* Tooltip de acciones */
+.action-btn:hover .action-tooltip {
+  opacity: 1;
+}
+.action-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0d1117;
+  color: #e2e8f0;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+  z-index: 50;
+}
+.action-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #0d1117;
+}
 
 /* Poster stack para listas */
 .entry-poster-wrap { height: 110px; }

@@ -189,7 +189,7 @@ watch(() => route.params.id, () => {
             </figure>
 
             <div class="post-content text-slate-300 leading-relaxed text-lg mb-16 font-sans font-light text-left">
-                <div v-html="post.content"></div>
+                <div class="ck-content" v-html="post.content"></div>
             </div>
 
             <section class="border-t border-slate-800/50 pt-12">

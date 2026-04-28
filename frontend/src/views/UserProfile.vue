@@ -52,9 +52,7 @@ const contentSections = ref([
 ])
 
 const goCreateEntry = () => {
-  if (auth.user?.id) {
-    router.push({ name: 'create-entry', params: { id: auth.user.id } })
-  }
+  router.push({ name: 'create-entry' })
 }
 
 // 1. Cargar lo que el usuario HA CREADO
@@ -255,6 +253,11 @@ const goToProfile = (username) => {
 // Obtener inicial para el avatar con inicial del nombre del user
 const getInitial = (name) => {
     return name ? name.charAt(0).toUpperCase() : '?'
+}
+
+const stripHtml = (html) => {
+    if (!html) return ''
+    return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 const loadAll = async () => {
@@ -550,7 +553,7 @@ onMounted(loadAll)
                   <div class="p-3 flex flex-col gap-1.5">
                     <h3 class="text-[11px] font-black text-brand uppercase leading-tight line-clamp-2">{{ item.title }}</h3>
                     <p class="text-[9px] font-bold text-slate-400 uppercase truncate">{{ item.films?.[0]?.title }}</p>
-                    <p class="text-[10px] text-slate-500 italic line-clamp-2 mt-1">"{{ item.content }}"</p>
+                    <p class="text-[10px] text-slate-500 italic line-clamp-2 mt-1">"{{ stripHtml(item.content) }}"</p>
                   </div>
                 </div>
 
