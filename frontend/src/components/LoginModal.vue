@@ -81,8 +81,8 @@ const onKeydown = (e) => {
 
    
     <div class="relative min-h-full flex items-center justify-center px-4" @click.self="close">
-      <div class="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
-        <div class="flex items-center justify-between px-6 py-4 bg-slate-950 border-b border-slate-800">
+      <div class="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#1b2228] shadow-2xl overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 bg-[#14181c] border-b border-white/10">
           <h2 class="text-base md:text-lg font-semibold text-slate-100">
             ¡Qué alegría tenerte de vuelta!
           </h2>
@@ -101,7 +101,7 @@ const onKeydown = (e) => {
                 type="email"
                 required
                 autocomplete="email"
-                class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand"
+                class="w-full rounded-lg bg-[#14181c] border border-white/10 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand"
               />
             </div>
 
@@ -112,7 +112,7 @@ const onKeydown = (e) => {
                 type="password"
                 required
                 autocomplete="current-password"
-                class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand"
+                class="w-full rounded-lg bg-[#14181c] border border-white/10 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand"
               />
             </div>
           </div>
@@ -124,7 +124,7 @@ const onKeydown = (e) => {
           <div class="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
-              class="px-4 py-2 rounded-lg border border-slate-700 text-sm font-semibold text-slate-200 hover:bg-slate-800"
+              class="px-4 py-2 rounded-lg border border-white/10 text-sm font-semibold text-slate-200 hover:bg-white/5"
               @click="close"
             >
               Cancelar
@@ -132,7 +132,7 @@ const onKeydown = (e) => {
 
             <button
               type="submit"
-              class="px-4 py-2 rounded-lg bg-emerald-500 text-sm font-semibold text-slate-900 hover:bg-emerald-400 disabled:opacity-60"
+              class="px-4 py-2 rounded-lg bg-brand text-sm font-semibold text-white hover:bg-brand/80 disabled:opacity-60"
               :disabled="loading"
             >
               {{ loading ? 'Conectando…' : 'Login' }}
