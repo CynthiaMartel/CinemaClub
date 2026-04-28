@@ -6,7 +6,9 @@ import { useInstallPrompt } from '@/composables/useInstallPrompt'
 import logoUrl from '@/assets/img/logoCineClub7.png'
 import LoginModal from '@/components/LoginModal.vue'
 import ChangePasswordModal from '@/components/ChangePasswordModal.vue'
+import FilmotecaModal from '@/components/FilmotecaModal.vue'
 import { avatarUrl } from '@/composables/useAvatar'
+import { useNavState } from '@/composables/useNavState'
 
 const router = useRouter()
 const route  = useRoute()
@@ -28,9 +30,10 @@ const handleInstall = async () => {
   }
 }
 
-const isLoginOpen          = ref(false)
-const isUserMenuOpen       = ref(false)
-const isChangePasswordOpen = ref(false)
+const isLoginOpen           = ref(false)
+const isChangePasswordOpen  = ref(false)
+const isFilmotecaOpen       = ref(false)
+const { isUserMenuOpen }    = useNavState()
 const userMenuRef          = ref(null)
 
 // Navegación
@@ -64,6 +67,11 @@ const goProfile = () => {
 const goChangePassword = () => {
   isUserMenuOpen.value = false
   isChangePasswordOpen.value = true
+}
+
+const goFilmoteca = () => {
+  isUserMenuOpen.value = false
+  isFilmotecaOpen.value = true
 }
 
 const logout = async () => {
@@ -291,6 +299,12 @@ onBeforeUnmount(() => {
                 </template>
 
                 <!-- Opciones de usuario -->
+                <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 flex items-center gap-2.5 transition-colors" @click="goFilmoteca">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 flex-shrink-0">
+                    <path d="M4.5 4.5a3 3 0 0 0-3 3v9a3 3 0 0 0 3 3h8.25a3 3 0 0 0 3-3v-9a3 3 0 0 0-3-3H4.5ZM19.94 18.75l-2.69-2.69V7.94l2.69-2.69c.944-.945 2.56-.276 2.56 1.06v11.38c0 1.336-1.616 2.005-2.56 1.06Z" />
+                  </svg>
+                  Mi Filmoteca
+                </button>
                 <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors" @click="goProfile">Mi perfil</button>
                 <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors" @click="goCommunity">Comunidad</button>
                 <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors" @click="goChangePassword">Cambiar contraseña</button>
@@ -400,6 +414,7 @@ onBeforeUnmount(() => {
 
   <LoginModal v-model="isLoginOpen" />
   <ChangePasswordModal v-model="isChangePasswordOpen" />
+  <FilmotecaModal v-model="isFilmotecaOpen" />
 
   <!-- Panel de instrucciones de instalación (Safari / Firefox) -->
   <Teleport to="body">
