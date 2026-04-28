@@ -25,7 +25,7 @@ const fetchUserLists = async () => {
   isLoading.value = true
   errorMsg.value  = null
   try {
-    const { data } = await api.get(`/user_profiles/${auth.user.id}/lists`)
+    const { data } = await api.get(`/user_profiles/${auth.user.name}/lists`)
     lists.value = data.data ?? data ?? []
   } catch {
     errorMsg.value = 'No se pudieron cargar tus listas.'
@@ -53,7 +53,7 @@ const addFilmToList = async (list) => {
 
 const goCreateList = () => {
   close()
-  router.push({ name: 'create-entry', params: { id: auth.user.id } })
+  router.push({ name: 'create-entry', query: { type: 'user_list' } })
 }
 
 // Carga las listas cada vez que se abre el modal

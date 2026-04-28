@@ -1,17 +1,22 @@
 <script setup>
+import { useRouter } from 'vue-router';
+
 defineProps({
   films: Array,
   showNumbers: Boolean,
-  isEditable: Boolean 
+  isEditable: Boolean
 });
 
 defineEmits(['remove']);
+
+const router = useRouter();
 </script>
 
 <template>
   <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
-    <div v-for="(film, index) in films" :key="film.idFilm || film.id" 
-         class="relative group cursor-pointer transition-transform duration-300 hover:-translate-y-2">
+    <div v-for="(film, index) in films" :key="film.idFilm || film.id"
+         class="relative group cursor-pointer transition-transform duration-300 hover:-translate-y-2"
+         @click="router.push({ name: 'film-detail', params: { id: film.idFilm || film.id } })">
       
       <div class="aspect-[2/3] overflow-hidden rounded-lg border border-slate-800 group-hover:border-emerald-500/50 transition-all shadow-xl bg-slate-900">
         <img :src="film.poster_url" 
