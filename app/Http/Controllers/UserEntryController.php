@@ -178,6 +178,61 @@ class UserEntryController extends Controller
         ], 200);
     }
 
+    // ACTUALIZAR una entrada existente (solo el dueño o admin)
+
+    public function update(Request $request, $id): JsonResponse
+    {
+        $user = Auth::user();
+        $entry = UserEntry::findOrFail($id);
+
+        if ($entry->user_id !== $user->id && !$user->isAdmin()) {
+            return response()->json(['error' => 'No tienes permiso para editar esta entrada.'], 403);
+        }
+
+        $validated = $request->validate([
+            'type'       => 'sometimes|in:user_list,user_debate,user_review',
+            'title'      => 'sometimes|required|string|max:255',
+            'content'    => 'nullable|string',
+            'visibility' => 'sometimes|in:public,friends,private',
+        ]);
+
+        if (!empty($validated['content'])) {
+            $validated['content'] = strip_tags($validated['content'],
+                '<p><br><strong><em><u><s><ul><ol><li><h2><h3><h4><blockquote><a><img><figure><figcaption>'
+            );
+        }
+
+        $entry->update($validated);
+
+        if ($request->has('film_ids')) {
+            $entry->films()->sync($request->film_ids);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $entry->load('films'),
+        ], 200);
+    }
+
+    // ELIMINAR una entrada (solo el dueño o admin)
+
+    public function destroy($id): JsonResponse
+    {
+        $user = Auth::user();
+        $entry = UserEntry::findOrFail($id);
+
+        if ($entry->user_id !== $user->id && !$user->isAdmin()) {
+            return response()->json(['error' => 'No tienes permiso para eliminar esta entrada.'], 403);
+        }
+
+        $entry->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Entrada eliminada correctamente.',
+        ], 200);
+    }
+
     // MOSTRAR COLECCIÓN DE LISTS, DEBATES Y REVIEWS que el usuario haya creado
 
     public function getCreatedLists($username): JsonResponse
