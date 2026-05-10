@@ -11,6 +11,11 @@ const props = defineProps({
 const store = useUserFilmActionsStore();
 const { userVote, isSavingRate } = storeToRefs(store);
 
+const handleDeleteRating = () => {
+  if (isSavingRate.value) return;
+  store.deleteRating(props.filmId, props.filmRef);
+};
+
 // Lógica visual 
 const hoverWidth = ref(0);
 
@@ -67,8 +72,17 @@ const handleStarClick = () => {
 
     <div class="rating-info">
       <span v-if="isSavingRate" class="saving-tag" role="status" aria-live="polite">Guardando...</span>
-      <span v-else class="score-tag ">{{ hoverWidth > 0 ? hoverWidth / 18 : userVote }} </span>
+      <span v-else class="score-tag">{{ hoverWidth > 0 ? hoverWidth / 18 : userVote }}</span>
     </div>
+
+    <button
+      v-if="userVote > 0 && !isSavingRate"
+      @click="handleDeleteRating"
+      class="delete-rating-btn"
+      title="Borrar puntuación"
+    >
+      ¿Borrar puntuación de película?
+    </button>
   </div>
 </template>
 
@@ -169,5 +183,22 @@ const handleStarClick = () => {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+.delete-rating-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #475569;
+  transition: color 0.15s ease;
+}
+
+.delete-rating-btn:hover {
+  color: #ef4444;
 }
 </style>

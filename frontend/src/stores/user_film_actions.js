@@ -76,11 +76,33 @@ export const useUserFilmActionsStore = defineStore('userFilmActions', () => {
     const toggleWatched = (filmId, filmRef) => toggleAction(filmId, filmRef, 'watched');
     const toggleWatchLater = (filmId, filmRef) => toggleAction(filmId, filmRef, 'watch_later');
 
+    const deleteRating = async (filmId, filmRef) => {
+        if (isSavingRate.value || !filmId) return;
+        const filmData = filmRef.value !== undefined ? filmRef.value : filmRef;
+        if (!filmData) return;
+
+        isSavingRate.value = true;
+        try {
+            const response = await api.delete(`/films/unmarkAction/${filmId}`, {
+                data: { field: 'rating' }
+            });
+            if (response.data.success) {
+                userVote.value = 0;
+                if (filmData.user_action) filmData.user_action.rating = null;
+            }
+        } catch (err) {
+            console.error('Error al borrar puntuación:', err);
+        } finally {
+            isSavingRate.value = false;
+        }
+    };
+
     return {
         userVote,
         isSavingRate,
         isProcessingAction,
         saveRating,
+        deleteRating,
         toggleFavorite,
         toggleWatched,
         toggleWatchLater,
