@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
@@ -57,6 +57,19 @@ const newPersonTmdbId   = ref('')
 const isCreatingPerson  = ref(false)
 let castTimeout = null
 
+// --- Edición inline de persona (director o reparto) ---
+const editingDirectorInfo = ref(false)
+const editDirName         = ref('')
+const editDirPhoto        = ref('')
+const editDirTmdbId       = ref('')
+const isSavingDir         = ref(false)
+
+const editingCastIdx  = ref(null)
+const editCastName    = ref('')
+const editCastPhoto   = ref('')
+const editCastTmdbId  = ref('')
+const isSavingCast    = ref(false)
+
 // --- Premios / Nominaciones / Festivales ---
 const newAward       = ref('')
 const newNomination  = ref('')
@@ -73,6 +86,53 @@ const toast = ref(null)
 function showToast(msg, type = 'ok') {
   toast.value = { msg, type }
   setTimeout(() => (toast.value = null), 3500)
+}
+
+// --- Monitor de cola ---
+const monitorOpen    = ref(false)
+const monitorActive  = ref(false)
+const monitorData    = ref(null)
+const monitorError   = ref('')
+const monitorLoading = ref(false)
+let   monitorTimer   = null
+
+async function fetchQueueStatus() {
+  monitorLoading.value = true
+  monitorError.value   = ''
+  try {
+    const { data } = await api.get('/admin/queue-status')
+    monitorData.value = data
+  } catch (err) {
+    monitorError.value = err?.response?.data?.message || 'Error al consultar la cola'
+  } finally {
+    monitorLoading.value = false
+  }
+}
+
+function startMonitor() {
+  monitorActive.value = true
+  fetchQueueStatus()
+  monitorTimer = setInterval(fetchQueueStatus, 7000)
+}
+
+function stopMonitor() {
+  monitorActive.value = false
+  clearInterval(monitorTimer)
+  monitorTimer = null
+}
+
+function toggleMonitor() {
+  monitorActive.value ? stopMonitor() : startMonitor()
+}
+
+function onVisibilityChange() {
+  if (!monitorActive.value) return
+  if (document.hidden) {
+    clearInterval(monitorTimer)
+  } else {
+    fetchQueueStatus()
+    monitorTimer = setInterval(fetchQueueStatus, 7000)
+  }
 }
 
 // --- Cargar datos para edición ---
@@ -149,6 +209,57 @@ function clearDirector() {
   directorIdInput.value  = ''
   directorResults.value  = []
   newDirName.value = ''; newDirPhoto.value = ''; newDirTmdbId.value = ''
+  editingDirectorInfo.value = false
+}
+function openEditDirector() {
+  editDirName.value   = selectedDirector.value.name
+  editDirPhoto.value  = selectedDirector.value.photo || ''
+  editDirTmdbId.value = selectedDirector.value.tmdb_id || ''
+  editingDirectorInfo.value = true
+}
+async function saveEditDirector() {
+  if (!editDirName.value.trim() || !selectedDirector.value) return
+  isSavingDir.value = true
+  try {
+    const { data } = await api.put(`/admin/cast-crew/${selectedDirector.value.idPerson}/update`, {
+      name:    editDirName.value.trim(),
+      photo:   editDirPhoto.value.trim()  || null,
+      tmdb_id: editDirTmdbId.value        ? parseInt(editDirTmdbId.value) : null,
+    })
+    selectedDirector.value = { ...selectedDirector.value, name: data.data.name, photo: data.data.photo, tmdb_id: data.data.tmdb_id }
+    editingDirectorInfo.value = false
+    showToast('Director/a actualizado correctamente')
+  } catch (err) {
+    const msg = err?.response?.data?.errors?.tmdb_id?.[0] || err?.response?.data?.message || 'Error al actualizar'
+    showToast(msg, 'err')
+  } finally { isSavingDir.value = false }
+}
+
+function openEditCast(idx) {
+  const m = castList.value[idx]
+  editCastName.value   = m.name
+  editCastPhoto.value  = m.photo || ''
+  editCastTmdbId.value = m.tmdb_id || ''
+  editingCastIdx.value = idx
+}
+async function saveEditCast() {
+  const idx = editingCastIdx.value
+  if (idx === null) return
+  const member = castList.value[idx]
+  isSavingCast.value = true
+  try {
+    const { data } = await api.put(`/admin/cast-crew/${member.idPerson}/update`, {
+      name:    editCastName.value.trim(),
+      photo:   editCastPhoto.value.trim()  || null,
+      tmdb_id: editCastTmdbId.value        ? parseInt(editCastTmdbId.value) : null,
+    })
+    castList.value[idx] = { ...member, name: data.data.name, photo: data.data.photo, tmdb_id: data.data.tmdb_id }
+    editingCastIdx.value = null
+    showToast('Persona actualizada correctamente')
+  } catch (err) {
+    const msg = err?.response?.data?.errors?.tmdb_id?.[0] || err?.response?.data?.message || 'Error al actualizar'
+    showToast(msg, 'err')
+  } finally { isSavingCast.value = false }
 }
 async function lookupDirectorById() {
   if (!directorIdInput.value) return
@@ -268,7 +379,7 @@ async function fetchFromTmdb() {
     tmdbError.value = err?.response?.data?.message || 'Error al conectar con TMDB'
   } finally { isFetching.value = false }
 }
-function applyTmdbData() {
+async function applyTmdbData() {
   if (!tmdbPreview.value) return
   const f = tmdbPreview.value.film
   Object.assign(form.value, {
@@ -285,8 +396,26 @@ function applyTmdbData() {
     frame:             f.frame            || form.value.frame,
     backdrop:          f.backdrop         || form.value.backdrop,
   })
+
+  // Director: si ya está en BD lo seleccionamos; si no, lo creamos automáticamente
   const dir = tmdbPreview.value.director
-  if (dir?.idPerson) selectDirector({ idPerson: dir.idPerson, name: dir.name, photo: dir.photo })
+  if (dir) {
+    if (dir.idPerson) {
+      selectDirector({ idPerson: dir.idPerson, name: dir.name, photo: dir.photo })
+    } else {
+      try {
+        const { data } = await api.post('/admin/cast-crew/store', {
+          name:    dir.name,
+          photo:   dir.photo || null,
+          tmdb_id: dir.tmdb_id || null,
+        })
+        selectDirector({ idPerson: data.data.idPerson, name: data.data.name, photo: data.data.photo })
+      } catch {
+        showToast('No se pudo crear al director automáticamente. Añádelo manualmente.', 'err')
+      }
+    }
+  }
+
   for (const m of tmdbPreview.value.cast || []) {
     if (!m.idPerson) continue
     if (castList.value.some(c => c.idPerson === m.idPerson)) continue
@@ -340,6 +469,12 @@ function goBack() { router.push({ name: 'admin-dashboard' }) }
 onMounted(() => {
   if (!auth.user || auth.user.idRol != 1) { router.replace({ name: 'home' }); return }
   if (isEdit.value) loadFilm()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+})
+
+onUnmounted(() => {
+  clearInterval(monitorTimer)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 </script>
 
@@ -369,6 +504,119 @@ onMounted(() => {
       </div>
 
       <template v-else>
+
+        <!-- ── Monitor de cola ──────────────────────────────────── -->
+        <section class="bg-[#0d1117] border border-slate-700/50 rounded-xl mb-6 overflow-hidden">
+
+          <!-- Cabecera (siempre visible) -->
+          <div class="flex items-center justify-between px-4 py-3 cursor-pointer select-none" @click="monitorOpen = !monitorOpen">
+            <div class="flex items-center gap-3 min-w-0">
+              <div :class="['w-2 h-2 rounded-full flex-shrink-0 transition-colors',
+                !monitorData         ? 'bg-slate-600' :
+                monitorData.failed_total > 0 ? 'bg-red-500 animate-pulse' :
+                monitorData.pending_total > 0 ? 'bg-amber-400 animate-pulse' :
+                'bg-emerald-400']"></div>
+              <span class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Monitor de importación</span>
+              <div v-if="monitorData" class="hidden sm:flex items-center gap-2 text-[10px]">
+                <span :class="monitorData.pending_total > 0 ? 'text-amber-400' : 'text-slate-600'">
+                  {{ monitorData.pending_total }} en cola
+                </span>
+                <span class="text-slate-700">·</span>
+                <span :class="monitorData.failed_total > 0 ? 'text-red-400' : 'text-slate-600'">
+                  {{ monitorData.failed_total }} fallido{{ monitorData.failed_total !== 1 ? 's' : '' }}
+                </span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <button type="button" @click.stop="toggleMonitor"
+                :class="['px-2.5 py-1 rounded-md text-[11px] font-bold border transition flex items-center gap-1.5',
+                  monitorActive
+                    ? 'bg-emerald-900/40 text-emerald-400 border-emerald-800/50'
+                    : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-white']">
+                <span :class="['w-1.5 h-1.5 rounded-full', monitorActive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600']"></span>
+                {{ monitorActive ? 'Activo' : 'Iniciar' }}
+              </button>
+              <svg :class="['w-4 h-4 text-slate-600 transition-transform', monitorOpen ? 'rotate-180' : '']"
+                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Panel expandible -->
+          <div v-if="monitorOpen" class="border-t border-slate-800 px-4 py-4 space-y-4">
+
+            <!-- Acciones -->
+            <div class="flex items-center gap-3 flex-wrap">
+              <button type="button" @click="fetchQueueStatus" :disabled="monitorLoading"
+                class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition disabled:opacity-50">
+                <svg :class="['w-3.5 h-3.5', monitorLoading ? 'animate-spin' : '']" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Actualizar ahora
+              </button>
+              <span v-if="monitorData" class="text-[10px] text-slate-600">
+                {{ new Date(monitorData.checked_at).toLocaleTimeString('es-ES') }}
+              </span>
+              <span v-if="monitorActive" class="text-[10px] text-emerald-700">· cada 7 s</span>
+            </div>
+
+            <p v-if="monitorError" class="text-xs text-red-400">{{ monitorError }}</p>
+
+            <div v-if="!monitorData && !monitorLoading && !monitorError" class="text-xs text-slate-600">
+              Pulsa "Iniciar" para monitoreo continuo, o "Actualizar ahora" para una sola consulta.
+            </div>
+
+            <!-- Tarjetas de estado -->
+            <div v-if="monitorData" class="grid grid-cols-2 gap-3">
+              <div :class="['rounded-lg p-3 border',
+                monitorData.pending_total > 0
+                  ? 'bg-amber-900/20 border-amber-800/40'
+                  : 'bg-slate-800/50 border-slate-700/40']">
+                <p class="text-[10px] uppercase tracking-widest text-slate-500 mb-1">En cola</p>
+                <p :class="['text-2xl font-bold', monitorData.pending_total > 0 ? 'text-amber-400' : 'text-slate-500']">
+                  {{ monitorData.pending_total }}
+                </p>
+                <div v-if="Object.keys(monitorData.pending_by_class).length" class="mt-2 space-y-1">
+                  <div v-for="(count, cls) in monitorData.pending_by_class" :key="cls"
+                    class="flex items-center justify-between text-[11px]">
+                    <span class="text-slate-500 truncate">{{ cls }}</span>
+                    <span class="text-amber-500 font-bold ml-2 flex-shrink-0">{{ count }}</span>
+                  </div>
+                </div>
+              </div>
+              <div :class="['rounded-lg p-3 border',
+                monitorData.failed_total > 0
+                  ? 'bg-red-900/20 border-red-800/40'
+                  : 'bg-slate-800/50 border-slate-700/40']">
+                <p class="text-[10px] uppercase tracking-widest text-slate-500 mb-1">Fallidos</p>
+                <p :class="['text-2xl font-bold', monitorData.failed_total > 0 ? 'text-red-400' : 'text-slate-500']">
+                  {{ monitorData.failed_total }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Últimos errores -->
+            <div v-if="monitorData?.failed_recent?.length" class="space-y-2">
+              <p class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Últimos errores</p>
+              <div v-for="job in monitorData.failed_recent" :key="job.id"
+                class="bg-red-950/20 border border-red-900/30 rounded-lg px-3 py-2.5 space-y-1">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-medium text-red-300">{{ job.class }}</span>
+                  <span class="text-[10px] text-slate-600 flex-shrink-0">{{ job.failed_at }}</span>
+                </div>
+                <p class="text-[11px] text-slate-500 font-mono break-all leading-relaxed">{{ job.message }}</p>
+              </div>
+            </div>
+            <div v-else-if="monitorData?.failed_total === 0"
+              class="flex items-center gap-2 text-xs text-emerald-600">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              Sin errores en la cola
+            </div>
+          </div>
+        </section>
 
         <!-- ── TMDB Import ────────────────────────────────────────── -->
         <section class="bg-[#0d1b2a] border border-blue-800/40 rounded-xl p-4 sm:p-6 mb-6 space-y-5">
@@ -480,16 +728,48 @@ onMounted(() => {
             </div>
 
             <!-- Director seleccionado -->
-            <div v-if="selectedDirector" class="flex items-center gap-3 p-3 bg-[#00e054]/10 border border-[#00e054]/30 rounded-lg">
-              <img v-if="selectedDirector.photo" :src="selectedDirector.photo" class="w-9 h-9 rounded-full object-cover" />
-              <div v-else class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 text-xs font-bold">{{ selectedDirector.name?.charAt(0) }}</div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-white">{{ selectedDirector.name }}</p>
-                <p class="text-xs text-slate-400">ID: {{ selectedDirector.idPerson }}</p>
+            <div v-if="selectedDirector">
+              <div class="flex items-center gap-3 p-3 bg-[#00e054]/10 border border-[#00e054]/30 rounded-lg">
+                <img v-if="selectedDirector.photo" :src="selectedDirector.photo" class="w-9 h-9 rounded-full object-cover" />
+                <div v-else class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 text-xs font-bold">{{ selectedDirector.name?.charAt(0) }}</div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-white">{{ selectedDirector.name }}</p>
+                  <p class="text-xs text-slate-400">ID: {{ selectedDirector.idPerson }}</p>
+                </div>
+                <button type="button" @click="openEditDirector" class="text-slate-500 hover:text-blue-400 transition p-1" title="Editar datos de la persona">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6.5-6.5a2 2 0 012.828 2.828L11.828 13.828A2 2 0 0110.414 14H9v-1.414A2 2 0 019.586 11z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19h14"/></svg>
+                </button>
+                <button type="button" @click="clearDirector" class="text-slate-500 hover:text-red-400 transition p-1">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
               </div>
-              <button type="button" @click="clearDirector" class="text-slate-500 hover:text-red-400 transition p-1">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
+
+              <!-- Formulario edición inline director -->
+              <div v-if="editingDirectorInfo" class="mt-2 bg-[#14181c] border border-blue-800/40 rounded-xl p-4 space-y-3">
+                <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Editar datos de la persona</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="field-label">Nombre <span class="text-red-400">*</span></label>
+                    <input v-model="editDirName" type="text" class="field-input" placeholder="Nombre completo" />
+                  </div>
+                  <div>
+                    <label class="field-label">URL de foto</label>
+                    <input v-model="editDirPhoto" type="url" class="field-input" placeholder="https://…" />
+                  </div>
+                  <div>
+                    <label class="field-label">TMDB Person ID <span class="text-slate-600">(opcional)</span></label>
+                    <input v-model="editDirTmdbId" type="number" class="field-input" placeholder="Ej: 138" />
+                  </div>
+                </div>
+                <div class="flex gap-3">
+                  <button type="button" @click="saveEditDirector" :disabled="isSavingDir || !editDirName.trim()"
+                    class="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-500 disabled:opacity-50 transition">
+                    <svg v-if="isSavingDir" class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                    {{ isSavingDir ? 'Guardando…' : 'Guardar cambios' }}
+                  </button>
+                  <button type="button" @click="editingDirectorInfo = false" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white text-sm transition">Cancelar</button>
+                </div>
+              </div>
             </div>
 
             <!-- Buscar por nombre -->
@@ -542,17 +822,49 @@ onMounted(() => {
             <h2 class="section-title">Reparto</h2>
 
             <div v-if="castList.length" class="space-y-2">
-              <div v-for="(member, idx) in castList" :key="idx" class="flex items-center gap-3 p-3 bg-[#14181c] border border-slate-800 rounded-lg">
-                <img v-if="member.photo" :src="member.photo" class="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-                <div v-else class="avatar-placeholder flex-shrink-0">{{ member.name?.charAt(0) }}</div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm text-white">{{ member.name }} <span class="text-slate-500 text-xs">(ID: {{ member.idPerson }})</span></p>
-                  <p class="text-xs text-slate-400">{{ member.role }}<span v-if="member.character_name"> · {{ member.character_name }}</span></p>
+              <div v-for="(member, idx) in castList" :key="idx">
+                <div class="flex items-center gap-3 p-3 bg-[#14181c] border border-slate-800 rounded-lg">
+                  <img v-if="member.photo" :src="member.photo" class="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                  <div v-else class="avatar-placeholder flex-shrink-0">{{ member.name?.charAt(0) }}</div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm text-white">{{ member.name }} <span class="text-slate-500 text-xs">(ID: {{ member.idPerson }})</span></p>
+                    <p class="text-xs text-slate-400">{{ member.role }}<span v-if="member.character_name"> · {{ member.character_name }}</span></p>
+                  </div>
+                  <input v-model="member.role" type="text" class="field-input w-28 text-xs py-1.5 flex-shrink-0" placeholder="Rol" />
+                  <button type="button" @click="openEditCast(idx)" class="text-slate-500 hover:text-blue-400 transition p-1 flex-shrink-0" title="Editar datos de la persona">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6.5-6.5a2 2 0 012.828 2.828L11.828 13.828A2 2 0 0110.414 14H9v-1.414A2 2 0 019.586 11z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19h14"/></svg>
+                  </button>
+                  <button type="button" @click="removeCast(idx)" class="text-slate-600 hover:text-red-400 transition p-1 flex-shrink-0">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
                 </div>
-                <input v-model="member.role" type="text" class="field-input w-28 text-xs py-1.5 flex-shrink-0" placeholder="Rol" />
-                <button type="button" @click="removeCast(idx)" class="text-slate-600 hover:text-red-400 transition p-1 flex-shrink-0">
-                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
+
+                <!-- Formulario edición inline del miembro -->
+                <div v-if="editingCastIdx === idx" class="mt-1 mb-1 bg-[#14181c] border border-blue-800/40 rounded-xl p-4 space-y-3">
+                  <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Editar datos de la persona</p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label class="field-label">Nombre <span class="text-red-400">*</span></label>
+                      <input v-model="editCastName" type="text" class="field-input" placeholder="Nombre completo" />
+                    </div>
+                    <div>
+                      <label class="field-label">URL de foto</label>
+                      <input v-model="editCastPhoto" type="url" class="field-input" placeholder="https://…" />
+                    </div>
+                    <div>
+                      <label class="field-label">TMDB Person ID <span class="text-slate-600">(opcional)</span></label>
+                      <input v-model="editCastTmdbId" type="number" class="field-input" placeholder="Ej: 6193" />
+                    </div>
+                  </div>
+                  <div class="flex gap-3">
+                    <button type="button" @click="saveEditCast" :disabled="isSavingCast || !editCastName.trim()"
+                      class="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-500 disabled:opacity-50 transition">
+                      <svg v-if="isSavingCast" class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                      {{ isSavingCast ? 'Guardando…' : 'Guardar cambios' }}
+                    </button>
+                    <button type="button" @click="editingCastIdx = null" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white text-sm transition">Cancelar</button>
+                  </div>
+                </div>
               </div>
             </div>
             <p v-else class="text-xs text-slate-600">No hay miembros añadidos todavía.</p>
@@ -671,12 +983,12 @@ onMounted(() => {
             <h2 class="section-title">Puntuaciones</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label class="field-label">Nota media usuarios (0–10)</label>
+                <label class="field-label">Nota global TMDB (0–10)</label>
                 <input v-model="form.vote_average" type="number" step="0.1" min="0" max="10" class="field-input" placeholder="Ej: 7.5" />
                 <p v-if="errors.vote_average" class="field-error">{{ errors.vote_average[0] }}</p>
               </div>
               <div>
-                <label class="field-label">Nota global TMDB (0–10)</label>
+                <label class="field-label">Nota media usuarios (0–10)</label>
                 <input v-model="form.globalRate" type="number" step="0.1" min="0" max="10" class="field-input" placeholder="Ej: 8.1" />
                 <p v-if="errors.globalRate" class="field-error">{{ errors.globalRate[0] }}</p>
               </div>

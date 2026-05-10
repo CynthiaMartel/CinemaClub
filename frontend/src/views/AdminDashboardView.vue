@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
@@ -13,7 +13,54 @@ const isLoading = ref(true)
 const currentPage = ref(1)
 const lastPage = ref(1)
 const total = ref(0)
-const perPage = 24
+const perPage = 12
+
+// --- Monitor de cola ---
+const monitorOpen    = ref(false)
+const monitorActive  = ref(false)
+const monitorData    = ref(null)
+const monitorError   = ref('')
+const monitorLoading = ref(false)
+let   monitorTimer   = null
+
+async function fetchQueueStatus() {
+  monitorLoading.value = true
+  monitorError.value   = ''
+  try {
+    const { data } = await api.get('/admin/queue-status')
+    monitorData.value = data
+  } catch (err) {
+    monitorError.value = err?.response?.data?.message || 'Error al consultar la cola'
+  } finally {
+    monitorLoading.value = false
+  }
+}
+
+function startMonitor() {
+  monitorActive.value = true
+  fetchQueueStatus()
+  monitorTimer = setInterval(fetchQueueStatus, 7000)
+}
+
+function stopMonitor() {
+  monitorActive.value = false
+  clearInterval(monitorTimer)
+  monitorTimer = null
+}
+
+function toggleMonitor() {
+  monitorActive.value ? stopMonitor() : startMonitor()
+}
+
+function onVisibilityChange() {
+  if (!monitorActive.value) return
+  if (document.hidden) {
+    clearInterval(monitorTimer)
+  } else {
+    fetchQueueStatus()
+    monitorTimer = setInterval(fetchQueueStatus, 7000)
+  }
+}
 
 // --- Estado búsqueda ---
 const searchQuery = ref('')
@@ -136,6 +183,12 @@ onMounted(() => {
     return
   }
   fetchFilms()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+})
+
+onUnmounted(() => {
+  clearInterval(monitorTimer)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 </script>
 
@@ -184,6 +237,150 @@ onMounted(() => {
           Añadir película
         </button>
       </div>
+
+      <!-- ── Monitor de importación ───────────────────────────────────── -->
+      <section class="bg-[#0d1117] border border-slate-700/50 rounded-xl mb-6 overflow-hidden">
+
+        <!-- Cabecera (siempre visible) -->
+        <div class="flex items-center justify-between px-4 py-3 cursor-pointer select-none" @click="monitorOpen = !monitorOpen">
+          <div class="flex items-center gap-3 min-w-0">
+            <div :class="['w-2 h-2 rounded-full flex-shrink-0 transition-colors',
+              !monitorData         ? 'bg-slate-600' :
+              monitorData.failed_total > 0  ? 'bg-red-500 animate-pulse' :
+              monitorData.pending_total > 0 ? 'bg-amber-400 animate-pulse' :
+              'bg-emerald-400']"></div>
+            <span class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Monitor de importación</span>
+            <div v-if="monitorData" class="hidden sm:flex items-center gap-2 text-[10px]">
+              <span :class="monitorData.pending_total > 0 ? 'text-amber-400' : 'text-slate-600'">
+                {{ monitorData.pending_total }} en cola
+              </span>
+              <span class="text-slate-700">·</span>
+              <span :class="monitorData.failed_total > 0 ? 'text-red-400' : 'text-slate-600'">
+                {{ monitorData.failed_total }} fallido{{ monitorData.failed_total !== 1 ? 's' : '' }}
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <button type="button" @click.stop="toggleMonitor"
+              :class="['px-2.5 py-1 rounded-md text-[11px] font-bold border transition flex items-center gap-1.5',
+                monitorActive
+                  ? 'bg-emerald-900/40 text-emerald-400 border-emerald-800/50'
+                  : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-white']">
+              <span :class="['w-1.5 h-1.5 rounded-full', monitorActive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600']"></span>
+              {{ monitorActive ? 'Activo' : 'Iniciar' }}
+            </button>
+            <svg :class="['w-4 h-4 text-slate-600 transition-transform', monitorOpen ? 'rotate-180' : '']"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Panel expandible -->
+        <div v-if="monitorOpen" class="border-t border-slate-800 px-4 py-4 space-y-4">
+
+          <div class="flex items-center gap-3 flex-wrap">
+            <button type="button" @click="fetchQueueStatus" :disabled="monitorLoading"
+              class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition disabled:opacity-50">
+              <svg :class="['w-3.5 h-3.5', monitorLoading ? 'animate-spin' : '']" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              Actualizar ahora
+            </button>
+            <span v-if="monitorData" class="text-[10px] text-slate-600">
+              {{ new Date(monitorData.checked_at).toLocaleTimeString('es-ES') }}
+            </span>
+            <span v-if="monitorActive" class="text-[10px] text-emerald-700">· cada 7 s</span>
+          </div>
+
+          <p v-if="monitorError" class="text-xs text-red-400">{{ monitorError }}</p>
+
+          <div v-if="!monitorData && !monitorLoading && !monitorError" class="text-xs text-slate-600">
+            Pulsa "Iniciar" para monitoreo continuo, o "Actualizar ahora" para una consulta puntual.
+          </div>
+
+          <div v-if="monitorData" class="grid grid-cols-2 gap-3">
+            <div :class="['rounded-lg p-3 border',
+              monitorData.pending_total > 0
+                ? 'bg-amber-900/20 border-amber-800/40'
+                : 'bg-slate-800/50 border-slate-700/40']">
+              <p class="text-[10px] uppercase tracking-widest text-slate-500 mb-1">En cola</p>
+              <p :class="['text-2xl font-bold', monitorData.pending_total > 0 ? 'text-amber-400' : 'text-slate-500']">
+                {{ monitorData.pending_total }}
+              </p>
+              <div v-if="Object.keys(monitorData.pending_by_class).length" class="mt-2 space-y-1">
+                <div v-for="(count, cls) in monitorData.pending_by_class" :key="cls"
+                  class="flex items-center justify-between text-[11px]">
+                  <span class="text-slate-500 truncate">{{ cls }}</span>
+                  <span class="text-amber-500 font-bold ml-2 flex-shrink-0">{{ count }}</span>
+                </div>
+              </div>
+            </div>
+            <div :class="['rounded-lg p-3 border',
+              monitorData.failed_total > 0
+                ? 'bg-red-900/20 border-red-800/40'
+                : 'bg-slate-800/50 border-slate-700/40']">
+              <p class="text-[10px] uppercase tracking-widest text-slate-500 mb-1">Fallidos</p>
+              <p :class="['text-2xl font-bold', monitorData.failed_total > 0 ? 'text-red-400' : 'text-slate-500']">
+                {{ monitorData.failed_total }}
+              </p>
+            </div>
+          </div>
+
+          <div v-if="monitorData?.failed_recent?.length" class="space-y-2">
+            <p class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Últimos errores</p>
+            <div v-for="job in monitorData.failed_recent" :key="job.id"
+              class="bg-red-950/20 border border-red-900/30 rounded-lg px-3 py-2.5 space-y-1">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-medium text-red-300">{{ job.class }}</span>
+                <span class="text-[10px] text-slate-600 flex-shrink-0">{{ job.failed_at }}</span>
+              </div>
+              <p class="text-[11px] text-slate-500 font-mono break-all leading-relaxed">{{ job.message }}</p>
+            </div>
+          </div>
+          <div v-else-if="monitorData?.failed_total === 0"
+            class="flex items-center gap-2 text-xs text-emerald-600">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            Sin errores en la cola
+          </div>
+
+          <!-- Importadas recientemente -->
+          <div v-if="monitorData" class="space-y-2">
+            <div class="flex items-center justify-between">
+              <p class="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                Importadas últimos 14 días
+              </p>
+              <span class="text-[10px] text-slate-600">
+                {{ monitorData.recent_total }} película{{ monitorData.recent_total !== 1 ? 's' : '' }}
+              </span>
+            </div>
+            <div v-if="monitorData.recently_imported?.length"
+              class="max-h-64 overflow-y-auto space-y-1 pr-1">
+              <div v-for="film in monitorData.recently_imported" :key="film.id"
+                class="flex items-center gap-3 bg-slate-800/50 border border-slate-700/30 rounded-lg px-3 py-2">
+                <img v-if="film.frame" :src="film.frame" :alt="film.title"
+                  class="w-7 h-10 object-cover rounded flex-shrink-0 bg-slate-700" loading="lazy"/>
+                <div v-else class="w-7 h-10 rounded flex-shrink-0 bg-slate-700/60 flex items-center justify-center">
+                  <svg class="w-3 h-3 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"/>
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-xs text-slate-200 truncate font-medium">{{ film.title }}</p>
+                  <p class="text-[10px] text-slate-500">{{ film.year }}</p>
+                </div>
+                <span class="text-[10px] text-slate-600 flex-shrink-0">
+                  {{ new Date(film.imported_at).toLocaleDateString('es-ES', { day:'2-digit', month:'short' }) }}
+                </span>
+              </div>
+            </div>
+            <p v-else class="text-xs text-slate-600">No se han importado películas en los últimos 14 días.</p>
+          </div>
+
+        </div>
+      </section>
 
       <!-- Barra de búsqueda -->
       <div class="relative mb-6">
