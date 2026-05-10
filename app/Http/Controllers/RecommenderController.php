@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Film;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class RecommenderController extends Controller
@@ -97,6 +98,15 @@ class RecommenderController extends Controller
             return $this->fallbackRanking($films);
         }
 
+        // Caché por combinación de films + preferencias: evita llamar a OpenAI
+        // dos veces para la misma búsqueda. TTL 30 min: balance entre frescura y coste.
+        $filmIds    = collect($films)->pluck('id')->sort()->values()->all();
+        $cacheKey   = 'recommender_rank_' . md5(json_encode($filmIds) . $preferences);
+        $cached     = Cache::get($cacheKey);
+        if ($cached) {
+            return response()->json($cached);
+        }
+
         $filmList = collect($films)->take(30)->map(function ($f, $i) {
             $overview     = isset($f['overview']) ? mb_substr(strip_tags($f['overview']), 0, 150) : '';
             $overviewLine = $overview ? "\n   Sinopsis: {$overview}" : '';
@@ -158,11 +168,15 @@ class RecommenderController extends Controller
                 ])
                 ->values();
 
-            return response()->json([
+            $response = [
                 'success'    => true,
                 'data'       => $result,
                 'ai_powered' => true,
-            ]);
+            ];
+
+            Cache::put($cacheKey, $response, now()->addMinutes(30));
+
+            return response()->json($response);
 
         } catch (\Exception $e) {
             return $this->fallbackRanking($films);
