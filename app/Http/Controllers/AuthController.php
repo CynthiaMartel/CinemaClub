@@ -10,53 +10,74 @@ use App\Models\User;
 use Carbon\Carbon;
 
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use App\Mail\AccountBlockedMail;
-
 
 class AuthController extends Controller
 {
-    // LOGIN: autentica al usuario y devuelve un token Sanctum
+    const MAX_ACTIVE_TOKENS = 5;
 
-        public function login(AuthRequest $request)
+    private function verifyTurnstile(Request $request): bool
     {
-        // Validar campos para loguin con EMAIL y PASSWORD (ya lo hace AuthRequest)
+        if (app()->environment('local', 'testing')) {
+            return true;
+        }
 
-        $email    = $request->email;
-        $password = $request->password;
+        $token = $request->input('cf_turnstile_response');
+        if (empty($token)) {
+            return false;
+        }
 
-        // LIMITADOR DE INTENTOS FALLIDOS: si usuario falla al loguearse más de 5 veces en 1 min., no se deja que el usuario vuelva a intentar el log durante unos segundos  
-        // Nota: Sistema de protección temporal que no marca al usuario como bloqueado sino que evita ataque desde mismo IP o mismo mail un tiempo
-            
-        $throttleKey = 'login:' . strtolower($email) . '|' . $request->ip(); // $throttleKey: Construcción de clave única para contar intentos de login (ej: login:cynthia@example.com|192.168.0.5)
-        $maxAttempts = config('app.max_failed_attempts', 5);
+        $response = Http::asForm()->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+            'secret'   => config('services.turnstile.secret'),
+            'response' => $token,
+            'remoteip' => $request->ip(),
+        ]);
 
-        if (RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) { // Este if devuelve success 0 y un mensaje si se han superado los maxAttemps, 
-            $seconds = RateLimiter::availableIn($throttleKey); // que en este caso son 5 (RateLimiter::tooManyAttempts($key, $maxAttempts))
+        return $response->json('success', false) === true;
+    }
+
+    public function login(AuthRequest $request)
+    {
+        $identifier = $request->identifier;
+        $password   = $request->password;
+
+        if (!$this->verifyTurnstile($request)) {
             return response()->json([
                 'success' => 0,
-                'message' => "Demasiados intentos. Espera {$seconds} segundos."
+                'message' => 'Verificación de seguridad fallida. Por favor, inténtalo de nuevo.',
+            ], 422);
+        }
+
+        $throttleKey = 'login:' . strtolower($identifier) . '|' . $request->ip();
+        $maxAttempts = config('app.max_failed_attempts', 5);
+
+        if (RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            return response()->json([
+                'success' => 0,
+                'message' => "Demasiados intentos. Espera {$seconds} segundos.",
             ], 429);
         }
 
-        // Variable que busca usuario por email para manejarla en if de más adelante
-        $user = User::where('email', $email)->first();
+        // Buscar por email o por nombre de usuario
+        $user = filter_var($identifier, FILTER_VALIDATE_EMAIL)
+            ? User::where('email', $identifier)->first()
+            : User::where('name', $identifier)->first();
 
-        // VALIDACIÓN DE USUARIO Y PASSWORD: Si usuario no existe o password incorrecta: aumenta contador de intentos fallidos
-        // Nota: Bloquea cuenta si llega a más de 5 intentos y se penaliza IP temporalmente
-        if (!$user || !Hash::check($password, $user->password)) { // Si password escrita no coincide con password hasheada guardada en la BD, entra en el if
-                                                                //Nota: Hash::check() compara la contraseña escrita con el hash guardado en la BD, 
-                                                                // ya que Laravel las guarda ya hasheadas. Devuelve true si hash guardado y password coinciden, false si no
-                                                                                        
-            RateLimiter::hit($throttleKey, 60); // Registramo en caché un intento fallido que durará 60 segundos (RateLimiter::hit($key, $decaySeconds))
+        // Mensaje genérico para no revelar si el email existe (evita enumeración)
+        $invalidMsg = 'Usuario o contraseña incorrectos';
+
+        if (!$user || !Hash::check($password, $user->password)) {
+            RateLimiter::hit($throttleKey, 60);
 
             $justBlockedNow = false;
 
-            if ($user) { // Si usuario existe (email en BD), entramos en el if (pero su password escrita no coincidía con la hasheada en BD)
-                $user->failedAttempts = $user->failedAttempts + 1; // Se incrementa el contador de fallos a 1
+            if ($user) {
+                $user->failedAttempts = $user->failedAttempts + 1;
 
-                // Si el contador de fallos llega a 5, se marca el user como blocked
                 if ($user->failedAttempts >= $maxAttempts) {
-                    // Si antes no estaba bloqueado y ahora pasa a estarlo, marcamos bandera
                     if (!$user->blocked) {
                         $justBlockedNow = true;
                     }
@@ -65,7 +86,6 @@ class AuthController extends Controller
 
                 $user->save();
 
-                // Si se acaba de bloquear aquí, enviamos aviso
                 if ($justBlockedNow) {
                     try {
                         Mail::to($user->email)->send(new AccountBlockedMail($user));
@@ -75,32 +95,53 @@ class AuthController extends Controller
                 }
             }
 
-            return response()->json([
-                'success' => 0,
-                'message' => 'Usuario o contraseña incorrectos'
-            ], 401);
+            return response()->json(['success' => 0, 'message' => $invalidMsg], 401);
         }
 
-        // Si el usuario está bloqueado success pasa a 0 y se lanza mensaje de bloqueado
         if ($user->blocked) {
             return response()->json([
                 'success' => 0,
-                'message' => 'Tu cuenta está bloqueada'
+                'message' => 'Tu cuenta está bloqueada. Contacta con el soporte.',
             ], 403);
         }
 
-        // Si no entra en ningún if --> Restablecer intentos fallidos y actualizar última conexión
+        // Bloquear login si el email no ha sido verificado
+        if (is_null($user->email_verified_at)) {
+            return response()->json([
+                'success' => 0,
+                'message' => 'Debes verificar tu email antes de iniciar sesión. Revisa tu bandeja de entrada.',
+            ], 403);
+        }
+
         $user->failedAttempts     = 0;
         $user->dateHourLastAccess = Carbon::now();
         $user->ipLastAccess       = $request->ip();
         $user->save();
 
-        // Crear token Sanctum y enviarlo como cookie HttpOnly
-        // (el token nunca llega al JavaScript del frontend)
+        // Si el usuario tiene 2FA activo, emitir token temporal en lugar del Sanctum real
+        if ($user->hasTwoFactorEnabled()) {
+            $tempToken = Str::random(64);
+            $user->two_factor_temp_token            = $tempToken;
+            $user->two_factor_temp_token_expires_at = Carbon::now()->addMinutes(5);
+            $user->save();
+
+            return response()->json([
+                'success'    => 2,
+                'requires_2fa' => true,
+                'temp_token' => $tempToken,
+            ], 200);
+        }
+
+        // Revocar tokens más antiguos si se supera el límite de sesiones concurrentes
+        $tokens = $user->tokens()->orderBy('created_at', 'asc')->get();
+        if ($tokens->count() >= self::MAX_ACTIVE_TOKENS) {
+            $tokens->take($tokens->count() - self::MAX_ACTIVE_TOKENS + 1)->each->delete();
+        }
+
         $token = $user->createToken('login_token')->plainTextToken;
 
-        $cookieMinutes = 60 * 24 * 7; // 7 días
-        $secure        = app()->environment('production'); // HTTPS solo en producción
+        $cookieMinutes = 60 * 24 * 7;
+        $secure        = app()->environment('production');
 
         $user->load('profile:user_id,avatar');
 
@@ -108,40 +149,30 @@ class AuthController extends Controller
             'success' => 1,
             'message' => 'Inicio de sesión exitoso. ¡Bienvenida!',
             'user'    => [
-                'id'    => $user->id,
-                'name'  => $user->name,
-                'email' => $user->email,
-                'idRol' => $user->idRol,
-                'role'  => optional($user->role)->rolType,
-                'avatar' => $user->profile?->avatar,
+                'id'               => $user->id,
+                'name'             => $user->name,
+                'email'            => $user->email,
+                'idRol'            => $user->idRol,
+                'role'             => optional($user->role)->rolType,
+                'avatar'           => $user->profile?->avatar,
+                'two_factor_enabled' => $user->hasTwoFactorEnabled(),
             ],
         ], 200)->withCookie(
             cookie('auth_token', $token, $cookieMinutes, '/', null, $secure, true, false, 'lax')
-            //                                                              ↑ httponly  ↑ raw  ↑ samesite
         );
     }
 
-
-    // LOGOUT: revoca el token actual // Nota: En la ruta, lleva mildware asegurando que el usuario haya iniciado sesión (auth:sanctum)
-    
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
             'success' => 1,
-            'message' => 'Sesión cerrada correctamente'
+            'message' => 'Sesión cerrada correctamente',
         ])->withCookie(cookie()->forget('auth_token'));
     }
 
-    // checkSession(): para obtener información del usuario autentificado mediante tokens Sanctum. 
-    // Usado para saber si la sesión sigue activa y obtener datos delusuario en diferentes partes del código: como votar, escribir reseñas, por ej.
-
-    // Nota: En la ruta, lleva mildware que valida automáticament el token recibido en cabexera en la cabecera 'Authorization: Bearer <token>, antes de utilizar este controlador,
-    // y Laravel inyecta el usuario autenticado en $request->user(), si token es válido.
-    // Aunque, esto ya se hace de forma automática por Sanctu, tenemos esta función para usarla estretégicamente en otras partes del código devolviendo la información útil y eprsonalizada del usuario (como ip, role, blocked..)
-    
-    public function checkSession (Request $request)
+    public function checkSession(Request $request)
     {
         $user = $request->user();
         $user->load('profile:user_id,avatar');
@@ -153,11 +184,11 @@ class AuthController extends Controller
                 'name'    => $user->name,
                 'email'   => $user->email,
                 'idRol'   => $user->idRol,
-                'role'    => optional($user->role)->rolType,
-                'blocked' => (bool) $user->blocked,
-                'avatar'  => $user->profile?->avatar,
+                'role'               => optional($user->role)->rolType,
+                'blocked'            => (bool) $user->blocked,
+                'avatar'             => $user->profile?->avatar,
+                'two_factor_enabled' => $user->hasTwoFactorEnabled(),
             ],
         ]);
     }
 }
-

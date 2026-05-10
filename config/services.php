@@ -35,12 +35,22 @@ return [
         ],
     ],
 
-    'tmdb' => [ // API TMDB
-    'key' => env('TMDB_API_KEY'),
+    'tmdb' => [
+        'key' => env('TMDB_API_KEY'),
+    ],
+
+    'azure_translator' => [
+        'key'    => env('AZURE_TRANSLATOR_KEY'),
+        'region' => env('AZURE_TRANSLATOR_REGION', 'westeurope'),
     ],
 
     'openai' => [
         'key' => env('OPENAI_API_KEY'),
+    ],
+
+    'turnstile' => [
+        'site_key' => env('TURNSTILE_SITE_KEY', '1x00000000000000000000AA'),
+        'secret'   => env('TURNSTILE_SECRET_KEY', '1x0000000000000000000000000000000AA'),
     ],
 
     'cloudinary' => [

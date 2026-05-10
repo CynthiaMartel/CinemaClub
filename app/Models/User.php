@@ -20,19 +20,34 @@ class User extends Authenticatable
         'ipLastAccess',
         'dateHourLastAccess',
         'failedAttempts',
-        'blocked'
+        'blocked',
+        'verification_token',
+        'email_verified_at',
+        'two_factor_secret',
+        'two_factor_confirmed_at',
+        'two_factor_temp_token',
+        'two_factor_temp_token_expires_at',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_temp_token',
     ];
 
     protected $casts = [
-        'email_verified_at' => 'datetime',
-        'blocked' => 'boolean',
-        'dateHourLastAccess' => 'datetime',
+        'email_verified_at'              => 'datetime',
+        'blocked'                        => 'boolean',
+        'dateHourLastAccess'             => 'datetime',
+        'two_factor_confirmed_at'        => 'datetime',
+        'two_factor_temp_token_expires_at' => 'datetime',
     ];
+
+    public function hasTwoFactorEnabled(): bool
+    {
+        return !is_null($this->two_factor_confirmed_at);
+    }
 
     // RELACIONES ROLE, POST
 

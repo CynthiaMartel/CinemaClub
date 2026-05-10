@@ -18,20 +18,16 @@ class AuthRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'email', 'exists:users,email'],
-            'password' => ['required', 'string'],
+            'identifier' => ['required', 'string'],
+            'password'   => ['required', 'string'],
         ];
     }
 
-
-     // Mensajes personalizados para mostrar los errores concretos de validación
     public function messages(): array
     {
         return [
-            'email.required' => 'Debes escribir tu email.',
-            'email.email' => 'El formato del email no es válido. Revísalo.',
-            'email.exists' => 'No existe ninguna cuenta con este email.',
-            'password.required' => 'Debes escribir tu contraseña.',
+            'identifier.required' => 'Debes escribir tu email o nombre de usuario.',
+            'password.required'   => 'Debes escribir tu contraseña.',
         ];
     }
 

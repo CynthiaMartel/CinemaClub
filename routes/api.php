@@ -3,6 +3,9 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\ChangePasswordController;
+use App\Http\Controllers\VerifyEmailController;
+use App\Http\Controllers\ForgotPasswordController;
+use App\Http\Controllers\TwoFactorController;
 
 use App\Http\Controllers\FilmController;
 use App\Http\Controllers\FilmDataController;
@@ -53,6 +56,7 @@ Route::get('/user', function (Request $request) {
     
 // BÚSQUEDA GLOBAL (films, usuarios, entries, posts)
 Route::get('/search', [SearchController::class, 'global'])
+    ->middleware('throttle:30,1')
     ->name('api.search.global');
 
 /*
@@ -61,9 +65,11 @@ Route::get('/search', [SearchController::class, 'global'])
 |--------------------------------------------------------------------------
 */
 Route::post('/recommender/filter', [RecommenderController::class, 'filter'])
+    ->middleware('throttle:20,1')
     ->name('api.recommender.filter');
 
 Route::post('/recommender/rank', [RecommenderController::class, 'rank'])
+    ->middleware('throttle:10,1')
     ->name('api.recommender.rank');
 
 // BÚSQUEDA barra de búsqueda -> PÚBLICAS
@@ -82,6 +88,10 @@ Route::get('/films/{id}/watch-providers', [FilmController::class, 'watchProvider
 
 Route::get('/films/{film}', [FilmController::class, 'show'])
     ->name('api.films.show');
+
+Route::post('/films/{film}/translate-overview', [FilmController::class, 'translateOverview'])
+    ->middleware('throttle:60,1')
+    ->name('api.films.translate-overview');
 
 // para ADMIN -> REQUIEREN AUTENTIFICACIÓN
 Route::middleware('auth:sanctum') 
@@ -112,6 +122,15 @@ Route::middleware('auth:sanctum')
     // CREAR nueva persona en cast_crew
     Route::post('/admin/cast-crew/store', [FilmController::class, 'castPersonStore'])
         ->name('api.admin.cast-crew.store');
+
+    // ACTUALIZAR persona en cast_crew
+    Route::put('/admin/cast-crew/{id}/update', [FilmController::class, 'castPersonUpdate'])
+        ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->name('api.admin.cast-crew.update');
+
+    // ESTADO DE LA COLA de jobs (monitor de importación)
+    Route::get('/admin/queue-status', [FilmController::class, 'queueStatus'])
+        ->name('api.admin.queue-status');
 });
 
 
@@ -139,10 +158,40 @@ Route::get('/check-session', [AuthController::class, 'checkSession'])
     ->middleware('auth:sanctum') // Activa guardia sanctum: middleware para comprobar token, ya que hay sesión cuando el usuario está logueado 
     ->name('api.checkSession');  // No se pone withoutMiddleware porque peticiones tipo GET no necesitan CSRF
 
-// REGISTER: crea una nueva cuenta de usuario
+// REGISTER: crea una nueva cuenta de usuario (máx. 10 registros/IP/minuto)
 Route::post('/register', [RegisterController::class, 'register'])
-    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class) // Quita guardia de CSRF propio de formularios web: acepta peticiones API (JSON, sin cookies,) al trabajar con api
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('throttle:10,1')
     ->name('api.register');
+
+// 2FA — verificación del código TOTP tras login (pública: no requiere token Sanctum)
+Route::post('/2fa/verify', [TwoFactorController::class, 'verify'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('throttle:10,1')
+    ->name('api.2fa.verify');
+
+// 2FA — gestión (requiere token Sanctum, solo admin y editor)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/2fa/setup',   [TwoFactorController::class, 'setup'])  ->name('api.2fa.setup');
+    Route::post('/2fa/confirm',[TwoFactorController::class, 'confirm'])->name('api.2fa.confirm');
+    Route::delete('/2fa/disable',[TwoFactorController::class, 'disable'])->name('api.2fa.disable');
+});
+
+// VERIFY EMAIL: activa la cuenta mediante el token recibido por email
+Route::get('/verify-email/{token}', [VerifyEmailController::class, 'verify'])
+    ->name('api.verify-email');
+
+// FORGOT PASSWORD: envía enlace de restablecimiento (máx. 5 solicitudes/IP/minuto)
+Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLink'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('throttle:5,1')
+    ->name('api.forgot-password');
+
+// RESET PASSWORD: aplica la nueva contraseña con el token del email
+Route::post('/reset-password', [ForgotPasswordController::class, 'resetPassword'])
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+    ->middleware('throttle:5,1')
+    ->name('api.reset-password');
 
 
 /*
@@ -297,8 +346,10 @@ Route::get('/reviews', [UserEntryController::class, 'getCreatedReviews']);
 Route::middleware('auth:sanctum')->group(function () {
     //  CREAR nueva lista, debate o reseña
     //  Solo usuarios autenticados pueden crear entradas
+    //  throttle:10,1 → máximo 10 entradas por minuto por usuario
     Route::post('/user_entries/create', [UserEntryController::class, 'store'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->middleware('throttle:10,1')
         ->name('api.user_entries.create');
 
     //  ACTUALIZAR una entrada (solo para el dueño o admin)
@@ -312,9 +363,10 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('api.user_entries.destroy');
 
     //  ME GUSTA : Dar o quitar “like” a una entrada
-    //  Se actualiza automáticamente el contador likes_count
+    //  throttle:30,1 → máximo 30 likes por minuto (previene manipulación masiva)
     Route::post('/user_entries/{entryId}/like', [UserEntryController::class, 'toggleLike'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->middleware('throttle:30,1')
         ->name('api.user_entries.toggleLike');
 
     //  GUARDAR o quitar una lista (en user_saved_lists) SOLO TIPO USER_LISTS
@@ -354,8 +406,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // UserCommentController: comentarios con polimorfismos para usar en films (comentarios de películas) o en entradas (comentarios en entradas de usuarios)
 
     // CREAR comentario (en film o entry) por IdFilm o o id de la entrada
+    // throttle:15,1 → máximo 15 comentarios por minuto por usuario
     Route::post('/comments/{type}/{id}/create', [UserCommentController::class, 'store'])
         ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ->middleware('throttle:15,1')
         ->name('api.comments.store');
 
     // ELIMINAR comentario por ID

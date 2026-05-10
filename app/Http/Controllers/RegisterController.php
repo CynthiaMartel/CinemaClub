@@ -2,38 +2,62 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\RegisterRequest;  
+use App\Http\Requests\RegisterRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Http\Request;
-
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 use App\Models\UserProfile;
-use App\Mail\WelcomeUserMail;
-
+use App\Mail\VerifyEmailMail;
+use Illuminate\Support\Facades\Http;
 
 class RegisterController extends Controller
 {
-    // Método para crear una nueva cuenta de usuario
+    private function verifyTurnstile(RegisterRequest $request): bool
+    {
+        if (app()->environment('local', 'testing')) {
+            return true;
+        }
+
+        $token = $request->input('cf_turnstile_response');
+        if (empty($token)) {
+            return false;
+        }
+
+        $response = Http::asForm()->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+            'secret'   => config('services.turnstile.secret'),
+            'response' => $token,
+            'remoteip' => $request->ip(),
+        ]);
+
+        return $response->json('success', false) === true;
+    }
+
     public function register(RegisterRequest $request)
     {
-        // Los datos ya vienen validados por RegisterRequest (Request/RegisterRquest.php)
-        // Si hay errores, Laravel devolverá JSON 422 automáticamente
+        if (!$this->verifyTurnstile($request)) {
+            return response()->json([
+                'success' => 0,
+                'message' => 'Verificación de seguridad fallida. Por favor, inténtalo de nuevo.',
+            ], 422);
+        }
 
-        // Creación del nuevo usuario
+        $token = Str::random(64);
+
         $user = new User();
-        $user->name = $request->name;
-        $user->email = $request->email;
-        $user->password = Hash::make($request->password);
-        $user->idRol = 3; // Rol por defecto "User"
-        $user->ipLastAccess = $request->ip();
+        $user->name               = $request->name;
+        $user->email              = $request->email;
+        $user->password           = Hash::make($request->password);
+        $user->idRol              = 3;
+        $user->ipLastAccess       = $request->ip();
         $user->dateHourLastAccess = Carbon::now();
+        $user->verification_token = $token;
+        $user->email_verified_at  = null;
         $user->save();
 
-        // Creación automática de perfil de usuario pero VACÍA
-        $profile = UserProfile::create([
+        UserProfile::create([
             'user_id'   => $user->id,
             'bio'       => null,
             'location'  => null,
@@ -41,34 +65,18 @@ class RegisterController extends Controller
             'top_films' => [],
         ]);
 
-        // Para enviar correo de bienvenida 
+        // El enlace va a una ruta del SPA que luego llama a la API
+        $verificationUrl = rtrim(config('app.frontend_url'), '/') . '/verify-email/' . $token;
+
         try {
-            Mail::to($user->email)->send(new WelcomeUserMail($user));
+            Mail::to($user->email)->send(new VerifyEmailMail($user, $verificationUrl));
         } catch (\Exception $e) {
-            \Log::warning("Error enviando correo de bienvenida a {$user->email}: ".$e->getMessage());
+            \Log::warning("Error enviando correo de verificación a {$user->email}: " . $e->getMessage());
         }
-
-        // Crear token Sanctum y enviarlo como cookie HttpOnly
-        $token = $user->createToken('register_token')->plainTextToken;
-
-        $cookieMinutes = 60 * 24 * 7;
-        $secure        = app()->environment('production');
 
         return response()->json([
             'success' => 1,
-            'message' => '¡Cuenta creada con éxito! Te damos la bienvenida.',
-            'user' => [
-                'id'      => $user->id,
-                'name'    => $user->name,
-                'email'   => $user->email,
-                'idRol'   => $user->idRol,
-                'role'    => optional($user->role)->rolType,
-                'blocked' => false,
-                'avatar'  => $profile->avatar ?? null,
-            ]
-        ], 201)->withCookie(
-            cookie('auth_token', $token, $cookieMinutes, '/', null, $secure, true, false, 'lax')
-        );
+            'message' => 'Cuenta creada. Revisa tu email y haz clic en el enlace de verificación para activarla.',
+        ], 201);
     }
 }
-
