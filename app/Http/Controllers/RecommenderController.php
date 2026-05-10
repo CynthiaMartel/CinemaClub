@@ -22,7 +22,7 @@ class RecommenderController extends Controller
 
         $query = Film::query()
             ->select(['idFilm', 'title', 'genre', 'origin_country', 'duration',
-                      'release_date', 'frame', 'vote_average', 'globalRate', 'overview'])
+                      'release_date', 'frame', 'vote_average', 'globalRate', 'overview', 'overview_es'])
             ->where('duration', '>', 0)
             ->whereNotNull('frame')
             ->where('frame', '!=', '');
@@ -70,6 +70,7 @@ class RecommenderController extends Controller
             'globalRate'   => round((float) $film->globalRate, 1),
             'vote_average' => round((float) $film->vote_average, 1),
             'overview'     => $film->overview,
+            'overview_es'  => $film->overview_es,
         ]);
 
         return response()->json([

@@ -48,28 +48,30 @@ const cachedFilms = ref([])   // películas filtradas guardadas para refinar sin
 const refinement  = ref('')   // texto libre de refinamiento
 const reranking   = ref(false)
 
-// Estado por card: traducción de la sinopsis/explicación
-const cardState = ref({}) // { [filmId]: { translated, translating, showTranslated } }
+// Estado por card: traducción de la sinopsis
+const cardState = ref({}) // { [filmId]: { translating, showTranslated, error } }
 
 const getCard = (id) => {
   if (!cardState.value[id]) {
-    cardState.value[id] = { translated: null, translating: false, showTranslated: false }
+    cardState.value[id] = { translating: false, showTranslated: false, error: false }
   }
   return cardState.value[id]
 }
 
-const toggleTranslation = async (id, text) => {
-  const c = getCard(id)
+const toggleTranslation = async (film) => {
+  const c = getCard(film.id)
+  // Si ya tiene overview_es, solo alternar
+  if (film.overview_es) { c.showTranslated = !c.showTranslated; return }
   if (c.showTranslated) { c.showTranslated = false; return }
-  if (c.translated) { c.showTranslated = true; return }
+  // Llamar al endpoint de Azure (guarda en BD y devuelve traducción)
   c.translating = true
+  c.error = false
   try {
-    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|es`)
-    const json = await res.json()
-    c.translated = json.responseData?.translatedText || null
-    if (c.translated) c.showTranslated = true
-  } catch (e) {
-    console.error('Error traduciendo:', e)
+    const { data } = await api.post(`/films/${film.id}/translate-overview`)
+    film.overview_es = data.overview_es
+    c.showTranslated = true
+  } catch {
+    c.error = true
   } finally {
     c.translating = false
   }
@@ -560,8 +562,8 @@ const refineResults = async () => {
                   </h3>
                   <!-- Sinopsis / explicación IA -->
                   <p v-if="item.explanation" class="text-xs sm:text-[13px] text-slate-200 leading-relaxed line-clamp-3">
-                    {{ getCard(item.film.id).showTranslated && getCard(item.film.id).translated
-                        ? getCard(item.film.id).translated
+                    {{ getCard(item.film.id).showTranslated && item.film.overview_es
+                        ? item.film.overview_es
                         : item.explanation }}
                   </p>
                   <!-- Providers badge -->
@@ -574,10 +576,10 @@ const refineResults = async () => {
                 </svg>
               </div>
 
-              <!-- Fila traducción -->
-              <div v-if="item.explanation" class="flex items-center gap-2 px-3 sm:px-4 pb-3">
+              <!-- Fila traducción (solo si hay overview, no en explicaciones IA) -->
+              <div v-if="item.film.overview" class="flex items-center gap-2 px-3 sm:px-4 pb-3">
                 <button
-                  @click.stop="toggleTranslation(item.film.id, item.explanation)"
+                  @click.stop="toggleTranslation(item.film)"
                   :disabled="getCard(item.film.id).translating"
                   class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 px-2.5 py-1 rounded transition-all disabled:opacity-40"
                 >
@@ -592,7 +594,7 @@ const refineResults = async () => {
                      : getCard(item.film.id).showTranslated ? 'Ver original'
                      : 'Traducir sinopsis' }}
                 </button>
-                <span v-if="getCard(item.film.id).showTranslated" class="text-xs text-slate-500">vía MyMemory</span>
+                <span v-if="getCard(item.film.id).error" class="text-xs text-red-400">Error al traducir.</span>
               </div>
             </div>
           </div>
