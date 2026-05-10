@@ -16,16 +16,23 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Importación semanal automática de películas desde TMDB
-// Cada lunes a las 03:00 AM trae las películas del año en curso y el anterior (páginas 1-3)
-Schedule::job(new ImportFilmsJob(
-    now()->subYear()->year,  // yearStart: año anterior
-    now()->year,             // yearEnd:   año en curso
-    1,                       // startPage
-    3                        // endPage
-))->weeklyOn(1, '10:00')    // Lunes a las 10:00 AM
-  ->name('import-films-weekly')
-  ->withoutOverlapping();   // Evita que se solapen si el job anterior aún no terminó
+// Importación automática de películas desde TMDB — 1 página por ejecución
+// Dividido en 3 días distintos para evitar timeouts en hosting compartido
+// (~20 películas + Wikidata por ejecución ≈ 5-10 min)
+Schedule::job(new ImportFilmsJob(now()->subYear()->year, now()->year, 1, 1))
+    ->weeklyOn(1, '10:00')  // Lunes   — página 1
+    ->name('import-films-page1')
+    ->withoutOverlapping();
+
+Schedule::job(new ImportFilmsJob(now()->subYear()->year, now()->year, 2, 2))
+    ->weeklyOn(3, '10:00')  // Miércoles — página 2
+    ->name('import-films-page2')
+    ->withoutOverlapping();
+
+Schedule::job(new ImportFilmsJob(now()->subYear()->year, now()->year, 3, 3))
+    ->weeklyOn(5, '10:00')  // Viernes  — página 3
+    ->name('import-films-page3')
+    ->withoutOverlapping();
 
 // ── Panel Editorial IA ─────────────────────────────────────────────────────
 
@@ -63,7 +70,21 @@ Schedule::job(new ProcessEventWithAIJob())
     ->name('process-events-ai')
     ->withoutOverlapping();
 
+// ── Cola de trabajos (Hostinger no tiene worker persistente) ───────────────
+// Procesa todos los jobs pendientes y para — se ejecuta cada minuto vía cron
+// --timeout=3600 es el tope por job; el job de importación declara $timeout=3600
+// --max-time=55 hace que el worker se detenga antes de que el cron lo vuelva a lanzar
+Schedule::command('queue:work --stop-when-empty --tries=3 --timeout=3600 --max-time=55')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->name('queue-worker');
+
 // ── Limpieza periódica ─────────────────────────────────────────────────────
+
+// Elimina tokens Sanctum expirados (7 días) para que la tabla no crezca indefinidamente
+Schedule::command('sanctum:prune-expired --hours=168')
+    ->weekly()
+    ->name('prune-sanctum-tokens');
 
 // Eliminar NewsItems que llevan más de 1 mes sin convertirse en post.
 // Se mantienen los 'drafted' (ya tienen Post asociado) indefinidamente.

@@ -14,6 +14,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Lee el token de la cookie HttpOnly y lo pasa a Sanctum como Bearer
         $middleware->prependToGroup('api', \App\Http\Middleware\ReadTokenFromCookie::class);
+
+        // Límite base: 120 peticiones/minuto por IP para toda la API
+        $middleware->appendToGroup('api', \Illuminate\Routing\Middleware\ThrottleRequests::class.':120,1');
+
+        // Cabeceras de seguridad HTTP en todas las respuestas
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
