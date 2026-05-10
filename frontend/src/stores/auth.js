@@ -17,12 +17,17 @@ export const useAuthStore = defineStore('auth', {
 
   actions: {
 
-    async login(email, password) {
-      if (!email) throw new Error('Debes ingresar tu email')
+    async login(identifier, password, turnstileToken = '') {
+      if (!identifier) throw new Error('Debes ingresar tu email o nombre de usuario')
       if (!password) throw new Error('Debes ingresar la contraseña')
 
       try {
-        const { data } = await api.post('/login', { email, password })
+        const { data } = await api.post('/login', { identifier, password, cf_turnstile_response: turnstileToken })
+
+        // success=2 significa que el login fue correcto pero se requiere 2FA
+        if (data.requires_2fa) {
+          return data
+        }
 
         if (data.success !== 1) {
           throw new Error(data.message || 'Error en login')
@@ -42,6 +47,19 @@ export const useAuthStore = defineStore('auth', {
           throw new Error(err.response.data.message)
         }
         throw new Error(err?.message || 'No se pudo iniciar sesión')
+      }
+    },
+
+    async verifyTwoFactor(tempToken, code) {
+      try {
+        const { data } = await api.post('/2fa/verify', { temp_token: tempToken, code })
+        if (data.success !== 1) throw new Error(data.message || 'Código incorrecto')
+        this.user = data.user
+        localStorage.setItem('_loggedIn', '1')
+        return data
+      } catch (err) {
+        const msg = err?.response?.data?.message || err?.message || 'Error al verificar el código'
+        throw new Error(msg)
       }
     },
 
@@ -70,7 +88,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    async register(name, email, password, passwordConfirmation) {
+    async register(name, email, password, passwordConfirmation, turnstileToken = '') {
       if (!name) throw new Error('Debes ingresar tu nombre de usuario')
       if (!email) throw new Error('Debes ingresar tu email')
       if (!password) throw new Error('Debes ingresar la contraseña')
@@ -83,15 +101,50 @@ export const useAuthStore = defineStore('auth', {
           email,
           password,
           password_confirmation: passwordConfirmation,
+          cf_turnstile_response: turnstileToken,
         })
 
         if (data.success !== 1) {
           throw new Error(data.message || 'Error en registro nuevo usuario')
         }
 
-        this.user = data.user
-        localStorage.setItem('_loggedIn', '1')
+        // No hay auto-login: el usuario debe verificar su email primero
+        return data
+      } catch (err) {
+        if (err?.response?.status === 422 && err.response.data?.errors) {
+          const ex = new Error('VALIDATION')
+          ex.messages = Object.values(err.response.data.errors).flat()
+          throw ex
+        }
+        const ex = new Error('UNKNOWN')
+        ex.messages = [err?.response?.data?.message || err?.message || 'Error inesperado']
+        throw ex
+      }
+    },
 
+    async forgotPassword(email) {
+      if (!email) throw new Error('Debes ingresar tu email')
+      try {
+        const { data } = await api.post('/forgot-password', { email })
+        return data
+      } catch (err) {
+        const ex = new Error('UNKNOWN')
+        ex.messages = [err?.response?.data?.message || err?.message || 'Error inesperado']
+        throw ex
+      }
+    },
+
+    async resetPassword(token, email, password, passwordConfirmation) {
+      if (!password) throw new Error('Debes ingresar la nueva contraseña')
+      if (password !== passwordConfirmation) throw new Error('Las contraseñas no coinciden')
+      try {
+        const { data } = await api.post('/reset-password', {
+          token,
+          email,
+          password,
+          password_confirmation: passwordConfirmation,
+        })
+        if (data.success !== 1) throw new Error(data.message || 'Error al restablecer contraseña')
         return data
       } catch (err) {
         if (err?.response?.status === 422 && err.response.data?.errors) {
