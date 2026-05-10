@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Mews\Purifier\Facades\Purifier;
 
 class UserEntryController extends Controller
 {
@@ -23,13 +24,13 @@ class UserEntryController extends Controller
         $validated = $request->validated();
         $validated['user_id'] = $user->id;
 
-        // Sanitizar el contenido HTML de CKEditor para prevenir XSS.
-        // Permitimos únicamente etiquetas de formato seguras — cualquier
-        // <script>, evento inline (onerror, onclick…) o iframe queda eliminado.
+        // Las entradas de usuario (reseñas, debates, listas) usan un textarea plano,
+        // no un editor WYSIWYG, así que el contenido debería ser texto sin HTML.
+        // Usamos Purifier con el perfil 'entries' (HTML.Allowed = '') para garantizar
+        // que no se almacena ningún marcado HTML, incluyendo atributos de evento
+        // que strip_tags() no elimina.
         if (!empty($validated['content'])) {
-            $validated['content'] = strip_tags($validated['content'],
-                '<p><br><strong><em><u><s><ul><ol><li><h2><h3><h4><blockquote><a><img><figure><figcaption>'
-            );
+            $validated['content'] = Purifier::clean($validated['content'], 'entries');
         }
 
         // Crear  entrada lista, debate o reseña

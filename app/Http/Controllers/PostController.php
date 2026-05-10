@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Post;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Mews\Purifier\Facades\Purifier;
 
 class PostController extends Controller
 {
@@ -61,15 +62,22 @@ class PostController extends Controller
         }
 
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'subtitle' => 'nullable|string|max:255',
-            'content' => 'required|string',
-            'img' => 'nullable|url|max:255',
-            'visible' => 'boolean',
+            'title'      => 'required|string|max:255',
+            'subtitle'   => 'nullable|string|max:255',
+            'content'    => 'required|string',
+            'img'        => ['nullable', 'url', 'max:500', function ($attr, $value, $fail) {
+                $host = (string) parse_url($value, PHP_URL_HOST);
+                // Bloquear IPs privadas / loopback para prevenir SSRF si se añade fetch server-side
+                if (preg_match('/^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|::1$|0\.0\.0\.0)/i', $host)) {
+                    $fail('La URL de imagen no puede apuntar a direcciones de red internas.');
+                }
+            }],
+            'visible'    => 'boolean',
             'editorName' => 'nullable|string|max:150',
         ]);
 
-        $validated['idUser'] = $user->id; 
+        $validated['content'] = Purifier::clean($validated['content'], 'posts');
+        $validated['idUser']  = $user->id;
 
         $post = Post::create($validated);
 
@@ -111,13 +119,20 @@ class PostController extends Controller
         $post = Post::findOrFail($id);
 
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'subtitle' => 'nullable|string|max:255',
-            'content' => 'required|string',
-            'img' => 'nullable|url|max:255',
-            'visible' => 'boolean',
+            'title'      => 'required|string|max:255',
+            'subtitle'   => 'nullable|string|max:255',
+            'content'    => 'required|string',
+            'img'        => ['nullable', 'url', 'max:500', function ($attr, $value, $fail) {
+                $host = (string) parse_url($value, PHP_URL_HOST);
+                if (preg_match('/^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|::1$|0\.0\.0\.0)/i', $host)) {
+                    $fail('La URL de imagen no puede apuntar a direcciones de red internas.');
+                }
+            }],
+            'visible'    => 'boolean',
             'editorName' => 'nullable|string|max:150',
         ]);
+
+        $validated['content'] = Purifier::clean($validated['content'], 'posts');
 
         $post->update($validated);
 
