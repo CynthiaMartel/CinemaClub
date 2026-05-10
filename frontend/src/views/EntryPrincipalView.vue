@@ -172,16 +172,24 @@
         </div>
 
         <div v-else-if="entry.type === 'user_list'" class="max-w-4xl mx-auto">
-          
-          <div class="flex justify-end items-center gap-3 mb-8">
-            <button 
+
+          <div class="text-center mb-12">
+            <p class="text-yellow-600 text-3xl mb-2 font-serif">--</p>
+            <div class="ck-content text-slate-400 text-lg italic leading-relaxed px-4 md:px-10" v-html="entry.content"></div>
+          </div>
+          <div class="bg-gradient-to-b from-slate-900/40 to-transparent p-6 border-t border-slate-800/50 rounded-3xl shadow-2xl">
+              <MovieGrid :films="mappedFilms" show-numbers />
+          </div>
+
+          <div class="mt-12 flex items-center gap-4">
+            <button
               v-if="auth.isAuthenticated"
               @click="toggleLike"
               :disabled="savingLike"
               :class="[
                 'group flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 border',
-                likeSaved 
-                  ? 'bg-red-500/10 border-red-500/50 text-red-500' 
+                likeSaved
+                  ? 'bg-red-500/10 border-red-500/50 text-red-500'
                   : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-red-500 hover:text-red-500'
               ]"
             >
@@ -210,6 +218,7 @@
               </svg>
               {{ isSavedList ? 'Lista Guardada' : 'Guardar Lista' }}
             </button>
+
             <button
               @click="handleCreate"
               class="flex items-center gap-1.5 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-brand/50 text-brand hover:bg-brand hover:text-white transition-all duration-300"
@@ -219,14 +228,6 @@
               </svg>
               Crear entrada
             </button>
-          </div>
-          
-          <div class="text-center mb-12">
-            <p class="text-yellow-600 text-3xl mb-2 font-serif">--</p>
-            <div class="ck-content text-slate-400 text-lg italic leading-relaxed px-4 md:px-10" v-html="entry.content"></div>
-          </div>
-          <div class="bg-gradient-to-b from-slate-900/40 to-transparent p-6 border-t border-slate-800/50 rounded-3xl shadow-2xl">
-              <MovieGrid :films="mappedFilms" show-numbers />
           </div>
         </div>
 

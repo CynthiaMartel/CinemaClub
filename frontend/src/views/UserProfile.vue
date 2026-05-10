@@ -578,7 +578,7 @@ onMounted(loadAll)
               <div 
                 v-for="list in savedLists" 
                 :key="list.id"
-                @click="router.push(`/user_entries/${list.id}`)"
+                @click="router.push(`/entry/user_list/${list.id}`)"
                 class="flex-shrink-0 group cursor-pointer ltr-content w-[180px] md:w-[220px]"
               >
                 <div class="poster-stack-container mb-4">

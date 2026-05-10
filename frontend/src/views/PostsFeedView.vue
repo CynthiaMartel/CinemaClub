@@ -178,7 +178,7 @@ onMounted(() => {
                             </a>
                         </div>
 
-                        <div v-if="isAdminOrEditor" class="flex gap-3 pt-3 border-t border-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 mt-1">
+                        <div v-if="isAdminOrEditor" class="flex gap-3 pt-3 border-t border-white/5 mt-1">
                             <button 
                                 @click="goToEditor(post.id)" 
                                 class="text-[9px] text-blue-400 hover:text-blue-300 uppercase font-bold tracking-wider"

@@ -124,30 +124,28 @@ const originCountries = computed(() => {
     })
 })
 
-// Traducción de sinopsis
-const translatedOverview = ref(null)
-const isTranslating = ref(false)
+// Sinopsis: traducción
 const showTranslated = ref(false)
+const isTranslating  = ref(false)
+const translateError = ref(false)
 
 const translateOverview = async () => {
-  if (translatedOverview.value) { showTranslated.value = true; return }
+  if (isTranslating.value) return
   isTranslating.value = true
+  translateError.value = false
   try {
-    const text = encodeURIComponent(film.value.overview)
-    const res = await fetch(`https://api.mymemory.translated.net/get?q=${text}&langpair=en|es`)
-    const json = await res.json()
-    translatedOverview.value = json.responseData?.translatedText || null
-    if (translatedOverview.value) showTranslated.value = true
-  } catch (e) {
-    console.error('Error al traducir:', e)
+    const { data } = await api.post(`/films/${film.value.idFilm}/translate-overview`)
+    film.value.overview_es = data.overview_es
+    showTranslated.value = true
+  } catch {
+    translateError.value = true
   } finally {
     isTranslating.value = false
   }
 }
 
 const toggleTranslation = () => {
-  if (showTranslated.value) { showTranslated.value = false; return }
-  translateOverview()
+  showTranslated.value = !showTranslated.value
 }
 
 
@@ -160,6 +158,8 @@ const fetchFilm = async () => {
     const { data } = await api.get(`/films/${id}`)
     film.value = data
     await Promise.all([fetchUserFilmActions(), fetchFilmEntries(id)])
+    // Si ya está traducida en BD, mostrar en español directamente
+    if (film.value?.overview_es) showTranslated.value = true
   } catch (e) {
     error.value = 'No se pudo cargar la información de la película.'
   } finally {
@@ -300,20 +300,26 @@ onMounted(fetchFilm)
             </section>
 
             <section class="synopsis mb-10">
-              <p class="text-slate-300 text-lg leading-relaxed italic opacity-90 transition-opacity duration-300" :class="isTranslating ? 'opacity-40' : 'opacity-90'">
-                {{ showTranslated && translatedOverview ? translatedOverview : film.overview || 'Sinopsis no disponible.' }}
+              <p class="text-slate-300 text-lg leading-relaxed italic opacity-90 transition-opacity duration-300" :class="isTranslating ? 'opacity-40' : ''">
+                {{ showTranslated && film.overview_es ? film.overview_es : film.overview || 'Sinopsis no disponible.' }}
               </p>
               <div v-if="film.overview" class="flex items-center gap-3 mt-4">
-                <button
-                  @click="toggleTranslation"
-                  :disabled="isTranslating"
-                  class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-[#678] hover:text-white border border-[#2a3240] hover:border-[#445] px-3 py-1.5 rounded transition-all disabled:opacity-40"
-                >
-                  <svg v-if="isTranslating" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                  <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M5 8l6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
-                  {{ isTranslating ? 'Traduciendo...' : showTranslated ? 'Ver original' : 'Traducir al español' }}
-                </button>
-                <span v-if="showTranslated && translatedOverview" class="text-[9px] text-[#445]">vía MyMemory</span>
+                <!-- Ya traducida: alternar ES / EN -->
+                <template v-if="film.overview_es">
+                  <button @click="toggleTranslation" class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-[#678] hover:text-white border border-[#2a3240] hover:border-[#445] px-3 py-1.5 rounded transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M5 8l6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+                    {{ showTranslated ? 'Ver original' : 'Ver en español' }}
+                  </button>
+                </template>
+                <!-- Sin traducir: botón para traducir -->
+                <template v-else>
+                  <button @click="translateOverview" :disabled="isTranslating" class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-[#678] hover:text-white border border-[#2a3240] hover:border-[#445] px-3 py-1.5 rounded transition-all disabled:opacity-40">
+                    <svg v-if="isTranslating" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M5 8l6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+                    {{ isTranslating ? 'Traduciendo...' : 'Traducir al español' }}
+                  </button>
+                  <span v-if="translateError" class="text-[9px] text-red-400 font-bold">Error al traducir, inténtalo de nuevo.</span>
+                </template>
               </div>
             </section>
 

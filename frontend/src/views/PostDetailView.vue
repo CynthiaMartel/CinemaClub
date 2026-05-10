@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
 import LoginModal from '@/components/LoginModal.vue'
 import { avatarUrl } from '@/composables/useAvatar'
+import DOMPurify from 'dompurify'
 
 // --- SETUP ---
 const route = useRoute()
@@ -31,6 +32,17 @@ const editorInitials = computed(() => {
 
 const currentUserId = computed(() => auth.user?.id);
 const isAuthenticated = computed(() => auth.isAuthenticated);
+
+// Segunda línea de defensa contra XSS: aunque el servidor ya sanitiza con HTMLPurifier,
+// DOMPurify en el cliente previene cualquier payload que pudiera llegar corrupto o
+// provenir de una caché/migración de datos anterior.
+const safeContent = computed(() =>
+    DOMPurify.sanitize(post.value?.content ?? '', {
+        ALLOWED_TAGS: ['p','br','strong','b','em','i','u','s','h2','h3','h4','blockquote','ul','ol','li','a','img','figure','figcaption'],
+        ALLOWED_ATTR: ['href','title','target','rel','src','alt','width','height'],
+        ALLOW_DATA_ATTR: false,
+    })
+);
 
 // --- MÉTODOS ---
 const fetchPost = async () => {
@@ -189,7 +201,7 @@ watch(() => route.params.id, () => {
             </figure>
 
             <div class="post-content text-slate-300 leading-relaxed text-lg mb-16 font-sans font-light text-left">
-                <div class="ck-content" v-html="post.content"></div>
+                <div class="ck-content" v-html="safeContent"></div>
             </div>
 
             <section class="border-t border-slate-800/50 pt-12">

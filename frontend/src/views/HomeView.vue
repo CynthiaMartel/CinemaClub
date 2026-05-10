@@ -36,6 +36,10 @@ const friendsEntries = ref([])   // debates, reviews, listas de personas seguida
 const friendsEntriesPage = ref(1)
 const friendsEntriesPerPage = 6
 
+// Paginación para Debates en llamas
+const debatesPage = ref(1)
+const debatesPerPage = 4
+
 const paginatedFriendsEntries = computed(() => {
   const start = (friendsEntriesPage.value - 1) * friendsEntriesPerPage
   return friendsEntries.value.slice(start, start + friendsEntriesPerPage)
@@ -44,6 +48,20 @@ const paginatedFriendsEntries = computed(() => {
 const friendsEntriesTotalPages = computed(() =>
   Math.ceil(friendsEntries.value.length / friendsEntriesPerPage)
 )
+
+const paginatedDebates = computed(() => {
+  const start = (debatesPage.value - 1) * debatesPerPage
+  return popularDebates.value.slice(start, start + debatesPerPage)
+})
+
+const debatesTotalPages = computed(() =>
+  Math.ceil(popularDebates.value.length / debatesPerPage)
+)
+
+const stripHtml = (html) => {
+  if (!html) return ''
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+}
 
 // Saludo personalizado con nombre de usuario logueado
 const welcomeMessage = computed(() => {
@@ -240,7 +258,7 @@ watch(() => auth.isAuthenticated, (isAuth) => {
           <section v-if="friendsActivity.length > 0">
             <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
               <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-200">Visionados de mi comunidad</h2>
-              <button @click="router.push('/feed')" class="flex items-center gap-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-brand transition-colors">
+              <button @click="router.push({ name: 'community' })" class="flex items-center gap-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-brand transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
                 Ver todo
               </button>
@@ -286,7 +304,7 @@ watch(() => auth.isAuthenticated, (isAuth) => {
           <section v-if="friendsEntries.length > 0">
             <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
               <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-200">Debates, reviews, listas de mi comunidad</h2>
-              <button @click="router.push('/feed')" class="text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-brand transition-colors">Ver todo</button>
+              <button @click="router.push({ name: 'community' })" class="text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-brand transition-colors">Ver todo</button>
             </div>
 
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-5">
@@ -463,40 +481,74 @@ watch(() => auth.isAuthenticated, (isAuth) => {
               <button @click="router.push({ name: 'entry-feed', query: { tab: 'user_debate' } })" class="text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-brand transition-colors">Ver todos</button>
             </div>
 
-            <div v-if="popularDebates.length > 0" class="flex flex-col divide-y divide-slate-800/60">
+            <div v-if="popularDebates.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div
-                v-for="debate in popularDebates.slice(0, 8)" :key="debate.id"
+                v-for="debate in paginatedDebates" :key="debate.id"
                 @click="goToEntry('user_debate', debate.id)"
-                class="group cursor-pointer flex gap-4 py-4 first:pt-0 hover:bg-white/[0.02] transition-colors -mx-2 px-2 rounded"
+                class="group cursor-pointer bg-[#1b2228] border border-white/10 rounded-xl overflow-hidden hover:border-orange-500/30 transition-all shadow-md flex min-h-[140px]"
               >
-                <!-- Imagen cuadrada izquierda — crop fill como Letterboxd journal -->
-                <div class="flex-shrink-0 w-[155px] h-[100px] sm:w-[175px] sm:h-[115px] rounded overflow-hidden bg-slate-900">
+                <!-- Poster portrait -->
+                <div class="flex-shrink-0 w-[85px] sm:w-[95px] self-stretch overflow-hidden"
+                  @click.stop="debate.films?.[0]?.idFilm && router.push(`/films/${debate.films[0].idFilm}`)">
                   <img
-                    :src="debate.films?.[0]?.frame || '/default-debate.webp'"
-                    class="w-full h-full object-cover object-top opacity-75 group-hover:opacity-100 group-hover:scale-105 transition-all duration-400"
+                    :src="debate.films?.[0]?.frame || '/default-poster.webp'"
+                    :alt="debate.title"
+                    class="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                    loading="lazy"
                   />
                 </div>
-                <!-- Texto derecha -->
-                <div class="flex flex-col justify-center min-w-0 flex-1">
-                  <div class="flex items-center gap-1.5 mb-1.5">
-                    <i class="bi bi-chat-quote-fill text-[10px] text-orange-400" aria-hidden="true"></i>
-                    <span class="text-[9px] font-black uppercase tracking-[0.2em] text-orange-400 bg-orange-500/15 px-1.5 py-0.5 rounded">Debate</span>
-                  </div>
-                  <h3 class="text-[12px] font-black uppercase text-slate-200 line-clamp-2 leading-tight group-hover:text-white transition-colors mb-1.5">{{ debate.title }}</h3>
-                  <div class="flex items-center gap-1.5">
-                    <div class="w-4 h-4 rounded-full bg-slate-700 border border-slate-500 flex items-center justify-center flex-shrink-0">
-                      <span class="text-[6px] font-black text-white">{{ getInitial(debate.user?.name) }}</span>
+                <!-- Contenido -->
+                <div class="p-3 sm:p-4 flex flex-col justify-between min-w-0 flex-1 gap-2">
+                  <div class="flex flex-col gap-1.5">
+                    <div class="flex items-center gap-1.5">
+                      <i class="bi bi-chat-quote-fill text-[10px] text-orange-400" aria-hidden="true"></i>
+                      <span class="text-[9px] font-black uppercase tracking-[0.2em] text-orange-400 bg-orange-500/15 px-1.5 py-0.5 rounded">Debate</span>
                     </div>
-                    <span class="text-[10px] font-bold text-slate-200 truncate">{{ debate.user?.name }}</span>
+                    <h3 class="text-[12px] font-black uppercase text-slate-200 line-clamp-2 leading-tight group-hover:text-white transition-colors">{{ debate.title }}</h3>
+                    <p v-if="debate.content" class="text-[10px] text-slate-400 font-light line-clamp-2 leading-relaxed">{{ stripHtml(debate.content) }}</p>
+                  </div>
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                      <div class="w-4 h-4 rounded-full bg-slate-700 border border-slate-500 flex items-center justify-center flex-shrink-0">
+                        <span class="text-[6px] font-black text-white">{{ getInitial(debate.user?.name) }}</span>
+                      </div>
+                      <span class="text-[10px] font-bold text-slate-300 truncate">{{ debate.user?.name }}</span>
+                    </div>
+                    <span v-if="debate.likes_count" class="flex items-center gap-0.5 text-[9px] text-slate-500 font-bold flex-shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-2.5 h-2.5 text-brand">
+                        <path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
+                      </svg>
+                      {{ debate.likes_count }}
+                    </span>
                   </div>
                 </div>
               </div>
+            </div>
+
+            <!-- Paginación debates -->
+            <div v-if="debatesTotalPages > 1" class="flex items-center justify-center gap-3 mt-6 pt-4 border-t border-slate-800/50">
+              <button
+                @click="debatesPage--"
+                :disabled="debatesPage === 1"
+                class="w-7 h-7 flex items-center justify-center rounded border border-slate-700 text-slate-400 hover:border-orange-500 hover:text-orange-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+              </button>
+              <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{{ debatesPage }} / {{ debatesTotalPages }}</span>
+              <button
+                @click="debatesPage++"
+                :disabled="debatesPage === debatesTotalPages"
+                class="w-7 h-7 flex items-center justify-center rounded border border-slate-700 text-slate-400 hover:border-orange-500 hover:text-orange-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+              </button>
             </div>
         </section>
 
         <section>
             <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
               <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-200">Journal</h2>
+              <button @click="router.push({ name: 'post-feed' })" class="text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-brand transition-colors">Ver más</button>
             </div>
             
             <div v-if="journalPosts.length > 0" class="max-h-[600px] overflow-y-auto brand-scroll pr-4 pb-4">
@@ -524,11 +576,6 @@ watch(() => auth.isAuthenticated, (isAuth) => {
                      </article>
                  </div>
 
-                 <div v-if="journalPosts.length > 15" class="w-full flex justify-center mt-6 pt-4 border-t border-slate-800/50">
-                    <button @click="router.push({ name: 'post-feed' })" class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition-colors py-2.5 px-8 border border-slate-700 hover:border-brand hover:bg-brand/10 rounded-full">
-                        Ver todo el Journal
-                    </button>
-                 </div>
             </div>
             <div v-else class="py-10 border border-dashed border-slate-800 rounded text-center opacity-40">
                 <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold italic">Aún no hay publicaciones.</p>
