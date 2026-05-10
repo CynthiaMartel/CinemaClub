@@ -43,8 +43,8 @@ class NewsSourceSeeder extends Seeder
             // ════════════════════════════════════════════════
 
             [
-                'name'                 => 'El Día — Cultura y Cine (Tenerife)',
-                'url'                  => 'https://www.eldia.es/rss/',
+                'name'                 => 'Canarias7 — Cine',
+                'url'                  => 'https://www.canarias7.es/rss/2.0/?section=/cultura/cine',
                 'type'                 => 'rss',
                 'check_interval_hours' => 6,
                 'is_active'            => true,
@@ -226,7 +226,7 @@ class NewsSourceSeeder extends Seeder
 
         $this->command->info("NewsSourceSeeder: {$rss} RSS + {$scraping} scraping = " . count($sources) . ' fuentes');
         $this->command->line('');
-        $this->command->line('  RSS prensa canaria (activo): El Día ✓');
+        $this->command->line('  RSS prensa canaria (activo): Canarias7 Cine ✓');
         $this->command->line('  RSS verificados: Muestra Lanzarote ✓, LPA Film Festival ✓');
         $this->command->line('  RSS a verificar en prod: Animayo, Isla Calavera, De Sal y Lava, CAC');
         $this->command->line('  Scraping estático: TEA Tenerife, lpacultura, Isla Calavera (fallback)');
