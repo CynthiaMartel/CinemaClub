@@ -108,31 +108,26 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
                 // Buscar el wikidata_id proporcionado por TMDb; si no existe, se intentará obtener desde la BD o la cache wikidata_cache
                 $wikidataId = $details['external_ids']['wikidata_id'] ?? null;
 
-                // Si no hay wikidata_id desde TMDB;  comprobar si ya tenemos ese wikidata_id guardado en la BD 
-                $year = date('Y', strtotime($details['release_date']));
-                $filmWithSameTitle = Film::where('title', $details['title'])
-                    ->whereYear('release_date', $year)
-                    ->first();
-                if (!$wikidataId && $filmWithSameTitle && !empty($filmWithSameTitle->wikidata_id)) {
-                    $wikidataId = $filmWithSameTitle->wikidata_id;
-                    Log::info("Wikidata ID reutilizado desde BD para '{$details['title']}': {$wikidataId}");
+                // Si TMDB no incluye wikidata_id, comprobar si ya lo tenemos en la BD
+                if (!$wikidataId) {
+                    $year = date('Y', strtotime($details['release_date']));
+                    $filmWithSameTitle = Film::where('title', $details['title'])
+                        ->whereYear('release_date', $year)
+                        ->first();
+                    if ($filmWithSameTitle && !empty($filmWithSameTitle->wikidata_id)) {
+                        $wikidataId = $filmWithSameTitle->wikidata_id;
+                        Log::info("Wikidata ID reutilizado desde BD para '{$details['title']}': {$wikidataId}");
+                    }
                 }
 
-                // Si TMDb no devuelve wikidata_id ni existe en la BD; se buscará consultando SPARQL por el título original
+                // Si sigue sin haber wikidata_id, comprobar la caché local (resultados de importaciones anteriores)
+                // NO se hace búsqueda SPARQL por título — es demasiado lenta para importación masiva
+                // y puede provocar timeouts. Si TMDB no lo provee y no está en BD/caché, se importa sin datos Wikidata.
                 if (!$wikidataId) {
                     $originalTitle = $details['original_title'] ?? $details['title'] ?? null;
-
-                    // comprobar caché por título antes de consultar SPARQL
                     if ($originalTitle && isset($wikidataCache[$originalTitle])) {
                         $wikidataId = $wikidataCache[$originalTitle];
-                        Log::info("Wikidata ID obtenido de caché wikidata_cache para '{$originalTitle}': {$wikidataId}");
-                    } else {
-                        $wikidataId = $originalTitle ? $this->findWikidataIdByTitle($originalTitle) : null;
-                        // guardar en caché si se encontró
-                       if ($wikidataId && $originalTitle) {
-                        $wikidataCache[$originalTitle] = $wikidataId; // Lo metemos en el array de memoria
-                        Log::info("Nuevo ID encontrado y añadido al array de caché: {$originalTitle} => {$wikidataId}");
-                    } 
+                        Log::info("Wikidata ID obtenido de caché local para '{$originalTitle}': {$wikidataId}");
                     }
                 }
 
@@ -274,7 +269,7 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
                 $insertadas++;
                 Log::info("Película guardada en BD: {$film->title}");
 
-                usleep(400000); // Pausa después de procesar cada película para dar tiempo entre peticiones
+                usleep(200000); // 200ms entre películas — suficiente para no saturar TMDB
             } catch (\Throwable $e) {
                 $fallidas++;
                 Log::error("Error procesando {$movie['title']}: " . $e->getMessage());
@@ -349,7 +344,7 @@ public function importFromTMDB($yearStart, $yearEnd, $startPage = 1, $endPage = 
         $response = Http::withHeaders([
             'Accept' => 'application/json',
             'User-Agent' => 'CinemaClubApp/1.0 (contact: tu-email@ejemplo.com)'
-        ])->timeout(15)->get($url);
+        ])->timeout(8)->get($url);
 
         if (!$response->successful()) return ['awards' => [], 'nominations' => [], 'festivals' => [], 'alternative_titles' => []];
 
