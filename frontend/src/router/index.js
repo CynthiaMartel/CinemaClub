@@ -48,6 +48,7 @@ const routes = [
     name: 'create-entry',
     component: () => import('@/views/EntryFormView.vue'),
     props: true,
+    meta: { requiresAuth: true },
   },
   {
     path: '/entry-feed/',
@@ -66,17 +67,24 @@ const routes = [
     component: () => import('@/views/SearchView.vue'),
   },
   {
-  path: '/post-editor/:id?', 
+  path: '/post-editor/:id?',
   name: 'post-editor',
-  // Opción recomendada (Lazy load)
   component: () => import('@/views/PostEditorView.vue'),
-  props: true // Esto permite pasar los parámetros como variables automática
+  props: true,
+  meta: { requiresAuth: true, requiresEditor: true },
+  },
+
+  {
+    path: '/community',
+    name: 'community',
+    component: () => import('@/views/CommunityView.vue'),
+    meta: { requiresAuth: true },
   },
 
   {
   path: '/post-feed',
-  name: 'post-feed', 
-  component: () => import('@/views/PostsFeedView.vue') 
+  name: 'post-feed',
+  component: () => import('@/views/PostsFeedView.vue')
 },
 
 {path: '/post-reed/:id?',
@@ -127,6 +135,17 @@ const routes = [
     meta: { requiresAuth: true },
   },
 
+  {
+    path: '/reset-password',
+    name: 'reset-password',
+    component: () => import('@/views/ResetPasswordView.vue'),
+  },
+  {
+    path: '/verify-email/:token',
+    name: 'verify-email',
+    component: () => import('@/views/VerifyEmailView.vue'),
+  },
+
   // ******aquí van más rutas después: noticias, perfil, etc.
 ]
 
@@ -142,11 +161,18 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   const auth = useAuthStore()
 
+  // Sin sesión → redirige a home con ?redirect= para que LoginModal retome el destino
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    return next({ name: 'home', query: { redirect: to.fullPath } })
+  }
+
+  // Solo admins (idRol 1)
+  if (to.meta.requiresAdmin && auth.user?.idRol != 1) {
     return next({ name: 'home' })
   }
 
-  if (to.meta.requiresAdmin && auth.user?.idRol != 1) {
+  // Solo editors/admins (idRol 1 o 2)
+  if (to.meta.requiresEditor && auth.user?.idRol != 1 && auth.user?.idRol != 2) {
     return next({ name: 'home' })
   }
 
