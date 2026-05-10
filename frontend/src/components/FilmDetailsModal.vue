@@ -90,7 +90,8 @@ const nominationsProcessed = computed(() => {
 
 const directorPhoto = computed(() => {
   if (!directors.value || !directors.value.length) return null;
-  const path = directors.value[0].profile_path;
+  const dir = directors.value[0];
+  const path = dir.profile_path || dir.photo;
   return path ? getImageUrl(path) : null;
 });
 

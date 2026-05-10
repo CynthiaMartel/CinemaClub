@@ -27,6 +27,14 @@ const fetchUserLists = async () => {
   try {
     const { data } = await api.get(`/user_profiles/${auth.user.name}/lists`)
     lists.value = data.data ?? data ?? []
+    // Pre-marcar listas que ya contienen este film
+    const filmId = Number(props.filmId)
+    lists.value.forEach(list => {
+      const alreadyIn = list.films?.some(f => Number(f.idFilm) === filmId)
+      if (alreadyIn && !doneIds.value.includes(list.id)) {
+        doneIds.value.push(list.id)
+      }
+    })
   } catch {
     errorMsg.value = 'No se pudieron cargar tus listas.'
   } finally {
@@ -45,7 +53,12 @@ const addFilmToList = async (list) => {
     })
     doneIds.value.push(list.id)
   } catch (e) {
-    errorMsg.value = e.response?.data?.message ?? 'Error al añadir la película.'
+    if (e.response?.status === 409) {
+      // La película ya estaba en la lista; simplemente marcamos como hecho
+      doneIds.value.push(list.id)
+    } else {
+      errorMsg.value = e.response?.data?.message ?? 'Error al añadir la película.'
+    }
   } finally {
     addingId.value = null
   }
