@@ -7,6 +7,7 @@ import logoUrl from '@/assets/img/logoCineClub7.png'
 import LoginModal from '@/components/LoginModal.vue'
 import ChangePasswordModal from '@/components/ChangePasswordModal.vue'
 import FilmotecaModal from '@/components/FilmotecaModal.vue'
+import TwoFactorModal from '@/components/TwoFactorModal.vue'
 import { avatarUrl } from '@/composables/useAvatar'
 import { useNavState } from '@/composables/useNavState'
 
@@ -14,7 +15,7 @@ const router = useRouter()
 const route  = useRoute()
 const auth   = useAuthStore()
 
-const { showInstallButton, install, browserType } = useInstallPrompt()
+const { showInstallButton, canInstall, install, browserType } = useInstallPrompt()
 
 const installPanel = ref(null) // null | 'safari-mac' | 'safari-ios' | 'firefox'
 
@@ -26,13 +27,19 @@ const handleInstall = async () => {
   if (browserType === 'safari-mac' || browserType === 'safari-ios' || browserType === 'firefox') {
     installPanel.value = browserType
   } else {
-    await install()
+    if (canInstall.value) {
+      await install()
+    } else {
+      installPanel.value = 'chromium-manual'
+    }
   }
 }
 
 const isLoginOpen           = ref(false)
 const isChangePasswordOpen  = ref(false)
 const isFilmotecaOpen       = ref(false)
+const isTwoFactorOpen       = ref(false)
+const twoFactorEnabled      = computed(() => !!auth.user?.two_factor_enabled)
 const { isUserMenuOpen }    = useNavState()
 const userMenuRef          = ref(null)
 
@@ -62,6 +69,11 @@ const openLogin   = () => { isLoginOpen.value = true }
 const goProfile = () => {
   isUserMenuOpen.value = false
   if (auth.user?.name) router.push({ name: 'user-profile', params: { username: auth.user.name } })
+}
+
+const goTwoFactor = () => {
+  isUserMenuOpen.value = false
+  isTwoFactorOpen.value = true
 }
 
 const goChangePassword = () => {
@@ -308,6 +320,10 @@ onBeforeUnmount(() => {
                 <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors" @click="goProfile">Mi perfil</button>
                 <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors" @click="goCommunity">Comunidad</button>
                 <button type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors" @click="goChangePassword">Cambiar contraseña</button>
+                <button v-if="isEditorOrAdmin" type="button" class="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors flex items-center gap-2" @click="goTwoFactor">
+                  Verificación en dos pasos
+                  <span v-if="twoFactorEnabled" class="text-[10px] bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded font-semibold">Activo</span>
+                </button>
 
                 <!-- Instalar PWA — visible en todos los navegadores mientras no esté instalada -->
                 <template v-if="showInstallButton">
@@ -414,6 +430,8 @@ onBeforeUnmount(() => {
 
   <LoginModal v-model="isLoginOpen" />
   <ChangePasswordModal v-model="isChangePasswordOpen" />
+  <TwoFactorModal v-model="isTwoFactorOpen" :two-factor-enabled="twoFactorEnabled"
+    @changed="(val) => { if (auth.user) auth.user.two_factor_enabled = val }" />
   <FilmotecaModal v-model="isFilmotecaOpen" />
 
   <!-- Panel de instrucciones de instalación (Safari / Firefox) -->
@@ -483,6 +501,36 @@ onBeforeUnmount(() => {
                 <li class="flex gap-2"><span class="text-slate-500 font-mono">2.</span>Selecciona <strong class="text-white">Añadir a pantalla de inicio</strong></li>
                 <li class="flex gap-2"><span class="text-slate-500 font-mono">3.</span>Confirma con <strong class="text-white">Añadir</strong></li>
               </ol>
+            </template>
+
+            <!-- Chromium (Brave/Chrome): prompt no disponible aún, instrucciones manuales -->
+            <template v-else-if="installPanel === 'chromium-manual'">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="text-2xl">🧩</span>
+                <h2 class="text-base font-bold text-white">Instalar FilmoClub</h2>
+              </div>
+
+              <!-- Opción A: icono en barra de direcciones -->
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Opción más rápida</p>
+              <p class="text-sm text-slate-300 mb-3">
+                Mira la <strong class="text-white">barra de direcciones</strong> del navegador: si ves un icono de instalación
+                <strong class="text-white">(pantalla con flecha ↓)</strong>, púlsalo directamente.
+              </p>
+
+              <!-- Opción B: menú ⋮ -->
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">O bien, desde el menú</p>
+              <ol class="space-y-1.5 text-sm text-slate-300 mb-4">
+                <li class="flex gap-2"><span class="text-slate-500 font-mono">1.</span>Pulsa el menú <strong class="text-white">⋮</strong> del navegador (arriba a la derecha)</li>
+                <li class="flex gap-2"><span class="text-slate-500 font-mono">2.</span>Busca <strong class="text-white">Instalar FilmoClub…</strong></li>
+                <li class="flex gap-2"><span class="text-slate-500 font-mono">3.</span>Confirma con <strong class="text-white">Instalar</strong></li>
+              </ol>
+
+              <!-- Aviso si no aparece nada -->
+              <div class="rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 text-xs text-slate-400 leading-relaxed">
+                <strong class="text-slate-300 block mb-0.5">¿No ves ninguna de estas opciones?</strong>
+                Brave y Chrome necesitan que visites varias páginas del sitio antes de activar la instalación.
+                Navega un poco, cierra y vuelve a abrir el navegador, y el icono aparecerá solo.
+              </div>
             </template>
 
             <!-- Firefox -->
