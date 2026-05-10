@@ -6,6 +6,7 @@ use App\Models\UserEntry;
 use App\Models\UserEntryFilm;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\QueryException;
 
 class UserEntryFilmController extends Controller
 {
@@ -27,11 +28,34 @@ class UserEntryFilmController extends Controller
             return response()->json(['error' => 'No tienes permiso para modificar esta entrada.'], 403);
         }
 
-        $relation = UserEntryFilm::create([
-            'user_entry_id' => $request->user_entry_id,
-            'film_id' => $request->film_id,
-            'order' => $request->order,
-        ]);
+        $already = UserEntryFilm::where('user_entry_id', $request->user_entry_id)
+            ->where('film_id', $request->film_id)
+            ->first();
+
+        if ($already) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Esta película ya está en la lista.',
+                'data' => $already,
+            ], 409);
+        }
+
+        try {
+            $relation = UserEntryFilm::create([
+                'user_entry_id' => $request->user_entry_id,
+                'film_id' => $request->film_id,
+                'order' => $request->order,
+            ]);
+        } catch (QueryException $e) {
+            // Race condition: another request inserted the row between our check and create
+            if ($e->errorInfo[1] === 1062) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Esta película ya está en la lista.',
+                ], 409);
+            }
+            throw $e;
+        }
 
         return response()->json([
             'success' => true,

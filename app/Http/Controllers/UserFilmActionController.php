@@ -60,7 +60,7 @@ class UserFilmActionController extends Controller
             $targetId = $targetUser->id;
         }
         $type = $request->query('type');
-        $perPage = $request->query('per_page', 20); 
+        $perPage = min((int) $request->query('per_page', 20), 100);
 
         $validTypes = [
             'favorites'   => 'is_favorite',
@@ -118,7 +118,7 @@ class UserFilmActionController extends Controller
     // Mostrar tendencia en homeview para films watched o puntuadas más recientemente
     public function getTrendingFilms(Request $request): JsonResponse
     {
-        $perPage = $request->query('per_page', 15);
+        $perPage = min((int) $request->query('per_page', 15), 50);
 
         // Cacheamos el resultado 15 minutos — la lista de trending no necesita
         // ser exacta al segundo, y evita la subconsulta + JOIN en cada visita

@@ -45,6 +45,7 @@ class UserFeedController extends Controller
                 ->select('id', 'user_id', 'film_id', 'is_favorite', 'watched', 'watch_later', 'visibility', 'rating', 'updated_at', 'created_at')
                 ->with(['user.profile', 'film:idFilm,title,frame'])
                 ->latest('updated_at')
+                ->take(50)
                 ->get();
 
             $feed = collect();
