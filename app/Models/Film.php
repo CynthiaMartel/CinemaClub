@@ -10,7 +10,7 @@ class Film extends Model
     public $timestamps = true;
 
     protected $fillable = [
-        'tmdb_id','wikidata_id', 'title','original_title', 'genre','origin_country','original_language','overview',
+        'tmdb_id','wikidata_id', 'title','original_title', 'genre','origin_country','original_language','overview','overview_es',
         'duration','release_date','frame','awards','nominations','festivals',
         'total_awards','total_nominations','total_festivals',
         'vote_average','globalRate','director_id', 'alternative_titles', 'backdrop',

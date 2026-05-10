@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use App\Http\Requests\FilmRequest;
 use Illuminate\Database\QueryException;
+use App\Services\AzureTranslatorService;
 
 class FilmController extends Controller
 {
@@ -154,9 +155,33 @@ class FilmController extends Controller
 
     // Búsqueda por id de film para película concreta
     public function show(Film $film)
-    
     {
-        return response()->json($film->load('cast')); //Para que devuelva la relación cast_crew y podamos ver director y reparto
+        $film->load('cast');
+
+        return response()->json($film);
+    }
+
+    public function translateOverview(Film $film)
+    {
+        if (!$film->overview) {
+            return response()->json(['error' => 'Sin sinopsis original.'], 422);
+        }
+
+        if ($film->overview_es) {
+            return response()->json(['overview_es' => $film->overview_es]);
+        }
+
+        try {
+            $translated = app(AzureTranslatorService::class)->translate($film->overview);
+            if (!$translated) {
+                return response()->json(['error' => 'No se pudo traducir.'], 502);
+            }
+            $film->overview_es = $translated;
+            $film->saveQuietly();
+            return response()->json(['overview_es' => $translated]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => 'Error en el servicio de traducción.'], 502);
+        }
     }
 
     // Admin: Crear película manualmente por si se necesita añadir alguna película que no se haya encontrado con API TMDB ni Wikidata (de manera manual desde ADMIN)
@@ -329,6 +354,40 @@ class FilmController extends Controller
     }
 
     /**
+     * Actualiza datos de una persona en cast_crew desde el panel admin.
+     * PUT /api/admin/cast-crew/{id}/update
+     */
+    public function castPersonUpdate(Request $request, int $id)
+    {
+        $user = $request->user();
+        if (!$user || !$user->isAdminOrEditor()) {
+            return response()->json(['success' => 0, 'message' => 'No autorizado'], 403);
+        }
+
+        $person = \DB::table('cast_crew')->where('idPerson', $id)->first();
+        if (!$person) {
+            return response()->json(['success' => 0, 'message' => 'Persona no encontrada'], 404);
+        }
+
+        $validated = $request->validate([
+            'name'    => ['required', 'string', 'max:255'],
+            'photo'   => ['nullable', 'url', 'max:225'],
+            'tmdb_id' => ['nullable', 'integer', "unique:cast_crew,tmdb_id,{$id},idPerson"],
+        ]);
+
+        \DB::table('cast_crew')->where('idPerson', $id)->update([
+            'name'       => $validated['name'],
+            'photo'      => $validated['photo'] ?? null,
+            'tmdb_id'    => $validated['tmdb_id'] ?? null,
+            'updated_at' => now(),
+        ]);
+
+        $person = \DB::table('cast_crew')->where('idPerson', $id)->first();
+
+        return response()->json(['success' => 1, 'data' => $person]);
+    }
+
+    /**
      * Obtiene datos de una película desde la API de TMDB y los mapea a nuestro modelo.
      * GET /api/admin/tmdb-fetch?tmdb_id=12345
      */
@@ -477,6 +536,69 @@ class FilmController extends Controller
             'logo'     => 'https://image.tmdb.org/t/p/original' . $p['logo_path'],
             'priority' => $p['display_priority'],
         ], $providers);
+    }
+
+    /**
+     * Estado de la cola de jobs para el monitor de importación del panel admin.
+     * GET /api/admin/queue-status
+     */
+    public function queueStatus(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || $user->idRol != 1) {
+            return response()->json(['message' => 'No autorizado'], 403);
+        }
+
+        $pendingByClass = [];
+        foreach (\DB::table('jobs')->select('payload')->get() as $job) {
+            $payload   = json_decode($job->payload, true);
+            $class     = $payload['displayName'] ?? 'Unknown';
+            $parts     = explode('\\', $class);
+            $shortName = end($parts);
+            $pendingByClass[$shortName] = ($pendingByClass[$shortName] ?? 0) + 1;
+        }
+
+        $failedJobs = \DB::table('failed_jobs')
+            ->orderByDesc('failed_at')
+            ->limit(8)
+            ->get()
+            ->map(function ($job) {
+                $payload   = json_decode($job->payload, true);
+                $class     = $payload['displayName'] ?? 'Unknown';
+                $parts     = explode('\\', $class);
+                $firstLine = explode("\n", $job->exception ?? '');
+                return [
+                    'id'        => $job->uuid,
+                    'class'     => end($parts),
+                    'failed_at' => $job->failed_at,
+                    'message'   => $firstLine[0] ?? '',
+                ];
+            });
+
+        $recentlyImported = Film::select('idFilm', 'title', 'release_date', 'frame', 'created_at')
+            ->where('created_at', '>=', now()->subDays(14))
+            ->orderByDesc('created_at')
+            ->limit(30)
+            ->get()
+            ->map(fn ($f) => [
+                'id'          => $f->idFilm,
+                'title'       => $f->title,
+                'year'        => $f->release_date ? $f->release_date->format('Y') : null,
+                'frame'       => $f->frame,
+                'imported_at' => $f->created_at->toISOString(),
+            ]);
+
+        $recentTotal = Film::where('created_at', '>=', now()->subDays(14))->count();
+
+        return response()->json([
+            'pending_total'      => \DB::table('jobs')->count(),
+            'pending_by_class'   => $pendingByClass,
+            'failed_total'       => \DB::table('failed_jobs')->count(),
+            'failed_recent'      => $failedJobs,
+            'recently_imported'  => $recentlyImported,
+            'recent_total'       => $recentTotal,
+            'checked_at'         => now()->toISOString(),
+        ]);
     }
 }
 
