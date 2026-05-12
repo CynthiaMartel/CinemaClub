@@ -45,7 +45,9 @@ const _getBrowserType = () => {
   const ua = navigator.userAgent
   if (/iPad|iPhone|iPod/.test(ua)) return 'safari-ios'
   if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return 'safari-ios'
-  if (ua.includes('Firefox') || ua.includes('FxiOS')) return 'firefox'
+  if (ua.includes('FxiOS')) return 'firefox-ios'
+  if (ua.includes('Firefox') && ua.includes('Android')) return 'firefox-android'
+  if (ua.includes('Firefox')) return 'firefox-desktop'
   if (ua.includes('Safari') && !ua.includes('Chrome')) return 'safari-mac'
   return 'chromium' // Chrome, Brave, Edge — todos soportan beforeinstallprompt
 }

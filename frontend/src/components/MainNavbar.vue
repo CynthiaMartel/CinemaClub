@@ -17,14 +17,14 @@ const auth   = useAuthStore()
 
 const { showInstallButton, canInstall, install, browserType } = useInstallPrompt()
 
-const installPanel = ref(null) // null | 'safari-mac' | 'safari-ios' | 'firefox'
+const installPanel = ref(null) // null | 'safari-mac' | 'safari-ios' | 'firefox-android' | 'firefox-desktop' | 'firefox-ios'
 
 const closeInstallPanel = () => { installPanel.value = null }
 
 const handleInstall = async () => {
   isUserMenuOpen.value  = false
   isMobileMenuOpen.value = false
-  if (browserType === 'safari-mac' || browserType === 'safari-ios' || browserType === 'firefox') {
+  if (['safari-mac', 'safari-ios', 'firefox-android', 'firefox-desktop', 'firefox-ios'].includes(browserType)) {
     installPanel.value = browserType
   } else {
     if (canInstall.value) {
@@ -533,17 +533,48 @@ onBeforeUnmount(() => {
               </div>
             </template>
 
-            <!-- Firefox -->
-            <template v-else-if="installPanel === 'firefox'">
+            <!-- Firefox Android: instalación manual desde el menú del navegador -->
+            <template v-else-if="installPanel === 'firefox-android'">
               <div class="flex items-center gap-3 mb-4">
                 <span class="text-2xl">🦊</span>
-                <h2 class="text-base font-bold text-white">Firefox no admite instalación</h2>
+                <h2 class="text-base font-bold text-white">Instalar en Firefox Android</h2>
+              </div>
+              <ol class="text-sm text-slate-300 space-y-2 list-decimal list-inside">
+                <li>Pulsa el menú <strong class="text-white">⋮</strong> (tres puntos) arriba a la derecha.</li>
+                <li>Selecciona <strong class="text-white">Añadir a pantalla de inicio</strong>.</li>
+                <li>Confirma para instalar FilmoClub como app.</li>
+              </ol>
+            </template>
+
+            <!-- Firefox Desktop: no admite instalación PWA desde Firefox 85 -->
+            <template v-else-if="installPanel === 'firefox-desktop'">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="text-2xl">🦊</span>
+                <h2 class="text-base font-bold text-white">Firefox de escritorio no admite instalación</h2>
               </div>
               <p class="text-sm text-slate-300">
-                Para instalar FilmoClub como app, ábrela en
-                <strong class="text-white">Chrome</strong> o <strong class="text-white">Brave</strong>
+                Firefox eliminó el soporte de instalación de apps web en 2021.
+                Para instalar FilmoClub, ábrela en
+                <strong class="text-white">Chrome</strong>, <strong class="text-white">Edge</strong> o <strong class="text-white">Brave</strong>
                 y pulsa de nuevo el botón Instalar.
               </p>
+            </template>
+
+            <!-- Firefox iOS: Apple obliga a usar WebKit, sin soporte de instalación -->
+            <template v-else-if="installPanel === 'firefox-ios'">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="text-2xl">🦊</span>
+                <h2 class="text-base font-bold text-white">Instalar desde Safari</h2>
+              </div>
+              <p class="text-sm text-slate-300 mb-3">
+                Firefox en iOS no puede instalar apps web (Apple obliga a usar WebKit).
+                Ábrela en <strong class="text-white">Safari</strong> y sigue estos pasos:
+              </p>
+              <ol class="text-sm text-slate-300 space-y-2 list-decimal list-inside">
+                <li>Pulsa el botón <strong class="text-white">Compartir</strong> <span class="text-xs">⎋</span> de Safari.</li>
+                <li>Desplázate y toca <strong class="text-white">Añadir a pantalla de inicio</strong>.</li>
+                <li>Pulsa <strong class="text-white">Añadir</strong> para confirmar.</li>
+              </ol>
             </template>
 
           </div>
