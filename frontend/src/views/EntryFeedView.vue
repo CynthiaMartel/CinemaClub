@@ -281,8 +281,9 @@ onMounted(() => fetchEntries());
   margin-right: auto;
 }
 
-.brand-scroll::-webkit-scrollbar { height: 3px; }
-.brand-scroll::-webkit-scrollbar-thumb { background: #10b981; }
+.brand-scroll::-webkit-scrollbar { height: 3px; background: transparent; }
+.brand-scroll::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 2px; }
+.brand-scroll::-webkit-scrollbar-thumb:hover { background: #6b7280; }
 .rtl-container { direction: rtl; }
 .ltr-content { direction: ltr; }
 
