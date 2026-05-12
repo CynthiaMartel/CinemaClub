@@ -1,8 +1,13 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 
+const INSTALLED_LS_KEY = 'filmoclub_pwa_installed'
+
 const _isStandalone = () =>
   window.matchMedia('(display-mode: standalone)').matches ||
   ('standalone' in navigator && navigator.standalone === true)
+
+const _isInstalled = () =>
+  _isStandalone() || localStorage.getItem(INSTALLED_LS_KEY) === '1'
 
 // ─── Singleton persistente en window ────────────────────────────────────────
 // Las variables de módulo se resetean con cada hot-reload de Vite (HMR).
@@ -24,6 +29,7 @@ if (!window[LISTENER_KEY]) {
 
   window.addEventListener('appinstalled', () => {
     window[PROMPT_KEY] = null
+    localStorage.setItem(INSTALLED_LS_KEY, '1')
     window.dispatchEvent(new CustomEvent(PROMPT_EVENT))
     if (import.meta.env.DEV) console.log('[PWA] appinstalled ✓')
   })
@@ -55,19 +61,19 @@ const _getBrowserType = () => {
 // ─── Composable ─────────────────────────────────────────────────────────────
 export function useInstallPrompt() {
   const canInstall   = ref(!!getPrompt())
-  const isInstalled  = ref(_isStandalone())
+  const isInstalled  = ref(_isInstalled())
   const browserType  = _getBrowserType()
 
   const showInstallButton = computed(() => !isInstalled.value)
 
   const onPromptChanged = () => {
     canInstall.value  = !!getPrompt()
-    isInstalled.value = _isStandalone()
+    isInstalled.value = _isInstalled()
   }
 
   onMounted(() => {
     canInstall.value  = !!getPrompt()
-    isInstalled.value = _isStandalone()
+    isInstalled.value = _isInstalled()
     window.addEventListener(PROMPT_EVENT, onPromptChanged)
   })
 
@@ -83,7 +89,10 @@ export function useInstallPrompt() {
     const { outcome } = await e.userChoice
     window[PROMPT_KEY] = null
     canInstall.value   = false
-    if (outcome === 'accepted') isInstalled.value = true
+    if (outcome === 'accepted') {
+      localStorage.setItem(INSTALLED_LS_KEY, '1')
+      isInstalled.value = true
+    }
     window.dispatchEvent(new CustomEvent(PROMPT_EVENT))
   }
 
