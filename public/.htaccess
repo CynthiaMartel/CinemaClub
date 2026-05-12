@@ -27,3 +27,29 @@
     # 3. Todo lo demás (rutas de Vue Router) → Vue SPA
     RewriteRule ^ index.html [L]
 </IfModule>
+
+<IfModule mod_headers.c>
+    # HSTS: fuerza HTTPS durante 1 año incluyendo subdominios
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    # Evita clickjacking permitiendo enmarcado solo desde el mismo origen
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Evita MIME sniffing
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Referrer: origen completo en same-origin, solo origen en cross-origin
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Deshabilita explícitamente APIs del navegador que no usa la app
+    Header always set Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+
+    # CSP: reemplaza el "upgrade-insecure-requests" del servidor con una política completa
+    # - script-src: propio bundle + Cloudflare Turnstile (CAPTCHA)
+    # - style-src: propio CSS + Bootstrap Icons CDN + unsafe-inline para estilos de CKEditor
+    # - img-src: self + TMDB + data URIs + cualquier HTTPS (avatares de usuario externos)
+    # - font-src: Bootstrap Icons CDN + data URIs
+    # - frame-src: Cloudflare Turnstile crea un iframe interno para el challenge
+    # - worker-src: service worker (sw.js + workbox)
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https://image.tmdb.org https:; font-src 'self' https://cdn.jsdelivr.net data:; connect-src 'self'; worker-src 'self'; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'; upgrade-insecure-requests"
+</IfModule>
