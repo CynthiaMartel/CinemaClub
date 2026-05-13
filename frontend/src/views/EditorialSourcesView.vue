@@ -20,6 +20,74 @@ const editingId  = ref(null)
 const editForm   = ref({ name: '', url: '' })
 const isSaving   = ref(false)
 
+// ── Añadir fuente ────────────────────────────────────────────────────────────
+const showAddModal  = ref(false)
+const addStep       = ref(1)
+const isAnalyzing   = ref(false)
+const isCreating    = ref(false)
+const analyzeError  = ref('')
+const addForm = ref({
+  url: '', detectedUrl: '', name: '', type: 'scraping',
+  purpose: 'news', check_interval_hours: 12,
+  selector_config: { items: '', title: '', link: '', description: '' },
+})
+
+const openAddModal = () => {
+  addStep.value      = 1
+  analyzeError.value = ''
+  addForm.value      = {
+    url: '', detectedUrl: '', name: '', type: 'scraping',
+    purpose: 'news', check_interval_hours: 12,
+    selector_config: { items: '', title: '', link: '', description: '' },
+  }
+  showAddModal.value = true
+}
+
+const closeAddModal = () => { showAddModal.value = false }
+
+const analyzeUrl = async () => {
+  if (!addForm.value.url) return
+  isAnalyzing.value  = true
+  analyzeError.value = ''
+  try {
+    const { data } = await api.post('/editorial/sources/detect', { url: addForm.value.url }, { timeout: 20000 })
+    addForm.value.type = data.type
+    addForm.value.name = data.name || ''
+    if (data.type === 'rss') {
+      addForm.value.detectedUrl = data.detected_url
+    } else {
+      addForm.value.selector_config = data.selector_config ?? { items: '', title: '', link: '', description: '' }
+    }
+    addStep.value = 2
+  } catch (e) {
+    analyzeError.value = e.response?.data?.message || 'No se pudo analizar la URL. Comprueba que sea accesible.'
+  } finally {
+    isAnalyzing.value = false
+  }
+}
+
+const saveNewSource = async () => {
+  isCreating.value = true
+  try {
+    const payload = {
+      name:                 addForm.value.name,
+      url:                  addForm.value.type === 'rss' ? addForm.value.detectedUrl : addForm.value.url,
+      type:                 addForm.value.type,
+      purpose:              addForm.value.purpose,
+      check_interval_hours: Number(addForm.value.check_interval_hours),
+      selector_config:      addForm.value.type === 'scraping' ? addForm.value.selector_config : null,
+    }
+    const { data } = await api.post('/editorial/sources', payload)
+    sources.value.push(data.data)
+    showToast(data.message)
+    closeAddModal()
+  } catch {
+    showToast('Error al crear la fuente.', 'error')
+  } finally {
+    isCreating.value = false
+  }
+}
+
 const fmtDate = (d) => d
   ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   : 'Nunca'
@@ -122,12 +190,15 @@ onMounted(() => {
         <h1 class="text-xl sm:text-2xl font-black uppercase tracking-wider text-white">Fuentes de noticias</h1>
         <p class="text-[10px] text-slate-500 mt-1 uppercase tracking-widest">Cine canario — rastreo automático</p>
       </div>
-      <button
-        class="text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-white transition-colors whitespace-nowrap self-start"
-        @click="router.push({ name: 'editorial-inbox' })"
-      >
-        ← Inbox editorial
-      </button>
+      <div class="flex items-center gap-3">
+        <button class="btn-add-source" @click="openAddModal">+ Nueva fuente</button>
+        <button
+          class="text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-white transition-colors whitespace-nowrap"
+          @click="router.push({ name: 'editorial-inbox' })"
+        >
+          ← Inbox editorial
+        </button>
+      </div>
     </div>
 
     <!-- ── Descripción ───────────────────────────────────────────────── -->
@@ -319,6 +390,110 @@ onMounted(() => {
       </table>
     </div>
 
+    <!-- ── Modal — añadir fuente ────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showAddModal" class="modal-backdrop" @click.self="closeAddModal">
+          <div class="modal-box">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-5">
+              <h2 class="text-sm font-black uppercase tracking-wider text-white">Nueva fuente</h2>
+              <button class="text-slate-500 hover:text-white transition-colors text-lg leading-none" @click="closeAddModal">✕</button>
+            </div>
+
+            <!-- ── Paso 1: introducir URL ── -->
+            <template v-if="addStep === 1">
+              <p class="text-[11px] text-slate-500 mb-4">Introduce la URL de la web o feed. El sistema detectará automáticamente si tiene RSS o necesita scraping.</p>
+              <label class="modal-label">URL de la fuente</label>
+              <input
+                v-model="addForm.url"
+                class="modal-input mb-1"
+                type="url"
+                placeholder="https://ejemplo.com/noticias"
+                @keydown.enter="analyzeUrl"
+                autofocus
+              />
+              <p v-if="analyzeError" class="text-[11px] text-red-400 mt-2 mb-0">{{ analyzeError }}</p>
+              <div class="flex justify-end mt-4">
+                <button class="btn-modal-primary" :disabled="!addForm.url || isAnalyzing" @click="analyzeUrl">
+                  <svg v-if="isAnalyzing" class="spinner mr-1.5" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                  </svg>
+                  {{ isAnalyzing ? 'Analizando…' : 'Analizar URL' }}
+                </button>
+              </div>
+            </template>
+
+            <!-- ── Paso 2: confirmar y guardar ── -->
+            <template v-else>
+              <!-- Resultado de detección -->
+              <div class="detection-result mb-5">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="badge-type" :class="typeColor(addForm.type)">{{ typeLabel(addForm.type) }}</span>
+                  <span class="text-[11px] text-slate-400">detectado automáticamente</span>
+                </div>
+                <p v-if="addForm.type === 'rss'" class="text-[10px] text-slate-500 truncate">Feed: {{ addForm.detectedUrl }}</p>
+                <p v-else class="text-[10px] text-slate-500 truncate">Página: {{ addForm.url }}</p>
+              </div>
+
+              <!-- Nombre -->
+              <label class="modal-label">Nombre de la fuente</label>
+              <input v-model="addForm.name" class="modal-input mb-3" placeholder="Nombre descriptivo" />
+
+              <!-- Tipo manual (por si la detección no fue perfecta) -->
+              <div class="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label class="modal-label">Tipo</label>
+                  <select v-model="addForm.type" class="modal-input">
+                    <option value="rss">RSS / Atom</option>
+                    <option value="scraping">Scraping HTML</option>
+                    <option value="sitemap">Sitemap XML</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="modal-label">Propósito</label>
+                  <select v-model="addForm.purpose" class="modal-input">
+                    <option value="news">Noticias</option>
+                    <option value="events">Actividades / Eventos</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Intervalo -->
+              <label class="modal-label">Frecuencia de rastreo (horas)</label>
+              <input v-model.number="addForm.check_interval_hours" class="modal-input mb-3" type="number" min="1" max="168" />
+
+              <!-- Selectores CSS (solo scraping) -->
+              <template v-if="addForm.type === 'scraping'">
+                <p class="text-[10px] text-slate-500 mb-2 mt-1">Selectores CSS para extraer los artículos:</p>
+                <div class="selector-grid">
+                  <div v-for="field in ['items', 'title', 'link', 'description']" :key="field">
+                    <label class="modal-label capitalize">{{ field }}</label>
+                    <input v-model="addForm.selector_config[field]" class="modal-input" :placeholder="field === 'items' ? 'article, .post' : 'h2 a, h3 a'" />
+                  </div>
+                </div>
+              </template>
+
+              <!-- Acciones -->
+              <div class="flex items-center justify-between mt-5">
+                <button class="text-[10px] text-slate-500 hover:text-slate-300 transition-colors uppercase tracking-wider font-bold" @click="addStep = 1">← Volver</button>
+                <button class="btn-modal-primary" :disabled="!addForm.name || isCreating" @click="saveNewSource">
+                  <svg v-if="isCreating" class="spinner mr-1.5" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                  </svg>
+                  {{ isCreating ? 'Guardando…' : 'Guardar fuente' }}
+                </button>
+              </div>
+            </template>
+
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- ── Toast ──────────────────────────────────────────────────────── -->
     <Transition name="toast">
       <div
@@ -488,4 +663,54 @@ button.status-badge.paused:hover { background: rgb(71 85 105 / 0.5); color: #94a
 /* ── Toast ──────────────────────────────────────────────────── */
 .toast-enter-active, .toast-leave-active { transition: all 250ms ease; }
 .toast-enter-from, .toast-leave-to       { opacity: 0; transform: translateY(8px); }
+
+/* ── Botón nueva fuente ─────────────────────────────────────── */
+.btn-add-source {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+  padding: 5px 14px; border-radius: 7px; cursor: pointer; white-space: nowrap;
+  background: rgb(99 102 241 / 0.15); color: #a5b4fc;
+  border: 1px solid rgb(99 102 241 / 0.3); transition: all 150ms;
+}
+.btn-add-source:hover { background: rgb(99 102 241 / 0.28); border-color: rgb(99 102 241 / 0.5); color: #c7d2fe; }
+
+/* ── Modal ──────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgb(0 0 0 / 0.65); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.modal-box {
+  background: #0f172a; border: 1px solid rgb(51 65 85 / 0.6);
+  border-radius: 16px; padding: 24px 28px; width: 100%; max-width: 480px;
+  box-shadow: 0 25px 60px rgb(0 0 0 / 0.5);
+}
+.modal-label {
+  display: block; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  color: #64748b; margin-bottom: 4px;
+}
+.modal-input {
+  display: block; width: 100%;
+  background: rgb(30 41 59 / 0.8); border: 1px solid rgb(51 65 85 / 0.5);
+  border-radius: 7px; color: #e2e8f0; font-size: 12px;
+  padding: 7px 10px; outline: none; transition: border-color 150ms;
+}
+.modal-input:focus { border-color: #6366f1; }
+select.modal-input { cursor: pointer; }
+.btn-modal-primary {
+  display: inline-flex; align-items: center;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+  padding: 6px 16px; border-radius: 7px; cursor: pointer; white-space: nowrap;
+  background: rgb(99 102 241 / 0.2); color: #a5b4fc;
+  border: 1px solid rgb(99 102 241 / 0.4); transition: all 150ms;
+}
+.btn-modal-primary:hover:not(:disabled) { background: rgb(99 102 241 / 0.35); color: #c7d2fe; }
+.btn-modal-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.detection-result {
+  background: rgb(30 41 59 / 0.5); border: 1px solid rgb(51 65 85 / 0.4);
+  border-radius: 8px; padding: 10px 14px;
+}
+.selector-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.modal-enter-active, .modal-leave-active { transition: all 200ms ease; }
+.modal-enter-from, .modal-leave-to       { opacity: 0; transform: scale(0.97); }
 </style>
