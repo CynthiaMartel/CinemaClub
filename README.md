@@ -1,61 +1,131 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# CinemaClub
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Plataforma social de cine canario. Backend en **Laravel 12** + frontend SPA en **Vue 3 + Vite**.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Stack
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Capa | Tecnología |
+|---|---|
+| Backend | Laravel 12, PHP 8.3, Sanctum |
+| Frontend | Vue 3, Vite, Tailwind CSS, Pinia |
+| Base de datos | MySQL / TiDB Cloud |
+| Imágenes | Cloudinary |
+| IA editorial | OpenAI GPT-4o-mini |
+| Películas | TMDB API |
+| Traducción | Azure Translator |
+| Deploy | Hostinger (SSH puerto 65002) |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## Setup local
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Requisitos
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+- PHP 8.3+ con extensiones: `pdo_mysql`, `mbstring`, `openssl`, `xml`, `curl`
+- Composer 2+
+- Node 20+
+- MySQL 8+ (o acceso a TiDB Cloud)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### 1. Clonar e instalar dependencias
 
-## Laravel Sponsors
+```bash
+git clone <repo-url> cinemaclub
+cd cinemaclub
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+composer install
+cd frontend && npm install && cd ..
+```
 
-### Premium Partners
+### 2. Configurar entorno
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-## Contributing
+Edita `.env` y rellena al menos:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| Variable | Descripción |
+|---|---|
+| `DB_*` | Credenciales MySQL local |
+| `CLOUDINARY_URL` + `CLOUDINARY_CLOUD_NAME` | Panel de Cloudinary |
+| `OPENAI_API_KEY` | Necesaria para el panel editorial (IA) |
+| `TMDB_API_KEY` | Metadatos de películas |
+| `SANCTUM_STATEFUL_DOMAINS` | Dominio del frontend (`localhost:5173`) |
+| `FRONTEND_URL` | URL del frontend para CORS y emails |
 
-## Code of Conduct
+### 3. Base de datos
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+php artisan migrate
+php artisan db:seed          # Solo en desarrollo — ver nota abajo
+```
 
-## Security Vulnerabilities
+> **Nota sobre los seeders:** `NewsSourceSeeder` y `EventSourcesSeeder` tienen una guardia que impide ejecutarse en producción (`APP_ENV=production`). En producción, gestiona las fuentes desde el panel editorial.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 4. Arrancar
 
-## License
+```bash
+# Terminal 1 — backend
+php artisan serve --port=8001
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Terminal 2 — frontend
+cd frontend && npm run dev
+
+# Terminal 3 — cola de trabajos (scraping, IA, etc.)
+php artisan queue:work
+```
+
+Frontend disponible en `http://localhost:5173`.
+
+---
+
+## Estructura del proyecto
+
+```
+app/
+  Http/Controllers/     # API REST (Films, Editorial, Auth, Events…)
+  Models/               # Eloquent (User, Film, NewsSource, NewsItem…)
+  Jobs/                 # Cola: scraping, RSS, procesamiento IA
+database/
+  migrations/           # 43 migraciones en orden cronológico
+  seeders/              # Solo para desarrollo local
+frontend/
+  src/
+    views/              # Vistas Vue (HomeView, EditorialInboxView…)
+    stores/             # Pinia (auth, films…)
+    services/           # api.js (Axios configurado con Sanctum)
+routes/
+  api.php               # Rutas API REST
+  console.php           # Scheduler (scraping c/2h, IA c/1h)
+```
+
+---
+
+## Panel editorial
+
+El panel (`/editorial`) permite a admins y editores:
+
+1. Ver noticias capturadas automáticamente por fuentes RSS y scraping
+2. Procesarlas con IA (resumen, relevancia, categoría, entidades canarias)
+3. Aprobar, rechazar o convertirlas en borradores de artículo
+4. Gestionar fuentes — añadir nuevas con **auto-detección RSS vs scraping**
+
+El scheduler ejecuta `CheckNewsSourcesJob` cada 2 horas y `ProcessNewsItemWithAIJob` cada hora.
+
+---
+
+## Deploy (Hostinger)
+
+```bash
+ssh u767148652@46.202.172.42 -p 65002
+cd ~/domains/filmoclub.org/laravel
+```
+
+O usando el script incluido:
+
+```bash
+./deploy.sh
+```
