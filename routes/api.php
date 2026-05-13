@@ -540,6 +540,8 @@ Route::prefix('editorial')->group(function () {
 
     // Sources: listado, rastreo manual, rastreo global, edición y toggle activa/pausada
     Route::get('/sources',                     [EditorialController::class, 'sources']);
+    Route::post('/sources',                    [EditorialController::class, 'createSource']);
+    Route::post('/sources/detect',             [EditorialController::class, 'detectSource']);
     Route::post('/sources/check-all',          [EditorialController::class, 'checkAll']);
     Route::post('/sources/{id}/check-now',     [EditorialController::class, 'checkNow']);
     Route::patch('/sources/{id}/toggle',       [EditorialController::class, 'toggleSource']);

@@ -335,6 +335,101 @@ class EditorialController extends Controller
     }
 
     /**
+     * POST /api/editorial/sources/detect
+     * Analiza una URL y detecta si tiene RSS o hay que hacer scraping.
+     * Body: { "url": "https://..." }
+     */
+    public function detectSource(Request $request): JsonResponse
+    {
+        if ($err = $this->authorizeEditor()) return $err;
+
+        $validated = $request->validate(['url' => 'required|url|max:500']);
+        $url       = rtrim($validated['url'], '/');
+
+        try {
+            $client = new \GuzzleHttp\Client([
+                'timeout'         => 15,
+                'connect_timeout' => 8,
+                'verify'          => false,
+                'headers'         => ['User-Agent' => 'CinemaClub-Bot/1.0 (cinemaclub.es)'],
+                'allow_redirects' => ['max' => 5],
+            ]);
+            $html = (string) $client->get($url)->getBody();
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => 0,
+                'message' => 'No se pudo acceder a la URL: ' . $e->getMessage(),
+            ], 422);
+        }
+
+        $name   = $this->extractPageTitle($html) ?: parse_url($url, PHP_URL_HOST);
+        $rssUrl = $this->findRssLinkInHtml($html, $url) ?? $this->probeRssPaths($url, $client);
+
+        if ($rssUrl) {
+            return response()->json([
+                'success'      => 1,
+                'type'         => 'rss',
+                'detected_url' => $rssUrl,
+                'name'         => $name,
+            ]);
+        }
+
+        return response()->json([
+            'success'         => 1,
+            'type'            => 'scraping',
+            'name'            => $name,
+            'selector_config' => $this->suggestSelectors($html),
+        ]);
+    }
+
+    /**
+     * POST /api/editorial/sources
+     * Crea una nueva fuente editorial.
+     */
+    public function createSource(Request $request): JsonResponse
+    {
+        if ($err = $this->authorizeEditor()) return $err;
+
+        $validated = $request->validate([
+            'name'                 => 'required|string|max:255',
+            'url'                  => 'required|url|max:500',
+            'type'                 => 'required|in:rss,scraping,sitemap',
+            'purpose'              => 'nullable|in:news,events',
+            'check_interval_hours' => 'nullable|integer|min:1|max:168',
+            'selector_config'      => 'nullable|array',
+        ]);
+
+        $source = NewsSource::create([
+            'name'                 => $validated['name'],
+            'url'                  => $validated['url'],
+            'type'                 => $validated['type'],
+            'purpose'              => $validated['purpose'] ?? 'news',
+            'check_interval_hours' => $validated['check_interval_hours'] ?? 12,
+            'is_active'            => true,
+            'selector_config'      => $validated['selector_config'] ?? null,
+        ]);
+
+        return response()->json([
+            'success' => 1,
+            'message' => "Fuente \"{$source->name}\" creada correctamente.",
+            'data'    => [
+                'id'                   => $source->id,
+                'name'                 => $source->name,
+                'url'                  => $source->url,
+                'type'                 => $source->type,
+                'is_active'            => $source->is_active,
+                'check_interval_hours' => $source->check_interval_hours,
+                'last_checked_at'      => null,
+                'items_today'          => 0,
+                'total_items'          => 0,
+                'needs_review'         => false,
+                'failed_attempts'      => 0,
+                'last_error'           => null,
+            ],
+        ], 201);
+    }
+
+    /**
      * PATCH /api/editorial/sources/{id}/toggle
      * Activa/pausa una fuente.
      */
@@ -353,6 +448,77 @@ class EditorialController extends Controller
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────
+
+    private function extractPageTitle(string $html): string
+    {
+        if (preg_match('/<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)["\']/i', $html, $m)) {
+            return trim(html_entity_decode($m[1], ENT_QUOTES, 'UTF-8'));
+        }
+        if (preg_match('/<title[^>]*>([^<]+)<\/title>/i', $html, $m)) {
+            return trim(html_entity_decode($m[1], ENT_QUOTES, 'UTF-8'));
+        }
+        return '';
+    }
+
+    private function findRssLinkInHtml(string $html, string $baseUrl): ?string
+    {
+        $patterns = [
+            '/<link[^>]+type=["\']application\/(?:rss|atom)\+xml["\'][^>]+href=["\']([^"\']+)["\']/i',
+            '/<link[^>]+href=["\']([^"\']+)["\'][^>]+type=["\']application\/(?:rss|atom)\+xml["\']/i',
+        ];
+        foreach ($patterns as $pat) {
+            if (preg_match($pat, $html, $m)) {
+                return $this->toAbsoluteUrl($m[1], $baseUrl);
+            }
+        }
+        return null;
+    }
+
+    private function probeRssPaths(string $baseUrl, \GuzzleHttp\Client $client): ?string
+    {
+        $root  = parse_url($baseUrl, PHP_URL_SCHEME) . '://' . parse_url($baseUrl, PHP_URL_HOST);
+        $paths = ['/feed', '/rss', '/rss.xml', '/feed.xml', '/atom.xml', '/feed/rss2'];
+        foreach ($paths as $path) {
+            try {
+                $body = (string) $client->get($root . $path, ['timeout' => 5])->getBody();
+                if (str_contains($body, '<rss') || str_contains($body, '<feed') || str_contains($body, '<channel>')) {
+                    return $root . $path;
+                }
+            } catch (\Throwable) {
+                // sigue probando
+            }
+        }
+        return null;
+    }
+
+    private function suggestSelectors(string $html): array
+    {
+        // Detecta el contenedor de artículos más probable
+        $knownClasses = ['caja-evento', 'entrada-novedad', 'asset-abstract', 'news-item', 'article-item', 'post-item', 'entry-item'];
+        $items = 'article, .entry, .post, .item';
+        foreach ($knownClasses as $cls) {
+            if (str_contains($html, "class=\"$cls") || str_contains($html, "class='$cls")) {
+                $items = ".$cls";
+                break;
+            }
+        }
+        if ($items === 'article, .entry, .post, .item' && substr_count($html, '<article') > 2) {
+            $items = 'article';
+        }
+        return [
+            'items'       => $items,
+            'title'       => 'h1 a, h2 a, h3 a, .titulo, .title',
+            'link'        => 'h1 a, h2 a, h3 a, a',
+            'description' => '.excerpt, .intro, .description, .resumen, p',
+        ];
+    }
+
+    private function toAbsoluteUrl(string $url, string $base): string
+    {
+        if (str_starts_with($url, 'http')) return $url;
+        $root = parse_url($base, PHP_URL_SCHEME) . '://' . parse_url($base, PHP_URL_HOST);
+        return $root . (str_starts_with($url, '/') ? $url : '/' . $url);
+    }
 
     private function buildPostContent(string $summary, string $sourceUrl, string $sourceName): string
     {
