@@ -119,13 +119,5 @@ El scheduler ejecuta `CheckNewsSourcesJob` cada 2 horas y `ProcessNewsItemWithAI
 
 ## Deploy (Hostinger)
 
-```bash
-ssh u767148652@46.202.172.42 -p 65002
-cd ~/domains/filmoclub.org/laravel
-```
 
-O usando el script incluido:
-
-```bash
-./deploy.sh
 ```
