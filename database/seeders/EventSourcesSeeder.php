@@ -34,6 +34,11 @@ class EventSourcesSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            $this->command->error('EventSourcesSeeder no se ejecuta en producción (usa el panel editorial para gestionar fuentes).');
+            return;
+        }
+
         NewsSource::where('purpose', 'events')->delete();
 
         $sources = [

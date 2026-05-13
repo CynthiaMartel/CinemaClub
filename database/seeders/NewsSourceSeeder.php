@@ -29,6 +29,11 @@ class NewsSourceSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            $this->command->error('NewsSourceSeeder no se ejecuta en producción (usa el panel editorial para gestionar fuentes).');
+            return;
+        }
+
         \DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         NewsSource::truncate();
         \App\Models\NewsItem::truncate();
@@ -163,6 +168,44 @@ class NewsSourceSeeder extends Seeder
             ],
 
             // ════════════════════════════════════════════════
+            //  SCRAPING LIFERAY — CCA Gran Canaria
+            //  Sin RSS. HTML estático servido por Liferay CMS.
+            //  Verificado 2026-05-13: selectores extraídos del HTML real.
+            // ════════════════════════════════════════════════
+
+            [
+                'name'                 => 'CCA Gran Canaria — Noticias',
+                'url'                  => 'https://cca.grancanaria.com/noticias',
+                'type'                 => 'scraping',
+                'purpose'              => 'news',
+                'check_interval_hours' => 12,
+                'is_active'            => true,
+                'selector_config'      => [
+                    // Liferay AssetPublisher: cada noticia en div.caja-evento
+                    'items'       => 'div.caja-evento',
+                    'title'       => 'span.titulo',
+                    'link'        => 'a',
+                    'description' => 'div.intro-evento',
+                ],
+            ],
+
+            [
+                'name'                 => 'CCA Gran Canaria — Actividades',
+                'url'                  => 'https://cca.grancanaria.com/actividades',
+                'type'                 => 'scraping',
+                'purpose'              => 'events',
+                'check_interval_hours' => 24,
+                'is_active'            => true,
+                'selector_config'      => [
+                    // Liferay AssetPublisher: cada actividad en div.entrada-novedad
+                    'items'       => 'div.entrada-novedad',
+                    'title'       => 'h1',
+                    'link'        => 'a',
+                    'description' => 'p',
+                ],
+            ],
+
+            // ════════════════════════════════════════════════
             //  SCRAPING GOV/JS — Estructura compleja
             //  Se intentará con Guzzle estático.
             //  Si el HTML no contiene los selectores → fallará y se marcará
@@ -230,6 +273,7 @@ class NewsSourceSeeder extends Seeder
         $this->command->line('  RSS verificados: Muestra Lanzarote ✓, LPA Film Festival ✓');
         $this->command->line('  RSS a verificar en prod: Animayo, Isla Calavera, De Sal y Lava, CAC');
         $this->command->line('  Scraping estático: TEA Tenerife, lpacultura, Isla Calavera (fallback)');
+        $this->command->line('  Scraping Liferay: CCA Gran Canaria Noticias, CCA Gran Canaria Actividades');
         $this->command->line('  Scraping Gov/JS: Guiniguada, Filmoteca Canaria, Teatro Leal');
         $this->command->line('');
         $this->command->warn('  Para las fuentes Gov/JS con contenido dinámico instala Browsershot:');
